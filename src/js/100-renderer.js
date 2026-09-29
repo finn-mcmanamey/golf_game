@@ -9,9 +9,15 @@ const GLSLN=`float hsh(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.
 float vno(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hsh(i),hsh(i+vec2(1.0,0.0)),f.x),mix(hsh(i+vec2(0.0,1.0)),hsh(i+vec2(1.0,1.0)),f.x),f.y);}`;
 const SHADOWF=`uniform mat4 uLVP;uniform sampler2D uShadow;uniform vec2 uSmTex;uniform float uShadowK,uPcf;
 float unpackD(vec4 c){return dot(c,vec4(1.0,1.0/255.0,1.0/65025.0,1.0/16581375.0));}
+float shTap(vec2 uv,float z){return step(z,unpackD(texture2D(uShadow,uv)));}
+float shBil(vec2 uv,float z){vec2 t=uv/uSmTex-0.5,f=fract(t),b=(floor(t)+0.5)*uSmTex;return mix(mix(shTap(b,z),shTap(b+vec2(uSmTex.x,0.0),z),f.x),mix(shTap(b+vec2(0.0,uSmTex.y),z),shTap(b+uSmTex,z),f.x),f.y);}
 float shadowAt(vec3 w,vec3 n){if(uShadowK<=0.0)return 1.0;vec4 lp=uLVP*vec4(w+n*0.22,1.0);vec3 p=lp.xyz/lp.w*0.5+0.5;if(p.x<0.0||p.x>1.0||p.y<0.0||p.y>1.0||p.z>1.0)return 1.0;
-float s=0.0,m=9.0;for(int i=-1;i<=1;i++)for(int j=-1;j<=1;j++){s+=step(p.z-0.0011,unpackD(texture2D(uShadow,p.xy+vec2(float(i),float(j))*uSmTex)));}
-if(uPcf>1.5){for(int i=-2;i<=2;i++){s+=step(p.z-0.0011,unpackD(texture2D(uShadow,p.xy+vec2(float(i),-2.0)*uSmTex)))+step(p.z-0.0011,unpackD(texture2D(uShadow,p.xy+vec2(float(i),2.0)*uSmTex)));}for(int j=-1;j<=1;j++){s+=step(p.z-0.0011,unpackD(texture2D(uShadow,p.xy+vec2(-2.0,float(j))*uSmTex)))+step(p.z-0.0011,unpackD(texture2D(uShadow,p.xy+vec2(2.0,float(j))*uSmTex)));}m=25.0;}return 1.0-uShadowK*(1.0-s/m);}`;
+float z=p.z-(0.0006+0.0012*(1.0-clamp(dot(n,uSun),0.0,1.0))),s=0.0;
+if(uPcf>1.5){float a=6.2831853*fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453),ca=cos(a),sa=sin(a);mat2 r=mat2(ca,sa,-sa,ca);
+vec2 P[8];P[0]=vec2(-0.94,-0.40);P[1]=vec2(0.95,-0.77);P[2]=vec2(-0.09,-0.93);P[3]=vec2(0.34,0.29);P[4]=vec2(-0.92,0.46);P[5]=vec2(0.60,0.95);P[6]=vec2(-0.26,0.82);P[7]=vec2(0.82,-0.07);
+for(int i=0;i<8;i++)s+=shBil(p.xy+r*P[i]*2.2*uSmTex,z);s/=8.0;}
+else{for(int i=0;i<2;i++)for(int j=0;j<2;j++)s+=shBil(p.xy+(vec2(float(i),float(j))-0.5)*1.5*uSmTex,z);s/=4.0;}
+return 1.0-uShadowK*(1.0-s);}`;
 const PS=prog(`precision highp float;attribute vec3 aP,aN;attribute vec4 aC;uniform mat4 uVP,uM;uniform float uT,uFlut;varying vec3 vN,vC,vW;varying float vM;
 void main(){vec3 p=aP;float m=aC.a*3.984375;if(m>=2.0){float k=m-2.0;p.z+=(sin(uT*8.0+aP.x*6.0)*.12+cos(uT*2.7)*.04)*k*uFlut;p.y-=k*k*.05;}
 vec4 w=uM*vec4(p,1.0);vW=w.xyz;vN=normalize(mat3(uM)*aN);vC=aC.rgb*1.25;vM=m;gl_Position=uVP*w;}`,
@@ -99,7 +105,7 @@ const ID=M4.I(),cam={x:0,y:5,z:-10,tx:0,ty:0,tz:0,fov:55*DEG,fogK:.0012},VP={m:n
 const FR={};
 const GFX={level:('ontouchstart'in window)?1:2,shadows:true,post:!('ontouchstart'in window),refl:false,bloom:!('ontouchstart'in window),sm:('ontouchstart'in window)?1024:2048,names:['Low','Medium','High','Ultra']};
 function gfxSet(l,quiet){GFX.level=l;GFX.shadows=l>=1;GFX.post=l>=2;GFX.refl=l>=3;GFX.bloom=l>=2;GFX.sm=l>=2?(('ontouchstart'in window)?1024:2048):1024;if(SM.tex){gl.deleteFramebuffer(SM.fb);gl.deleteTexture(SM.tex);gl.deleteRenderbuffer(SM.rb);SM.tex=null}try{VS.setItem('voxellinks.gfx',l)}catch(e){}
-  if(l>=3)GFX.sm=gl.getParameter(gl.MAX_TEXTURE_SIZE)>=SHADOW_ULTRA?SHADOW_ULTRA:2048;GRASS.key='';/* E-4 */
+  if(l>=3||l===2&&!('ontouchstart'in window))GFX.sm=gl.getParameter(gl.MAX_TEXTURE_SIZE)>=SHADOW_ULTRA?SHADOW_ULTRA:2048;GRASS.key='';/* E-4 */
   if(W&&W.meshes&&W.meshes.terrain){freeMeshes(W);buildMeshes(W)}if(!quiet)hint('Graphics: '+GFX.names[l]+(l===0?' (no shadows)':l===1?' (shadows)':l===2?' (shadows, bloom, anti-aliasing, graded light)':' (reflections, grass at your feet, volumetric clouds, soft shadows)'),2.2)}
 const SM={tex:null},PPB={tex:null,w:0,h:0};
 function fboMake(w,h){const fb=gl.createFramebuffer(),tex=gl.createTexture(),rb=gl.createRenderbuffer();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
