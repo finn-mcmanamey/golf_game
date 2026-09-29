@@ -4,7 +4,7 @@ if(!gl){document.body.innerHTML='<p style="padding:40px;text-align:center">This 
 function prog(vs,fs){const mk=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(o));return o};
   const p=gl.createProgram();gl.attachShader(p,mk(gl.VERTEX_SHADER,vs));gl.attachShader(p,mk(gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
   const u={};for(let i=0,n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);i<n;i++){const nm=gl.getActiveUniform(p,i).name;u[nm]=gl.getUniformLocation(p,nm)}return{p,u}}
-const LIGHT=`float sh=shadowAt(vW,n);float dl=max(dot(n,uSun),0.0)*sh;vec3 amb=mix(uGnd,uSky,n.y*0.5+0.5);vec3 col=c*(amb*0.52+0.14+0.72*dl*uLight*vec3(1.05,1.0,0.92));`,FOGC=`float hf=exp(-max(vW.y-uFogH,0.0)*0.10)*uFogA;float f=clamp(1.0-exp(-distance(uEye,vW)*uFogK*(1.0+hf*2.2)),0.0,1.0);vec3 fgc=uFog+uLight*vec3(0.22,0.13,0.04)*pow(max(dot(normalize(vW-uEye),uSun),0.0),6.0)*(1.0-clamp(uSun.y*1.6,0.0,1.0));`;
+const LIGHT=`float sh=shadowAt(vW,n);float dl=clamp((dot(n,uSun)+0.18)/1.18,0.0,1.0)*sh;vec3 amb=mix(uGnd,uSky,n.y*0.5+0.5);vec3 col=c*(amb*0.52+0.14+0.72*dl*uLight*vec3(1.05,1.0,0.92));`,FOGC=`float hf=exp(-max(vW.y-uFogH,0.0)*0.10)*uFogA;float f=clamp(1.0-exp(-max(distance(uEye,vW)-25.0,0.0)*uFogK*(1.0+hf*2.2)),0.0,1.0);vec3 fgc=uFog+uLight*vec3(0.22,0.13,0.04)*pow(max(dot(normalize(vW-uEye),uSun),0.0),6.0)*(1.0-clamp(uSun.y*1.6,0.0,1.0));`;
 const GLSLN=`float hsh(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float vno(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hsh(i),hsh(i+vec2(1.0,0.0)),f.x),mix(hsh(i+vec2(0.0,1.0)),hsh(i+vec2(1.0,1.0)),f.x),f.y);}`;
 const SHADOWF=`uniform mat4 uLVP;uniform sampler2D uShadow;uniform vec2 uSmTex;uniform float uShadowK,uPcf;
@@ -142,7 +142,7 @@ function render(t){camKick();try{return render_(t)}finally{camUnkick()}}function
   FR.vp=vp;FR.eye=[cam.x,cam.y,cam.z];FR.fog=fog;FR.fogK=cam.fogK*(W&&W.fogMul||1);FR.t=t;FR.sun=SU;FR.light=light;FR.skyA=[sky[0]*.8+.25,sky[1]*.8+.25,sky[2]*.8+.25];FR.gnd=[fog[0]*.55,fog[1]*.5,fog[2]*.42];
   const wf=W&&W.cv>=3&&W.swell?windAt(curTick()):1,dr=W&&!rmOn()?windDrift(Math.max(0,S.t-(W.tLoad||0)))*CLOUDS.drift:0;FR.cox=W?(W.wind.x||0)*dr:0;FR.coz=W?(W.wind.z||0)*dr:0;FR.sway=W?.35+.12*Math.min((W.wind.s||0)*wf,6):0;FR.wnd=wnd19(wf);FR.flut=wf;const flat=W&&W.wea&&W.wea.flat;FR.cloudShadow=!flat;
   FR.shadowK=0;if(ready&&GFX.shadows&&shadowPass(SU))FR.shadowK=flat?.3:.7;
-  const clk=W&&W.clock;FR.fogH=W?(W.hlow!=null?W.hlow:0)+1.5:0;FR.fogA=!W?0:clk==null?.25:flat?.5:clk<11?lerp(.6,.12,(clk-8)/3):clk>15.5?lerp(.12,.45,(clk-15.5)/2):.12;
+  const clk=W&&W.clock;FR.fogH=W?(W.hlow!=null?W.hlow:0)+1.5:0;FR.fogA=!W?0:clk==null?.25:flat?.5:clk<11?lerp(.45,.12,(clk-8)/3):clk>15.5?lerp(.12,.45,(clk-15.5)/2):.12;
   FR.clip=-1e9;FR.reflOn=0;const toFbo=GFX.post&&PPB.tex;
   if(ready&&toFbo&&GFX.refl&&W.PD.length){const L=reflLevel();if(L!=null&&reflPass(L,t,sky,fog,light,flat)){FR.reflOn=1}}
   gl.bindFramebuffer(gl.FRAMEBUFFER,toFbo?PPB.fb:null);gl.viewport(0,0,VP.w,VP.h);if(toFbo){gl.depthMask(true);gl.clear(gl.DEPTH_BUFFER_BIT)}
