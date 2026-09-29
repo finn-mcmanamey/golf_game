@@ -1,0 +1,14 @@
+/* ===== S-6 recover and tell: a frame that throws is caught and the loop goes on; the round comes back from its last save; a one-line notice carries the bug code; three errors inside ERR_WINDOW drop a graphics tier; a lost graphics context holds the round, then reloads into it ===== */
+function s6Note(txt,btn,fn){if(typeof document==='undefined'||!document.body)return;let el=document.getElementById('errNote');
+  if(!el){el=document.createElement('div');el.id='errNote';el.style.cssText='position:fixed;bottom:8px;left:50%;transform:translateX(-50%);z-index:61;max-width:min(94vw,720px);padding:7px 12px;border-radius:10px;background:color-mix(in srgb,var(--g950) 94%,transparent);color:var(--white);font:13px/1.35 system-ui,sans-serif;display:flex;gap:10px;align-items:center';el.innerHTML='<span id="errNoteT"></span><button class="sec" id="errNoteB"></button><button class="sec" id="errNoteX" title="Hide">×</button>';document.body.appendChild(el);document.getElementById('errNoteX').onclick=()=>{el.style.display='none'}}
+  document.getElementById('errNoteT').textContent=txt;const b=document.getElementById('errNoteB');b.style.display=btn?'':'none';b.textContent=btn||'';b.onclick=fn||null;el.style.display='flex'}
+function s6Catch(e){const now=performance.now();errNote(e&&e.message||e,e&&e.stack);S6.t=S6.t.filter(t=>now-t<ERR_WINDOW);S6.t.push(now);let tier='';
+  if(S6.t.length>=3&&GFX.level>0){S6.t=[];try{gfxSet(GFX.level-1,true);tier=' · graphics down a tier'}catch(x){}}
+  let back='';if(!S6.busy&&S.mode!=='title'&&!S.bug&&!S.replay&&!S.lab&&!S.range&&loadSave()){S6.busy=true;try{continueRound();back=' · the round is back from its last save'}catch(x){errNote(x&&x.message||x,x&&x.stack)}finally{S6.busy=false}}
+  const say=code=>s6Note('Something went wrong'+back+tier+(code?' · bug code '+code.slice(0,16)+'…':''),'Copy bug code',()=>bugKey());say(null);try{bugEncode(bugState()).then(c=>{S.lastBug=c;say(c)},()=>{})}catch(x){}}
+/* the frame, guarded: in a browser a throw is caught and recovered; headless (no window frame loop) it is thrown, so the suite still sees it */
+function frame(now){try{frame_(now)}catch(e){if(typeof window==='undefined'||typeof window.requestAnimationFrame!=='function')throw e;s6Catch(e)}}
+function s6Gl(){if(typeof cv==='undefined'||!cv.addEventListener)return;cv.addEventListener('webglcontextlost',e=>{e.preventDefault();pzHold(true,'gl');try{if(S.mode!=='title'&&!S.bug)saveRound()}catch(x){}s6Note('The graphics card reset · rebuilding the scene…')},false);
+  cv.addEventListener('webglcontextrestored',()=>{VS.setItem('voxellinks.autoresume','1');location.reload()},false)}
+/* after a reload for a lost context, straight back into the round */
+function s6Boot(){s6Gl();if(VS.getItem('voxellinks.autoresume')==='1'){VS.removeItem('voxellinks.autoresume');if(loadSave()){continueRound();s6Note('The graphics card reset · the round is back where it was')}}}

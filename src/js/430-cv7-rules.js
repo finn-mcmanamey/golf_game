@@ -1,0 +1,29 @@
+/* ===== course version 7, the rules and the physics (v5 M2): F-087 wind by height, F-089 the stroke cap of ten, F-093's ninth surface (the path) with a deterministic free drop, obstacle collisions (walls, rocks, pot faces) and canopies that pass by species density. Versions 0–6 keep their rules: every change is behind W.cv>=7 ===== */
+const WIND_GRADIENT=tuneDef('F-087','WIND_GRADIENT',1.5,'phys','the wind at a high wedge\'s apex against the ground wind',1,2,.05),WIND_H0=tuneDef('F-087','WIND_H0',2,'phys','the flag\'s height: ground wind up to here',0,10,.5),WIND_H1=tuneDef('F-087','WIND_H1',30,'phys','a high wedge\'s apex: the full gradient from here',10,60,1);
+const CADDIE_WIND_PUNCH=tuneDef('F-087','CADDIE_WIND_PUNCH',.022,'ui','plays-like per m/s of along-wind, punch',.01,.04,.001),CADDIE_WIND_NORMAL=tuneDef('F-087','CADDIE_WIND_NORMAL',.026,'ui','normal',.01,.04,.001),CADDIE_WIND_HIGH=tuneDef('F-087','CADDIE_WIND_HIGH',.028,'ui','high',.01,.04,.001);
+const windH=h=>W&&W.cv>=7?1+(TUNE.WIND_GRADIENT-1)*clamp((h-TUNE.WIND_H0)/(TUNE.WIND_H1-TUNE.WIND_H0),0,1):1;
+const caddieWind=traj=>!W||W.cv<7?CADDIE.wind:traj===3?TUNE.CADDIE_WIND_PUNCH:traj===2?TUNE.CADDIE_WIND_HIGH:traj===4?TUNE.CADDIE_WIND_PUNCH-.001:traj===0?(TUNE.CADDIE_WIND_PUNCH+TUNE.CADDIE_WIND_NORMAL)/2:TUNE.CADDIE_WIND_NORMAL;
+const STROKE_CAP=tuneDef('F-089','STROKE_CAP',10,'phys','a hole ends at this many strokes on version 7',6,15,1);
+const capFor=(par,cv)=>cv>=7?TUNE.STROKE_CAP:par*3;
+const tallyCap=cv=>(cv==null?(W&&W.cv!=null?W.cv:S.cv):cv)>=7?TUNE.STROKE_CAP:0;
+const PATH_REST=tuneDef('F-093','PATH_REST',.6,'phys','a path\'s restitution',.4,.95,.01),PATH_BF=tuneDef('F-093','PATH_BF',.25,'phys','its bounce friction (the lever that sets the kick)',.05,.5,.01),PATH_ROLL=tuneDef('F-093','PATH_ROLL',.8,'phys','its rolling deceleration, m/s²',.3,3,.05);
+SURF.push({n:'Path',rest:PATH_REST,bf:PATH_BF,roll:PATH_ROLL,col:[.62,.60,.56],var:.03});LIE.push([1,1]);PUTT.push(.85);ZONE_LIE.push(1);TIGHT.push(true);for(const k of SG_LIE)k.push(k[2].slice());
+TUNE_APPLY.push(()=>{const p=SURF[9];p.rest=TUNE.PATH_REST;p.bf=TUNE.PATH_BF;p.roll=TUNE.PATH_ROLL});
+function pathRelief(){const d0=MM.hyp(B.x-W.pin.x,B.z-W.pin.z),x0=B.x,z0=B.z;for(let r=1;r<=16;r+=1)for(let k=0;k<16;k++){const a=k/16*TAU,x=x0+MM.sin(a)*r,z=z0+MM.cos(a)*r;if(oob(W,x,z))continue;terrainAt(W,x,z);const ty=TQ.ty;if(ty===9||ty===7||TQ.wl>-1e8&&TQ.h<TQ.wl)continue;if(MM.hyp(x-W.pin.x,z-W.pin.z)<d0-.05)continue;
+    B.x=x;B.z=z;B.y=TQ.h+BALL_R;B.dx=x;B.dz=z;B.pathDrop=true;return}}
+function obsAir(){for(const o of W.obs){const dx=B.x-o.x,dz=B.z-o.z;if(o.k==='sph'){const dy=B.y-o.y,d=MM.hyp(dx,dy,dz),R=o.r+BALL_R;if(d>=R||d<1e-6)continue;const nx=dx/d,ny=dy/d,nz=dz/d,vn=B.vx*nx+B.vy*ny+B.vz*nz;B.x=o.x+nx*R;B.y=o.y+ny*R;B.z=o.z+nz*R;if(vn<0){B.vx-=(1+o.e)*vn*nx;B.vy-=(1+o.e)*vn*ny;B.vz-=(1+o.e)*vn*nz;const a=(B.rng()-.5)*2*TUNE.ROCK_J*DEG,c=MM.cos(a),s=MM.sin(a),vx=B.vx,vz=B.vz;B.vx=vx*c-vz*s;B.vz=vx*s+vz*c;B.sp*=.5;B.ev.push('rock')}continue}
+    const reach=o.hx+o.hz+BALL_R+.5;if(Math.abs(dx)>reach||Math.abs(dz)>reach||B.y>o.y+o.hy+BALL_R||B.y<o.y-o.hy-BALL_R)continue;const c=MM.cos(o.yaw),s=MM.sin(o.yaw),lx=dx*c-dz*s,lz=dx*s+dz*c;
+    const px=o.hx+BALL_R-Math.abs(lx),pz=o.hz+BALL_R-Math.abs(lz),py=o.y+o.hy+BALL_R-B.y;if(px<=0||pz<=0)continue;
+    if(py<=px&&py<=pz&&py>=0){B.y=o.y+o.hy+BALL_R;if(B.vy<0)B.vy=-B.vy*o.e;B.vx*=.85;B.vz*=.85;B.sp*=.6;B.ev.push('wall');continue}
+    let lvx=B.vx*c-B.vz*s,lvz=B.vx*s+B.vz*c,nlx=lx,nlz=lz;
+    if(px<pz){const sg=lx>=0?1:-1;nlx=sg*(o.hx+BALL_R);if(lvx*sg<0)lvx=-lvx*o.e}else{const sg=lz>=0?1:-1;nlz=sg*(o.hz+BALL_R);if(lvz*sg<0)lvz=-lvz*o.e}
+    B.x=o.x+nlx*c+nlz*s;B.z=o.z-nlx*s+nlz*c;B.vx=lvx*c+lvz*s;B.vz=-lvx*s+lvz*c;B.vy*=.8;B.sp*=.5;B.ev.push(o.kind==='face'?'face':'wall')}}
+function obsRoll(){for(const o of W.obs){const dx=B.x-o.x,dz=B.z-o.z;if(o.k==='sph'){const d=MM.hyp(dx,dz),R=o.r*.9+BALL_R;if(d>=R||d<1e-6||B.y>o.y+o.r)continue;const nx=dx/d,nz=dz/d,vn=B.vx*nx+B.vz*nz;B.x=o.x+nx*R;B.z=o.z+nz*R;if(vn<0){B.vx-=(1+o.e)*vn*nx;B.vz-=(1+o.e)*vn*nz;B.ev.push('rock')}continue}
+    if(B.y>o.y+o.hy)continue;const reach=o.hx+o.hz+BALL_R+.5;if(Math.abs(dx)>reach||Math.abs(dz)>reach)continue;const c=MM.cos(o.yaw),s=MM.sin(o.yaw),lx=dx*c-dz*s,lz=dx*s+dz*c,px=o.hx+BALL_R-Math.abs(lx),pz=o.hz+BALL_R-Math.abs(lz);if(px<=0||pz<=0)continue;
+    let lvx=B.vx*c-B.vz*s,lvz=B.vx*s+B.vz*c,nlx=lx,nlz=lz;if(px<pz){const sg=lx>=0?1:-1;nlx=sg*(o.hx+BALL_R);if(lvx*sg<0)lvx=-lvx*o.e}else{const sg=lz>=0?1:-1;nlz=sg*(o.hz+BALL_R);if(lvz*sg<0)lvz=-lvz*o.e}
+    B.x=o.x+nlx*c+nlz*s;B.z=o.z-nlx*s+nlz*c;B.vx=lvx*c+lvz*s;B.vz=-lvx*s+lvz*c;B.sp*=.5;B.ev.push('wall')}}
+const CANOPY_DENSE=tuneDef('F-093','CANOPY_DENSE',.15,'phys','pass chance through a dense canopy',0,1,.05),CANOPY_MEDIUM=tuneDef('F-093','CANOPY_MEDIUM',.30,'phys','medium',0,1,.05),CANOPY_SPARSE=tuneDef('F-093','CANOPY_SPARSE',.55,'phys','sparse',0,1,.05),CANOPY_WINTER=tuneDef('F-093','CANOPY_WINTER',.90,'phys','a bare deciduous canopy in winter',0,1,.05),CANOPY_AUTUMN=tuneDef('F-093','CANOPY_AUTUMN',.15,'phys','added to a deciduous canopy in autumn',0,.5,.05);
+const CANOPY_CLASS={spruce:0,cedar:0,norfolk:0,gorse:0,buckthorn:0,banksia:0,bent:1,scots:1,oak:1,elm:1,cherry:1,teatree:1,birch:2,larch:2,paloverde:2,joshua:2,saguaro:2};
+function canopyPass(t){if(!W||W.cv<7||!W.bio)return .3;const sp=typeof tsp==='function'?tsp(t):null,cl=sp!=null&&CANOPY_CLASS[sp]!=null?CANOPY_CLASS[sp]:t.kind==='gorse'?0:t.kind==='cactus'?2:1;let p=cl===0?TUNE.CANOPY_DENSE:cl===2?TUNE.CANOPY_SPARSE:TUNE.CANOPY_MEDIUM;
+  const ever=sp?!!EVERGREEN[sp]:t.kind!=='oak';if(!ever){if(W.season===3)p=TUNE.CANOPY_WINTER;else if(W.season===2)p=Math.min(1,p+TUNE.CANOPY_AUTUMN)}return p}
+const newCv=()=>(S.seed===daily()||S.weekly||S.weeklyPending)?CV:tryOn()?CV:6;

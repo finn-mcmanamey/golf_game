@@ -1,0 +1,7 @@
+/* ---- particles (E-2): small boxes for grass, sand and water ---- */
+const PARTS=[];const PBUF=gl.createBuffer(),PARR=new ArrayBuffer(400*28),PF=new Float32Array(PARR),PU8=new Uint8Array(PARR);
+function burst(x,y,z,kind,n,vx=0,vz=0){if(!kind)return;const col=kind==='sand'?[.9,.82,.6]:kind==='water'?[.35,.6,.9]:kind==='grass'?[.35,.6,.25]:kind==='fire'?[1,.85,.3]:kind==='spark'?[1,.45,.3]:[.6,.45,.3];const R=Math.random;
+  for(let i=0;i<n&&PARTS.length<400;i++){const a=R()*TAU,sp=1+R()*3;PARTS.push({x,y:y+.05,z,vx:vx*.15+MM.sin(a)*sp,vy:1.5+R()*3.5*(kind==='water'?1.4:1),vz:vz*.15+MM.cos(a)*sp,s:kind==='water'?.06:.05+R()*.05,life:.6+R()*.6,col})}}
+function stepParts(dt){leafTick(dt);for(let i=PARTS.length-1;i>=0;i--){const p=PARTS[i];p.life-=dt;if(p.leaf){p.vx+=(MM.sin(p.life*3+p.x)*.8-p.vx*.6)*dt;p.vz+=(MM.cos(p.life*2.3+p.z)*.8-p.vz*.6)*dt;terrainAt(W,p.x,p.z);if(p.y<TQ.h+.04){p.y=TQ.h+.04;p.vx=p.vy=p.vz=0}}else p.vy-=9.8*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;if(p.life<=0||p.y<-5)PARTS.splice(i,1)}}
+function drawParts(){if(!PARTS.length||!PI)return;const n=PARTS.length;for(let i=0;i<n;i++){const p=PARTS[i],o=i*7;PF[o]=p.x;PF[o+1]=p.y;PF[o+2]=p.z;PF[o+3]=p.sx||p.s;PF[o+4]=p.sy||p.s;PF[o+5]=p.sz||p.s;const q=i*28+24;PU8[q]=cq(p.col[0]);PU8[q+1]=cq(p.col[1]);PU8[q+2]=cq(p.col[2]);PU8[q+3]=255}
+  gl.bindBuffer(gl.ARRAY_BUFFER,PBUF);gl.bufferData(gl.ARRAY_BUFFER,PU8.subarray(0,n*28),gl.DYNAMIC_DRAW);useProg(PI,AI);drawBoxes({inst:true,buf:PBUF,n})}
