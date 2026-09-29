@@ -3,6 +3,7 @@
 // Files are concatenated in filename order, so the numeric prefix is the load order.
 import { readFileSync, readdirSync, writeFileSync, mkdirSync, watch } from 'node:fs';
 import { createServer } from 'node:http';
+import { exec } from 'node:child_process';
 import vm from 'node:vm';
 
 const cat = (dir, ext) => readdirSync(dir).filter(f => f.endsWith(ext)).sort()
@@ -25,5 +26,10 @@ if (process.argv.includes('--dev')) {
   let t;
   watch('src', { recursive: true }, () => { clearTimeout(t); t = setTimeout(build, 50) });
   createServer((_, res) => res.writeHead(200, { 'content-type': 'text/html' }).end(readFileSync('dist/index.html')))
-    .listen(5173, () => console.log('http://localhost:5173 (rebuilds on save, refresh to see changes)'));
+    .listen(5173, () => {
+      const url = 'http://localhost:5173';
+      console.log(url, '(rebuilds on save, refresh to see changes)');
+      if (process.argv.includes('--open'))
+        exec(`${{ darwin: 'open', win32: 'start ""' }[process.platform] ?? 'xdg-open'} ${url}`);
+    });
 }
