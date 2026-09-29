@@ -23,10 +23,10 @@ void main(){vec3 p=aP;float m=aC.a*3.984375;if(m>=2.0){float k=m-2.0;p.z+=(sin(u
 vec4 w=uM*vec4(p,1.0);vW=w.xyz;vN=normalize(mat3(uM)*aN);vC=aC.rgb*1.25;vM=m;gl_Position=uVP*w;}`,
 `precision highp float;varying vec3 vN,vC,vW;varying float vM;uniform vec3 uEye,uSun,uFog,uLight,uSky,uGnd;uniform vec4 uOv;uniform float uT,uFogK,uFogH,uFogA,uClip;uniform sampler2D uRefl;uniform mat4 uRVP;uniform float uReflOn;uniform vec3 uWnd;${SHADOWF}
 void main(){if(vW.y<uClip)discard;if(uOv.a>0.0){gl_FragColor=uOv;return;}vec3 n=normalize(vN);vec3 c=vC;${LIGHT}float a=1.0;
-if(vM>0.5&&vM<1.5){vec3 v=normalize(uEye-vW);float t=uT;vec2 wd=uWnd.xy,w1=vec2(wd.x*0.906-wd.y*0.423,wd.x*0.423+wd.y*0.906),w2=vec2(wd.x*0.819+wd.y*0.574,-wd.x*0.574+wd.y*0.819);float ws=uWnd.z,A=0.05+0.05*min(ws,1.5),p0=dot(vW.xz,wd)*2.86-t*(1.8+ws*1.5),p1=dot(vW.xz,w1)*4.83-t*(2.4+ws*1.9),p2=dot(vW.xz,w2)*7.85-t*(3.1+ws*2.4);vec3 nn=normalize(vec3(-(wd.x*cos(p0)+w1.x*cos(p1)*0.6+w2.x*cos(p2)*0.35)*A,1.0,-(wd.y*cos(p0)+w1.y*cos(p1)*0.6+w2.y*cos(p2)*0.35)*A));
-float fr=pow(1.0-max(dot(nn,v),0.0),3.0);vec3 refl=mix(uSky*0.92,vec3(1.0),0.1);
+if(vM>0.5&&vM<1.5){vec3 v=normalize(uEye-vW);float t=uT;vec2 wd=uWnd.xy,w1=vec2(wd.x*0.906-wd.y*0.423,wd.x*0.423+wd.y*0.906),w2=vec2(wd.x*0.819+wd.y*0.574,-wd.x*0.574+wd.y*0.819);float ws=uWnd.z,A=0.05+0.05*min(ws,1.5),p0=dot(vW.xz,wd)*2.86-t*(1.8+ws*1.5),p1=dot(vW.xz,w1)*4.83-t*(2.4+ws*1.9),p2=dot(vW.xz,w2)*7.85-t*(3.1+ws*2.4);float p3=dot(vW.xz,vec2(-wd.y,wd.x))*13.1-t*4.2,p4=dot(vW.xz,w1+w2)*9.7-t*3.6,dk=1.0-smoothstep(12.0,45.0,distance(uEye,vW));vec3 nn=normalize(vec3(-(wd.x*cos(p0)+w1.x*cos(p1)*0.6+w2.x*cos(p2)*0.35+(-wd.y*cos(p3)*0.22+(w1.x+w2.x)*cos(p4)*0.14)*dk)*A,1.0,-(wd.y*cos(p0)+w1.y*cos(p1)*0.6+w2.y*cos(p2)*0.35+(wd.x*cos(p3)*0.22+(w1.y+w2.y)*cos(p4)*0.14)*dk)*A));
+float fr=pow(1.0-max(dot(nn,v),0.0),3.0);vec3 refl=mix(mix(uFog,uSky*0.92,0.75+0.25*clamp(reflect(-v,nn).y*3.0,0.0,1.0)),vec3(1.0),0.1);
 if(uReflOn>0.5){vec4 rp=uRVP*vec4(vW,1.0);vec2 ruv=rp.xy/rp.w*0.5+0.5+nn.xz*0.035;ruv=clamp(ruv,0.002,0.998);refl=mix(refl,texture2D(uRefl,ruv).rgb,0.85);}vec3 h=normalize(v+uSun);float sp=pow(max(dot(nn,h),0.0),160.0)*sh;
-col=mix(vC*(0.5+0.4*max(dot(nn,uSun),0.0)*sh+0.15),refl,0.12+0.55*fr)+vec3(1.0,0.96,0.86)*sp*1.3;a=0.84+0.12*fr;}
+float gl2=pow(max(dot(nn,h),0.0),24.0)*sh;col=mix(vC*(1.0-0.22*(1.0-fr))*(0.5+0.4*max(dot(nn,uSun),0.0)*sh+0.15),refl,0.12+0.55*fr)+uLight*vec3(1.0,0.96,0.86)*(sp*1.4+gl2*0.12);a=0.84+0.12*fr;}
 else if(vM>1.5&&vM<1.95){vec3 v=normalize(uEye-vW);vec3 h=normalize(v+uSun);col+=vec3(0.8)*pow(max(dot(n,h),0.0),70.0)*sh;}
 if(uOv.a<0.0){col*=uOv.rgb;a=-uOv.a;}
 ${FOGC}gl_FragColor=vec4(mix(col,fgc,f),a);}`);
