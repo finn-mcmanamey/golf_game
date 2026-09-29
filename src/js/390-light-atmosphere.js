@@ -12,7 +12,7 @@ const GRADE=[{lift:[0,0,0],gain:[1,1,1],gamma:1,sat:1,con:1},{lift:[.01,.012,.02
   {lift:[0,.005,0],gain:[.98,1.03,.96],gamma:.98,sat:1.06,con:1.02},{lift:[0,.006,.02],gain:[.97,1,1.06],gamma:1,sat:1,con:1.05},{lift:[0,.012,.012],gain:[.97,1.03,1.03],gamma:1.03,sat:1.04,con:1}];
 const SEASON_GRADE=[{gain:[1,1,1],sat:1},{gain:[1.02,1,.98],sat:1.03},{gain:[1.04,1,.96],sat:1.02},{gain:[.97,.99,1.03],sat:.9}];
 function gradeSet(){if(!PX.u.uExpo)return;const g=GRADE[W&&W.bio!=null?W.bio:0]||GRADE[0],se=SEASON_GRADE[W&&W.season!=null?W.season:0]||SEASON_GRADE[0],fl=W&&W.wea&&W.wea.flat;
-  gl.uniform1f(PX.u.uExpo,EXPOSURE);gl.uniform3f(PX.u.uLift,g.lift[0],g.lift[1],g.lift[2]);gl.uniform3f(PX.u.uGain,g.gain[0]*se.gain[0],g.gain[1]*se.gain[1],g.gain[2]*se.gain[2]);gl.uniform1f(PX.u.uGamma,g.gamma);gl.uniform1f(PX.u.uSat,(fl?1:1.05)*g.sat*se.sat);gl.uniform1f(PX.u.uCon,1.03*g.con)}
+  gl.uniform1f(PX.u.uExpo,EXPOSURE);gl.uniform3f(PX.u.uLift,g.lift[0],g.lift[1],g.lift[2]);gl.uniform3f(PX.u.uGain,g.gain[0]*se.gain[0],g.gain[1]*se.gain[1],g.gain[2]*se.gain[2]);gl.uniform1f(PX.u.uGamma,g.gamma);gl.uniform1f(PX.u.uSat,(fl?1:1.05)*satOf(g,se,W&&W.season));gl.uniform1f(PX.u.uCon,1.03*g.con)}
 /* Q-18: the sky's scattering on High — the sun's height tints zenith and horizon, a glow gathers round the sun */
 function skySet(){if(!PK.u.uScat)return;const SU=FR.sun||SUN;gl.uniform1f(PK.u.uScat,GFX.level>=2?1:0);gl.uniform1f(PK.u.uSunY,SU[1])}
 /* Q-19: the round's wind for the water (unit direction, strength from s(k)); the splash ring where a ball went in */

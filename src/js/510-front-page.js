@@ -7,9 +7,9 @@ const TROPHY_COL={gold:[.93,.74,.27],silver:[.8,.82,.85],bronze:[.72,.46,.26],pl
 const DIO_SLOTS=[['major','cupG'],['cup','cupS'],['season','cupG'],['promo','plaque'],['ace','ball'],['eagle','cupS'],['birdie','cupB'],['ld','bar'],['ctp','pin'],['passport','book']];
 const REAL=typeof window!=='undefined'&&typeof window.matchMedia==='function';
 const DIO={W:null,key:'',seed:0,t0:0,tick:0,err:null,firstT:null,buildMs:0,clockAt:null,seedAt:0,boxes:0,letters:0};
-function todaySeed(){if(gentleOn()){const d=new Date(),n=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5);return GENTLE_SEEDS[n%GENTLE_SEEDS.length]}return daily()}
+function todaySeed(){if(!gentleOn()&&dailyOnIsl())return dailyIsl().seed;if(gentleOn()){const d=new Date(),n=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5);return GENTLE_SEEDS[n%GENTLE_SEEDS.length]}return daily()}
 function frontN(){const[n,k]=lastMode();return!k&&n===18?18:9}
-function dioInputs(seed){const n=frontN(),cv=newCv(),tw=twistFor(seed,cv);let setup=setupFor(seed);if(tw===3)setup=3;const cond={season:S.seasonPick>=0?S.seasonPick:courseSeason(seed),wear:seed===daily()?WEAR_LEVEL.daily:S.condPick|0,kind:0,twist:tw};return{seed,n,cv,setup,cond,par:parsFor(n,cv,0)[0]}}
+function dioInputs(seed){const F=typeof frontIsl==='function'&&(FRONT.act||frontAct(loadSave()))?frontIsl():null;if(F&&(F.seed===seed||FRONT.act!=='today'))return dioInputsIsl(F);const n=frontN(),cv=newCv(),tw=twistFor(seed,cv);let setup=setupFor(seed);if(tw===3)setup=3;const cond={season:S.seasonPick>=0?S.seasonPick:courseSeason(seed),wear:seed===daily()?WEAR_LEVEL.daily:S.condPick|0,kind:0,twist:tw,v10:1};return{seed,n,cv,setup,cond,par:parsFor(n,cv,0)[0]}}
 function dioClock(){const d=new Date(),h=DIO.clockAt!=null?DIO.clockAt:d.getHours()+d.getMinutes()/60;return{t:tryOn()?islHourAt(h):clamp(h,DIO_CLOCK[0],DIO_CLOCK[1]),lit:h<DIO_LIT[0]||h>=DIO_LIT[1]}}
 const dioSeg=(x,z,ax,az,bx,bz)=>{const ex=bx-ax,ez=bz-az,l2=ex*ex+ez*ez||1,u=clamp(((x-ax)*ex+(z-az)*ez)/l2,0,1);return Math.hypot(x-ax-ex*u,z-az-ez*u)};
 function dioFront(){return DIO_L.house[1]+DIO_HOUSE.d/2}
@@ -63,12 +63,12 @@ function dioBoxes(W){const bx=[],lt=[],L=DIO_L,y0=W.dioY,P=HOUSE_PAL[W.bio|0]||H
   const[wx0,wz0]=L.washer;terrainAt(W,wx0,wz0);B(wx0,TQ.h+.5,wz0,.05,.5,.05,dark);B(wx0,TQ.h+1.05,wz0,.16,.12,.1,[.2,.35,.6]);
   DIO.boxes=bx.length+lt.length;return{s:bx,l:lt}}
 function withDW(Wd,f){const W1=W;W=Wd;try{return f()}finally{W=W1}}
-function dioBuild(force){if(!force&&!REAL)return false;try{const seed=DIO.seedAt||todaySeed(),I=dioInputs(seed),key=holeKey(seed,0,I.cv,I.setup,I.cond)+'/'+I.par,ck=dioClock();if(DIO.W&&DIO.key===key&&!force)return true;const t0=performance.now();
+function dioBuild(force){if(!force&&!REAL)return false;try{const seed0=DIO.seedAt||todaySeed(),I=dioInputs(seed0),seed=I.seed,key=holeKey(seed,0,I.cv,I.setup,I.cond)+'/'+I.par,ck=dioClock();if(DIO.W&&DIO.key===key&&!force)return true;const t0=performance.now();
     if(S.frontSeed===seed&&!loadSave())prebuild(null);const W0=PRE.W&&PRE.key===key?PRE.W:genHole(seed,0,I.par,I.cv,I.setup,I.cond);
     const Wd=Object.assign({},W0,{H:W0.H.slice(),ty:W0.ty.slice(),pond:W0.pond.slice(),trees:W0.trees.slice(),marks:[],meshes:null,base:null,shade:null,dio:true,key:'dio:'+key});
     applyClock(Wd,ck.t);Wd.lit=ck.lit;withDW(Wd,()=>{dioCarve(Wd);const sh=bakeShade(Wd);dioStamp(Wd,sh);Wd.shade=sh;buildMeshes(Wd)});
     if(DIO.W&&DIO.W.meshes)freeMeshes(DIO.W);DIO.W=Wd;DIO.key=key;DIO.seed=seed;DIO.buildMs=performance.now()-t0;DIO.tick=performance.now();DIO.err=null;if(!force&&REAL&&frontShown())drawFrame();return true}catch(e){DIO.err=String(e&&e.message||e);glOn();return false}}
-function dioTick(now){if(now-DIO.tick<DIO_TICK*1000)return;DIO.tick=now;if(todaySeed()!==DIO.seed){dioBuild();return}const ck=dioClock(),Wd=DIO.W;if(Math.abs(ck.t-(Wd.clock||0))>.01)applyClock(Wd,ck.t);if(ck.lit!==Wd.lit){DIO.clockT=ck.t;dioBuild(true)}}
+function dioTick(now){if(now-DIO.tick<DIO_TICK*1000)return;DIO.tick=now;if(dioSeedNow()!==DIO.seed){dioBuild();return}const ck=dioClock(),Wd=DIO.W;if(Math.abs(ck.t-(Wd.clock||0))>.01)applyClock(Wd,ck.t);if(ck.lit!==Wd.lit){DIO.clockT=ck.t;dioBuild(true)}}
 function dioCam(){const L=DIO_L,y0=DIO.W.dioY,t=rmOn()?0:(performance.now()-DIO.t0)/1000,asp=VP.w&&VP.h?VP.w/VP.h:16/9,k=Math.max(1,(16/9)/asp),D=DIO_DRIFT,sw=i=>D[i][0]*MM.sin(TAU*t/D[i][1]);
   const T=[L.look[0],y0+L.look[1],L.look[2]],C=[L.cam[0],y0+L.cam[1],L.cam[2]],Sg=[L.sign[0],y0+SIGN_BOARD.foot+SIGN_BOARD.h/2,L.sign[1]];cam.x=Sg[0]+(C[0]-Sg[0])*k+sw(0);cam.y=Sg[1]+(C[1]-Sg[1])*k+sw(1);cam.z=Sg[2]+(C[2]-Sg[2])*k+sw(2);cam.tx=T[0]+sw(0)*.35;cam.ty=T[1];cam.tz=T[2];cam.fov=DIO_CAM.fov*DEG}
 function glOn(){if(REAL)document.body.classList.add('gl-on')}
@@ -77,7 +77,7 @@ function dioRender(){const now=performance.now();dioTick(now);const g0=[GFX.leve
   dioCam();GFX.level=0;GFX.shadows=GFX.post=GFX.bloom=GFX.refl=false;HUDL.sy=0;W=DIO.W;
   try{render(S.t)}finally{W=null;[GFX.level,GFX.shadows,GFX.post,GFX.bloom,GFX.refl]=g0;[cam.fov,cam.fogK]=c0;HUDL.sy=sy}
   if(DIO.firstT==null){DIO.firstT=now;DIO.firstDone=performance.now();glOn()}}
-function drawFrame(){islClueTick();if(ISLV.on&&ISLV.W)islRender();else if(!W&&DIO.W&&S.mode==='title'&&frontShown())dioRender();else render(S.t)}
+function drawFrame(){islClueTick();chipTick();if(ISLV.on&&ISLV.W)islRender();else if(!W&&DIO.W&&S.mode==='title'&&frontShown())dioRender();else render(S.t)}
 const TILT={m:-1};function tiltTick(){const m=S.mode==='title'&&frontShown()?2:S.intro||ISLV.on?1:0;if(m===TILT.m||!REAL)return;TILT.m=m;const b=document.body;b.classList.toggle('tilt',m>0);b.classList.toggle('tilt-fly',m===1)}
 const SHEETS=[['tour','Tour','tour',['pCareer','pTour','pStats','pLocker']],['daily','Daily','daily',['pDaily']],['courses','Courses','flag',['pPlay','pPlaces','pBook','pRange']],['ghosts','Ghosts','ghost',['pGhosts','pFriends']],['island','Island','island',['pIsland']],['settings','Settings','gear',['pSettings']]];
 const TAB_N={pIsland:'Your island',pCareer:'Career',pTour:'Classic tour',pStats:'Stats',pLocker:'Locker',pDaily:'Calendar',pPlay:'Play a course',pPlaces:'Places',pBook:'Records',pRange:'Range',pGhosts:'Ghosts',pFriends:'Friends',pSettings:'Settings'};
@@ -92,15 +92,15 @@ function frontWire(){if(FRONT.wired||!REAL||!$('btnMain'))return;FRONT.wired=tru
   for(const b of document.querySelectorAll('#frontRow button'))b.onclick=()=>{AU.play('ui');if(FRONT.sheet===b.dataset.sheet){sheetClose();return}const sh=SHEETS.find(s=>s[0]===b.dataset.sheet),cur=S.chTab&&sh[3].includes(S.chTab)?S.chTab:sh[3][0];chTab(cur)};
   $('sheetWrap').addEventListener('pointerdown',e=>{if(e.target===$('sheetWrap'))sheetClose()});
   addEventListener('keydown',e=>{if(e.key!=='Escape'||!FRONT.sheet||!frontShown())return;if(document.querySelector('.ov:not(.hide):not(#title)'))return;sheetClose();e.stopImmediatePropagation();e.preventDefault()},true)}
-function frontAct(sv){if(sv)return'resume';const C=S.car;if(C&&C.cur&&C.cur.ev<EVENTS&&!C.cur.done){const M=C.cur.major,maj=isMajor(C.tier,C.cur.ev);if(!(maj&&M&&M.r1!=null&&!M.made))return'career'}const T=S.tour;if(T&&T.ev<TOUR.events)return'tour';return'today'}
+function frontAct(sv){if(sv)return'resume';const C=S.car;if(t8Is(C)){const N=t8Next(C);if(N&&!N.out&&!N.fin)return'career'}else if(C&&C.cur&&C.cur.ev<EVENTS&&!C.cur.done){const M=C.cur.major,maj=isMajor(C.tier,C.cur.ev);if(!(maj&&M&&M.r1!=null&&!M.made))return'career'}const T=S.tour;if(T&&T.ev<TOUR.events)return'tour';return'today'}
 function frontRefresh(sv){const a=FRONT.act=frontAct(sv);S.frontSeed=a==='today'?todaySeed():null;if(!REAL||!$('btnMain'))return;frontWire();let sub='';
-  if(a==='resume')sub=$('resumeText').textContent;else if(a==='career'){const C=S.car;sub=isMajor(C.tier,C.cur.ev)?'The major · '+TIER_NAMES[C.tier]+' tour':'Career · season '+C.season+' · event '+(C.cur.ev+1)+' of '+EVENTS}
-  else if(a==='tour')sub='Classic tour · event '+(S.tour.ev+1)+' of '+TOUR.events;else{const seed=S.frontSeed,I=dioInputs(seed);sub=(gentleOn()?'A gentle course to start':seed===daily()?'Today’s course':'Course #'+seed)+' · '+BIOMES[biomeOf(seed,I.cv)].n+' · '+SEASONS[I.cond.season].n+' · '+I.n+' holes'}
+  if(a==='resume')sub=$('resumeText').textContent;else if(a==='career'){const C=S.car;sub=t8Is(C)?(()=>{const N=t8Next(C),c=t8Cond(C,C.tier,N.e,N.r);return(N.e>=6?'Q-school':F8_N[N.e])+' · season '+C.season+' · '+islName(c.seed)})():(isMajor(C.tier,C.cur.ev)?'The major · '+TIER_NAMES[C.tier]+' tour':'Career · season '+C.season+' · event '+(C.cur.ev+1)+' of '+EVENTS)+(carIsl(C)?' · '+islName(C.cur.tiers[C.tier].seeds[C.cur.ev]):'')}
+  else if(a==='tour')sub='Classic tour · event '+(S.tour.ev+1)+' of '+TOUR.events+(S.tour.isl?' · '+islName(S.tour.seeds[S.tour.ev]):'');else{const seed=S.frontSeed,I=dioInputs(seed);sub=!gentleOn()&&dailyOnIsl()?todayLine():(gentleOn()?'A gentle course to start':seed===daily()?'Today’s course':'Course #'+seed)+' · '+BIOMES[biomeOf(seed,I.cv)].n+' · '+SEASONS[I.cond.season].n+' · '+I.n+' holes'}
   $('mainT').textContent=a==='today'?'Play today’s':'Continue';$('mainIc').innerHTML=ic(a==='today'?'play':'next');$('mainSub').textContent=sub;$('btnMain').classList.remove('busy');if(frontShown()&&!FRONT.sheet&&document.activeElement===document.body)$('btnMain').focus({preventScroll:true});
   {const r=$('btnIslRow');if(r)r.classList.toggle('hide',!tryOn())}if(frontShown()&&(!DIO.W||DIO.seed!==todaySeed()))later(()=>dioBuild())}
 const later=f=>{if(REAL&&typeof requestAnimationFrame==='function')requestAnimationFrame(()=>setTimeout(f,0));else f()};
 function mainGo(){const b=$('btnMain');if(!b||b.classList.contains('busy'))return;AU.play('ui');b.classList.add('busy');$('mainT').textContent='Teeing off…';
-  later(()=>{const a=FRONT.act;try{if(a==='resume')continueRound();else if(a==='career')careerEvent();else if(a==='tour')tourEvent();else{seedIn.value=todaySeed();showBiome();go(frontN(),null,0)}}finally{if(frontShown())frontRefresh(loadSave())}})}
+  later(()=>{const a=FRONT.act;try{if(a==='resume')continueRound();else if(a==='career')careerEvent();else if(a==='tour')tourEvent();else goToday()}finally{if(frontShown())frontRefresh(loadSave())}})}
 
 function TK(n,a){const C=TK.c||(TK.c=new Map()),k=n+'|'+(a==null?1:a);let v=C.get(k);if(v)return v;if(!TK.g){try{const cs=getComputedStyle(document.documentElement);TK.g=q=>cs.getPropertyValue('--'+q).trim()}catch(e){TK.g=()=>''}}
   const m=/^#([0-9a-f]{6})$/i.exec(TK.g(n)),rgb=m?[parseInt(m[1].slice(0,2),16),parseInt(m[1].slice(2,4),16),parseInt(m[1].slice(4),16)]:[128,128,128];v=a==null||a>=1?'rgb('+rgb+')':'rgba('+rgb+','+a+')';C.set(k,v);return v}

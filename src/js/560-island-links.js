@@ -2,7 +2,7 @@
 const LINK_MAX=2400,ISL_LINK_N=3;
 function islLinkEncode(seed,codes){let c='I1!'+(seed>>>0).toString(36);for(const x of codes.slice(0,ISL_LINK_N)){if(!x||x.includes('!')||(c+'!'+x).length>LINK_MAX)continue;c+='!'+x}return c}
 function islLinkDecode(c){c=(c||'').trim().replace(/^.*#/,'');const m=/^I1!([0-9a-z]{1,7})((?:![^!\s]+){0,3})$/.exec(c);if(!m||c.length>LINK_MAX)return null;const seed=parseInt(m[1],36);if(!(seed>=1&&seed<1073741824))return null;const G=[];
-  for(const x of m[2].split('!').filter(Boolean)){const d=decodeRound(x);if(d&&d.seed===seed&&d.cv>=CV_ISL&&d.n===9&&islKind(d.kind)>=2&&islKind(d.kind)<=5)G.push({code:x,d})}return{seed,G}}
+  for(const x of m[2].split('!').filter(Boolean)){const d=decodeRound(x);if(d&&!d.golfer&&d.seed===seed&&d.cv>=CV_ISL&&d.n===9&&islKind(d.kind)>=2&&islKind(d.kind)<=5)G.push({code:x,d})}return{seed,G}}
 function islLinkCodes(seed,first){const B=bookGet().bests||{},out=[];if(first)out.push({code:first,t:Infinity});for(const k of[2,3,4,5]){const b=B[islBestKey(seed,9,k)];if(b&&b.code)out.push({code:b.code,t:b.t||0})}out.sort((a,b)=>b.t-a.t);const seen=new Set();return out.map(o=>o.code.split('.')[0]).filter(c=>!seen.has(c)&&seen.add(c)).slice(0,ISL_LINK_N)}
 function islShare(seed,first){seed=Math.max(1,seed|0);const codes=islLinkCodes(seed,first),c=islLinkEncode(seed,codes),n=c.split('!').length-2;linkBox('Island link','Opens '+islName(seed)+(n?' with your ghost on '+n+' routing nine'+(n>1?'s':''):' (play a routing nine to attach your ghost)')+' · '+c.length+' characters',c)}
 function islBanner(c){const P=islLinkDecode(c);if(!P)return false;const seed=P.seed;ISL.seed=seed;lsSet('voxellinks.isl.last',seed);const inp=$('islSeed');if(inp)inp.value=seed;
