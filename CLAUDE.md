@@ -74,6 +74,36 @@ Free models and animations: [Kenney](https://kenney.nl), [Quaternius](https://qu
 - **Watch the size.** Note the bundle size in the pull request. Prefer tree-shaken imports and small `.glb` files.
 - **Keep a fallback.** If the library fails to load, the original golfer and scene still draw.
 
+### Known limit: the overlay can't hide behind the course
+
+A separate canvas has its own depth buffer, so a model drawn on it shows through trees and hills.
+That's fine for the golfer (usually in the open) and for screen effects. For anything that must sit *in*
+the scene, refactor in this order, stopping at the first that works:
+
+1. **Share one WebGL context.** Give Three.js the game's canvas and context
+   (`new THREE.WebGLRenderer({ canvas, context: gl })`, `autoClear = false`), draw after the game's opaque pass,
+   and call `renderer.resetState()` before handing the context back. Both then use the same depth buffer.
+   Current Three.js needs WebGL2, but the game asks for WebGL1 (`getContext('webgl',…)` in `100-renderer.js`):
+   switch it to `'webgl2'` first and check every game shader still compiles and looks the same.
+2. **Reuse the game's depth texture.** Photo mode already renders the camera's depth to a texture
+   (F-081, `150-look-sound-identity.js`). Pass it to the overlay's shaders and discard pixels behind the course.
+   Keeps two canvases; costs one extra depth pass a frame.
+3. **Move the renderer onto a library, one piece at a time.** The mesh builder (`040-mesh.js`) already produces
+   vertex arrays that can become `THREE.BufferGeometry`. Port the terrain first, then trees, water, the golfer.
+   Physics, generation and records stay untouched. This is a large refactor: plan it and do it on its own branch.
+
+Other libraries worth weighing for that refactor:
+
+| Library | Why consider it |
+|---------|-----------------|
+| [OGL](https://github.com/oframe/ogl) | Tiny (~30 KB), close to raw WebGL, so the existing shaders port with little change |
+| [twgl.js](https://twgljs.org) | Thin helpers that shorten the existing hand-written WebGL without changing how it looks |
+| [regl](https://github.com/regl-project/regl) | Functional WebGL wrapper; tidy for the many instanced box draws |
+| [Babylon.js](https://www.babylonjs.com) | Full engine with built-in shadows, post effects and an inspector; larger |
+| [PlayCanvas engine](https://github.com/playcanvas/engine) | Full engine tuned for fast loading on phones |
+
+Whichever is chosen, the rules above still hold: drawing only, guarded, one game script, and replays unchanged.
+
 ## Checking a change
 
 1. `npm run build` passes.
