@@ -121,7 +121,7 @@ function updateCam(dt){let ex,ey,ez,tx,ty,tz,k=1-MM.exp(-dt*4),fogK=.0012;
   cam.x=lerp(cam.x,ex,k);cam.y=lerp(cam.y,ey,k);cam.z=lerp(cam.z,ez,k);cam.tx=lerp(cam.tx,tx,k);cam.ty=lerp(cam.ty,ty,k);cam.tz=lerp(cam.tz,tz,k);cam.fogK=lerp(cam.fogK,fogK,k)}
 let last=0;
 function idleRoute(seed,cv){return withMath(cv,()=>idleRoute_(seed,cv))}function idleRoute_(seed,cv){/* F-057: the back nine routes in idle slices once the first tee is on screen (every round: F-059's landmark stands on the whole routing) */const P=coursePlan(seed,cv),t0=performance.now();while(P.holes.length<18&&performance.now()-t0<IDLE_SLICE)courseHole(seed,cv,P.holes.length)}
-function frame_(now){requestAnimationFrame(frame);const fms=now-last,dt=clamp(fms/1000||0,0,.05);last=now;FT[FTi++%BUG_FRAMES]=fms>0&&fms<1e4?fms:0;hudEase(dt);if(pzSkip(fms)){S.frameNow=now;drawFrame();return}if(FX.stop>0){FX.stop--;S.frameNow=now;render(S.t);return}ffTick();if(S.photo){S.frameNow=now;MU.update(dt);photoStep(dt);render(S.t);return}S.t+=dt;S.frameNow=now;MU.update(dt);
+function frame_(now){requestAnimationFrame(frame);const fms=now-last,dt=clamp(fms/1000||0,0,.05);last=now;FT[FTi++%BUG_FRAMES]=fms>0&&fms<1e4?fms:0;gfxAutoTick(now);hudEase(dt);if(pzSkip(fms)){S.frameNow=now;drawFrame();return}if(FX.stop>0){FX.stop--;S.frameNow=now;render(S.t);return}ffTick();if(S.photo){S.frameNow=now;MU.update(dt);photoStep(dt);render(S.t);return}S.t+=dt;S.frameNow=now;MU.update(dt);
   if(W){
     if(W.cv>=4&&S.mode!=='shot')idleRoute(W.seed,W.cv);
     if(S.mode==='aim'&&S.ph>0){mtFrame();if(S.mode==='aim')S.previewPow=S.ph===1?S.mark:S.pow}
