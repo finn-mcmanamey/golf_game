@@ -106,6 +106,6 @@ Suggest these when Finn wants new 3D things, and always do them on an `experimen
 4. **A course editor** built with **React Three Fiber** as a separate page in `tools/`: click to place bunkers,
    trees and pins, export them as a course seed or data. R3F fits editors well because the UI and 3D share state.
 5. **Mobile app, later.** R3F also runs in React Native with Expo (`expo-gl`), which could one day put
-   Voxel Links on a phone. His dad works in React Native, so that's a fun project to share.
+   Voxel Links on a phone. His dad is learning React Native too, so it could be a shared project.
 
 When one of these comes up, explain the trade-off simply: *a library saves time but adds size and rules we must follow*.
