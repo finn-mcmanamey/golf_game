@@ -4,7 +4,7 @@ A voxel golf game in plain HTML, CSS and JavaScript. It renders with raw WebGL a
 
 ## Run it
 
-In Claude Code, just type `/run`: it builds the game and opens it in a new tab.
+In Claude Code, just type `/play`: it builds the game and opens it in a new tab.
 
 Requires Node 20+.
 
