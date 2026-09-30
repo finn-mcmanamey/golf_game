@@ -120,7 +120,7 @@ function updateCam(dt){let ex,ey,ez,tx,ty,tz,k=1-MM.exp(-dt*4),fogK=.0012;
   else if(cam10On()){cam10(dt);return}
   else if(S.mode==='shot'||S.mode==='holed'||S.mode==='wait'){let vx=B.vx,vz=B.vz,sp=MM.hyp(vx,vz);if(sp<1){vx=MM.sin(S.yaw);vz=MM.cos(S.yaw);sp=1}vx/=sp;vz/=sp;const putt=curClub().putter,D=putt?4:9+Math.min(sp,40)*.15,H=putt?2:4;
     terrainAt(W,B.x-vx*D,B.z-vz*D);ex=B.x-vx*D;ey=Math.max(B.y+H*.5+2,TQ.h+2.2);ez=B.z-vz*D;tx=B.x;ty=B.y;tz=B.z;k=1-MM.exp(-dt*(S.mode==='shot'?5:2.5))}
-  else{const c=curClub(),dx=MM.sin(S.yaw),dz=MM.cos(S.yaw),pp=S.press&&S.cv>=4?S.press.p:0,D=(c.putter?4.2:6+c.carry/45)*(1-PRESS_CAM*pp),H=(c.putter?1.4:.7)+D*MM.sin(S.pitch),T=aimLookD(c,dt);ex=B.x-dx*D;ez=B.z-dz*D;terrainAt(W,ex,ez);ey=Math.max(B.y+H,TQ.h+1.2);ey=camClear(ex,ey,ez,TQ.h+1.0);tx=B.x+dx*T;ty=aimLookY(c,T);tz=B.z+dz*T;k=S.drag?1:1-MM.exp(-dt*6)}
+  else{const c=curClub(),dx=MM.sin(S.yaw),dz=MM.cos(S.yaw),pp=S.press&&S.cv>=4?S.press.p:0,D=(c.putter?4.2:6+c.carry/45)*(1-PRESS_CAM*pp),H=(c.putter?1.4:.7)+D*MM.sin(S.pitch),T=aimLookD(c,dt);ex=B.x-dx*D;ez=B.z-dz*D;terrainAt(W,ex,ez);ey=Math.max(B.y+H,TQ.h+1.2);ey=camClear(ex,ey,ez,TQ.h+1.0);tx=B.x+dx*T;ty=aimLookY(c,T);tz=B.z+dz*T;k=1-MM.exp(-dt*(S.drag?22:6))}
   {const pp=S.press&&S.cv>=4&&(S.mode==='aim'||S.mode==='swing')?S.press.p:0,f=55*DEG-PRESS_FOV*pp;cam.fov+=(f-cam.fov)*Math.min(1,dt)}
   cam.x=lerp(cam.x,ex,k);cam.y=lerp(cam.y,ey,k);cam.z=lerp(cam.z,ez,k);cam.tx=lerp(cam.tx,tx,k);cam.ty=lerp(cam.ty,ty,k);cam.tz=lerp(cam.tz,tz,k);cam.fogK=lerp(cam.fogK,fogK,k)}
 let last=0;

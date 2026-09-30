@@ -55,7 +55,7 @@ const biomeOf=(seed,cv)=>{if(!cv)return 0;let h=Math.imul((seed|0)^0x9E3779B9,0x
 const PAR9=[4,3,5,4,4,3,4,5,4],PAR18=PAR9.concat([4,4,3,5,4,4,3,5,4]),FOG=[.80,.86,.92],SUN=norm([-.4,.75,.45]);
 /* ===== Brief v4 numbers: each lives once in the brief; code uses the brief's names ===== */
 // F-057 Real 18
-const PAR18_4=[4,3,5,4,4,3,4,5,4,4,5,3,4,4,5,4,3,4],CLUB_OFF=35,BACK_TURN=[100,160],ROUTE_TRIES=11,ISLAND_17=.5,IDLE_SLICE=8;
+const PAR18_4=[4,3,5,4,4,3,4,5,4,4,5,3,4,4,5,4,3,4],CLUB_OFF=35,BACK_TURN=[100,160],ROUTE_TRIES=11,ISLAND_17=.5,IDLE_SLICE=3;
 const parsFor=(n,cv,kind)=>cv>=CV_ISL&&kind>=2?islPars(n,kind):cv>=4&&kind===1?new Array(n).fill(3):n===18?(cv>=4?PAR18_4:PAR18).slice():PAR9.slice(0,n);
 // F-058 seeded architects: weights and dimensions by style
 const ARCH_STYLES=[{n:'penal',col:'var(--bad)',w:{'Short iron':1.4,Punchbowl:1.3,Dogleg:1.3,'Three-shot':1.3,'Island green':.6,Cape:.6,Drivable:.7,'Reachable over water':.7},fw:.85,gr:.88,gb:1,fb:1,side:1,aggr:.2,caut:-.2},
