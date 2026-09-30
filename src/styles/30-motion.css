@@ -10,3 +10,8 @@ button.big,#chip button{transition:transform var(--dur-1) var(--ease-out),filter
 button.big:hover{filter:brightness(1.08)}
 button.big:active,#chip button:active{transform:scale(.97)}
 @media (prefers-reduced-motion:reduce){.ov:not(.hide) .box{animation:none}#hint,#msg,button.big,#chip button{transition:none}#hint,#hint.on{transform:translateX(-50%)}#msg,#msg.on{transform:translateX(-50%)}}
+/* HUD: one glass style for every box on the course, so they read as a set */
+#wind.calm svg,#wind.calm span{opacity:.6}
+#tools button{height:34px;min-width:34px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;gap:5px;background:var(--panel);color:var(--c50);border-color:color-mix(in srgb,var(--c50) 14%,transparent)}
+#map{background:var(--panel);border-radius:12px;border-color:color-mix(in srgb,var(--c50) 14%,transparent)}
+.panel{border-color:color-mix(in srgb,var(--c50) 14%,transparent);box-shadow:0 4px 18px color-mix(in srgb,var(--black) 18%,transparent)}
