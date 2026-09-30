@@ -15,3 +15,11 @@ button.sec:hover,.seg button:hover{transform:translateY(-1px)}button.sec:active,
 .ov .box kbd{background:var(--btn)}
 input,select,textarea{background:var(--field);color:var(--ink)}
 .stars5 b .ic{width:1em;height:1em}
+/* Round complete: a big result, folded fine print, and buttons that stay on screen */
+#card .box .sub{font-size:15px}
+#card .box .sub.cardScore{font-size:24px;color:var(--ink);margin:14px 0 4px}
+.cardMore{margin:6px 0 10px}
+.cardMore summary{cursor:pointer;color:var(--dim);font-size:14px;list-style:none}
+.cardMore summary::-webkit-details-marker{display:none}
+.cardMore summary::after{content:' ▸'}.cardMore[open] summary::after{content:' ▾'}
+#card .box>.row{position:sticky;bottom:-26px;background:var(--panel);margin:12px -30px -26px;padding:12px 30px 16px;border-top:1px solid var(--line)}
