@@ -1,5 +1,5 @@
 /* ===== v5 look · Q-21 The club, today (the front page's diorama) and Q-22 Clubhouse panels (tokens, icons, sheets). Drawing only: the plot is its own world, generated from the round's own inputs, drawn while the title shows and never read by a round or a record. ===== */
-const DIO_R=30,DIO_BLEND=10,DIO_HOUSE={w:18,d:9,h:4.4},DIO_TROPHY=10,SIGN_BOARD={w:10.4,h:2.4,foot:1},SIGN_CAP=1.3,SIGN_VOX=.08,DIO_CAM={fov:55},DIO_DRIFT=[[3,83],[.8,61],[1.5,107]],DIO_CLOCK=[6.5,18.5],DIO_LIT=[7,18],DIO_TICK=60,DIO_SOFT=.55,DIO_FADE=450,TILT_BAND=.24,TILT_BLUR=[2.5,1.5],FRONT_FIRST=1000;
+const DIO_R=30,DIO_BLEND=10,DIO_HOUSE={w:18,d:9,h:4.4},DIO_TROPHY=10,SIGN_BOARD={w:10.4,h:2.4,foot:1},SIGN_CAP=1.3,SIGN_VOX=.08,DIO_CAM={fov:55},DIO_DRIFT=[[3,83],[.8,61],[1.5,107]],DIO_CLOCK=[6.5,18.5],DIO_LIT=[7,18],DIO_TICK=60,DIO_SOFT=.55,DIO_FADE=450,DIO_GFX_MAX=2,TILT_BAND=.24,TILT_BLUR=[2.5,1.5],FRONT_FIRST=1000;
 const TITLE_FONT="Georgia,'Palatino Linotype','Book Antiqua',Palatino,serif";
 const DIO_L={c:[-13,-10],sign:[-11,-3],house:[-11,-20],green:[-27,-3,6],cam:[-7.5,13,20],look:[-11,-1.5,-8],trees:[[-26,-27],[5,-25],[-41,-12],[11,-10]],flag:[3,-16],bench:[-19,-9],washer:[3.6,-1.4]};
 const HOUSE_PAL=[[[.88,.84,.74],[.48,.22,.18],[.95,.94,.9]],[[.92,.91,.87],[.30,.33,.37],[.14,.2,.16]],[[.74,.68,.58],[.36,.26,.18],[.9,.86,.76]],[[.86,.70,.52],[.72,.36,.22],[.95,.88,.72]],[[.93,.89,.78],[.16,.32,.22],[.96,.95,.91]],[[.55,.38,.24],[.22,.22,.24],[.9,.86,.78]],[[.95,.95,.93],[.18,.45,.5],[.14,.2,.32]]];
@@ -74,7 +74,7 @@ function dioCam(){const L=DIO_L,y0=DIO.W.dioY,t=rmOn()?0:(performance.now()-DIO.
 function glOn(){if(REAL)document.body.classList.add('gl-on')}
 function frontShown(){const t=$('title');return!!t&&!t.classList.contains('hide')}
 function dioRender(){const now=performance.now();dioTick(now);const g0=[GFX.level,GFX.shadows,GFX.post,GFX.bloom,GFX.refl],c0=[cam.fov,cam.fogK],sy=HUDL.sy;
-  dioCam();GFX.level=0;GFX.shadows=GFX.post=GFX.bloom=GFX.refl=false;HUDL.sy=0;W=DIO.W;
+  dioCam();GFX.level=Math.min(GFX.level,DIO_GFX_MAX);GFX.refl=false;HUDL.sy=0;W=DIO.W;/* the front page gets the player's own shadows and grade (up to High) so it looks like the game, not a flat preview */
   try{render(S.t)}finally{W=null;[GFX.level,GFX.shadows,GFX.post,GFX.bloom,GFX.refl]=g0;[cam.fov,cam.fogK]=c0;HUDL.sy=sy}
   if(DIO.firstT==null){DIO.firstT=now;DIO.firstDone=performance.now();glOn()}}
 function drawFrame(){islClueTick();chipTick();if(ISLV.on&&ISLV.W)islRender();else if(!W&&DIO.W&&S.mode==='title'&&frontShown())dioRender();else render(S.t)}
