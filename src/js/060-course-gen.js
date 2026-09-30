@@ -274,6 +274,7 @@ function buildTerrain(W){const{cols,rows,ox,oz,H}=W,s=cols+1;
     else{T.tri(x0,h00,z0,x1,h10,z0,x0,h01,z1,r,g,b,0);T.tri(x1,h10,z0,x1,h11,z1,x0,h01,z1,r,g,b,0)}}
   return T.upload()}
 const CLOUDS={clear:9,breezy:15,overcast:34,drift:.6};
+const TEE_PAINT=[[[.13,.18,.32],[.93,.9,.82]],[[.42,.12,.14],[.93,.9,.82]],[[.9,.87,.78],[.2,.24,.2]]];/* navy, burgundy, cream: [body, cap] */
 function makeClouds(W){const R=mulberry32(thash(W.seed,W.idx+77)),rr=(a,b)=>a+R()*(b-a),wea=W.wea||WEATHER[0],flat=!!wea.flat,n=flat?CLOUDS.overcast:wea.wind>1.2?CLOUDS.breezy:CLOUDS.clear,L=W.light||[1,1,1];
   const cx=W.ox+W.cols*CS/2,cz=W.oz+W.rows*CS/2,span=Math.max(W.cols,W.rows)*CS*.5+320,wx=W.wind.x||0,wz=W.wind.z||0,ws=MM.hyp(wx,wz),ux=ws>.01?wx/ws:0,uz=ws>.01?wz/ws:1,up=ws*CLOUDS.drift*360,out=[];
   const base=flat?[.70,.72,.76]:[.97,.975,1],lo=flat?[52,66]:[70,96];
@@ -301,7 +302,7 @@ function buildMeshes(W){const{cols,rows,ox,oz,H,N}=W,s=cols+1,M={};W.shade=W.dio
   const bx=[];for(const t of W.trees)for(const b of treeBoxes(W,t))bx.push(W.cv>=4&&!b.eg?seasonBox(W,t,b):b);const n4=bx.length;if(W.cv>=4)props4(W,bx);if(W.cv>=7)props7(W,bx);if(W.dio)dioClear(W,bx,n4);
   const w=cols*CS,l=rows*CS;for(let x=ox+1;x<ox+w;x+=14)for(const z of[oz+1,oz+l-1]){terrainAt(W,x,z);bx.push([x,TQ.h+.5,z,.09,.55,.09,[.95,.95,.9]])}
   for(let z=oz+15;z<oz+l-1;z+=14)for(const x of[ox+1,ox+w-1]){terrainAt(W,x,z);bx.push([x,TQ.h+.5,z,.09,.55,.09,[.95,.95,.9]])}
-  for(const x of[-2,2]){terrainAt(W,x,0);bx.push([x,TQ.h+.16,0,.18,.16,.18,[.2,.35,.9]])}
+  {/* painted tee markers in a muted club colour, with a contrasting cap; the colour comes from a pure hash so it never touches the course RNG */const T=TEE_PAINT[(thash(W.seed,W.idx+501)>>>0)%TEE_PAINT.length];for(const x of[-2,2]){terrainAt(W,x,0);bx.push([x,TQ.h+.14,0,.18,.14,.18,T[0]]);bx.push([x,TQ.h+.3,0,.19,.025,.19,T[1]])}}
   M.boxes=buildBoxes(bx);if(W.dio){const D=dioBoxes(W);M.dboxes=buildBoxes(D.s);M.lboxes=buildBoxes(D.l)}M.clouds=buildBoxes(makeClouds(W));W.tLoad=S.t;
   const Cu=new MB(30*20);Cu.disc(W.pin.x,W.pin.y+.015,W.pin.z,CUP_R,20,[.04,.05,.03],0);M.cup=Cu.upload();
   const F=new MB(800),fc=W.flagCol||[.92,.16,.16],fv=(x,y)=>F.v(x,y,0,0,0,1,fc[0],fc[1],fc[2],2+(x/.92)*.98);
