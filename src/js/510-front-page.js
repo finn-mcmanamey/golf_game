@@ -77,7 +77,7 @@ function dioRender(){const now=performance.now();dioTick(now);const g0=[GFX.leve
   dioCam();GFX.level=Math.min(GFX.level,DIO_GFX_MAX);GFX.refl=false;HUDL.sy=0;W=DIO.W;/* the front page gets the player's own shadows and grade (up to High) so it looks like the game, not a flat preview */
   try{render(S.t)}finally{W=null;[GFX.level,GFX.shadows,GFX.post,GFX.bloom,GFX.refl]=g0;[cam.fov,cam.fogK]=c0;HUDL.sy=sy}
   if(DIO.firstT==null){DIO.firstT=now;DIO.firstDone=performance.now();glOn()}}
-function drawFrame(){islClueTick();chipTick();if(ISLV.on&&ISLV.W)islRender();else if(!W&&DIO.W&&S.mode==='title'&&frontShown())dioRender();else render(S.t)}
+function drawFrame(){islClueTick();chipTick();if(ISLV.on&&ISLV.W)islRender();else if(!W&&DIO.W&&S.mode==='title'&&frontShown()){if(!teeBusy())dioRender()}else render(S.t)}
 const TILT={m:-1};function tiltTick(){const m=S.mode==='title'&&frontShown()?2:S.intro||ISLV.on?1:0;if(m===TILT.m||!REAL)return;TILT.m=m;const b=document.body;b.classList.toggle('tilt',m>0);b.classList.toggle('tilt-fly',m===1)}
 const SHEETS=[['tour','Tour','tour',['pCareer','pTour','pStats','pLocker']],['daily','Daily','daily',['pDaily']],['courses','Courses','flag',['pPlay','pPlaces','pBook','pRange']],['ghosts','Ghosts','ghost',['pGhosts','pFriends']],['island','Island','island',['pIsland']],['settings','Settings','gear',['pSettings']]];
 const TAB_N={pIsland:'Your island',pCareer:'Career',pTour:'Classic tour',pStats:'Stats',pLocker:'Locker',pDaily:'Calendar',pPlay:'Play a course',pPlaces:'Places',pBook:'Records',pRange:'Range',pGhosts:'Ghosts',pFriends:'Friends',pSettings:'Settings'};
@@ -99,8 +99,7 @@ function frontRefresh(sv){const a=FRONT.act=frontAct(sv);S.frontSeed=a==='today'
   $('mainT').textContent=a==='today'?'Play today’s':'Continue';$('mainIc').innerHTML=ic(a==='today'?'play':'next');$('mainSub').textContent=sub;$('btnMain').classList.remove('busy');if(frontShown()&&!FRONT.sheet&&document.activeElement===document.body)$('btnMain').focus({preventScroll:true});
   {const r=$('btnIslRow');if(r)r.classList.toggle('hide',!tryOn())}if(frontShown()&&(!DIO.W||DIO.seed!==todaySeed()))later(()=>dioBuild())}
 const later=f=>{if(REAL&&typeof requestAnimationFrame==='function')requestAnimationFrame(()=>setTimeout(f,0));else f()};
-function mainGo(){const b=$('btnMain');if(!b||b.classList.contains('busy'))return;AU.play('ui');b.classList.add('busy');$('mainT').textContent='Teeing off…';
-  later(()=>{const a=FRONT.act;try{if(a==='resume')continueRound();else if(a==='career')careerEvent();else if(a==='tour')tourEvent();else goToday()}finally{if(frontShown())frontRefresh(loadSave())}})}
+function mainGo(){const b=$('btnMain');if(!b||b.classList.contains('busy'))return;AU.play('ui');teeLock();const a=FRONT.act;teeSoon(()=>teeOff(a,true))}
 
 function TK(n,a){const C=TK.c||(TK.c=new Map()),k=n+'|'+(a==null?1:a);let v=C.get(k);if(v)return v;if(!TK.g){try{const cs=getComputedStyle(document.documentElement);TK.g=q=>cs.getPropertyValue('--'+q).trim()}catch(e){TK.g=()=>''}}
   const m=/^#([0-9a-f]{6})$/i.exec(TK.g(n)),rgb=m?[parseInt(m[1].slice(0,2),16),parseInt(m[1].slice(2,4),16),parseInt(m[1].slice(4),16)]:[128,128,128];v=a==null||a>=1?'rgb('+rgb+')':'rgba('+rgb+','+a+')';C.set(k,v);return v}
