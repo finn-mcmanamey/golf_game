@@ -15,3 +15,7 @@ button.big:active,#chip button:active{transform:scale(.97)}
 #tools button{height:34px;min-width:34px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;gap:5px;background:var(--panel);color:var(--c50);border-color:color-mix(in srgb,var(--c50) 14%,transparent)}
 #map{background:var(--panel);border-radius:12px;border-color:color-mix(in srgb,var(--c50) 14%,transparent)}
 .panel{border-color:color-mix(in srgb,var(--c50) 14%,transparent);box-shadow:0 4px 18px color-mix(in srgb,var(--black) 18%,transparent)}
+/* the club picker sits on the swing bar as one piece, like a tab on a folder */
+body.chipbar #chip{margin-bottom:0;border-radius:12px 12px 0 0;border-bottom:0;padding:3px 10px 2px;background:var(--panel)}
+body.chipbar #meter{background:var(--panel);border-color:color-mix(in srgb,var(--c50) 14%,transparent);box-shadow:0 4px 18px color-mix(in srgb,var(--black) 18%,transparent)}
+body.chipbar #chip{border-color:color-mix(in srgb,var(--c50) 14%,transparent)}
