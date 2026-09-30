@@ -133,7 +133,7 @@ function drawBoxes(m,L=AI){if(!m.inst){draw(m);return}gl.bindBuffer(gl.ARRAY_BUF
   gl.bindBuffer(gl.ARRAY_BUFFER,m.buf);gl.vertexAttribPointer(L.aI,3,gl.FLOAT,false,28,0);gl.vertexAttribPointer(L.aS,3,gl.FLOAT,false,28,12);if(L.aK>=0)gl.vertexAttribPointer(L.aK,4,gl.UNSIGNED_BYTE,true,28,24);
   const div=['aI','aS','aK'].filter(k=>L[k]>=0);for(const k of div)INST.vertexAttribDivisorANGLE(L[k],1);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,unitBox.ib);INST.drawElementsInstancedANGLE(gl.TRIANGLES,36,gl.UNSIGNED_SHORT,0,m.n);for(const k of div)INST.vertexAttribDivisorANGLE(L[k],0)}
 function draw(m,M=ID,ov=null,mode=gl.TRIANGLES){if(!m||!m.n)return;bind(m);gl.uniformMatrix4fv(PS.u.uM,false,M);gl.uniform4fv(PS.u.uOv,ov||[0,0,0,0]);gl.drawArrays(mode,0,m.n)}
-function resize(){const d=Math.min(devicePixelRatio||1,2),w=(innerWidth*d)|0,h=(innerHeight*d)|0;if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;gl.viewport(0,0,w,h)}VP.w=w;VP.h=h;
+function resize(){const d=Math.min(devicePixelRatio||1,battDpr()),w=(innerWidth*d)|0,h=(innerHeight*d)|0;if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;gl.viewport(0,0,w,h)}VP.w=w;VP.h=h;
   if(GFX.post&&(PPB.w!==w||PPB.h!==h)){if(PPB.tex){gl.deleteFramebuffer(PPB.fb);gl.deleteTexture(PPB.tex);gl.deleteRenderbuffer(PPB.rb);PPB.tex=null}const f=fboMake(w,h);if(f)Object.assign(PPB,f);else GFX.post=false}}
 function render(t){camKick();try{return render_(t)}finally{camUnkick()}}function render_(t){resize();const asp=VP.w/VP.h,P=hudLens(M4.persp(cam.fov,asp,.3,4000)),V=M4.look([cam.x,cam.y,cam.z],[cam.tx,cam.ty,cam.tz],[0,1,0]),vp=M4.mul(P,V);VP.m=vp;
   const fx=cam.tx-cam.x,fy=cam.ty-cam.y,fz=cam.tz-cam.z,fl=MM.hyp(fx,fy,fz)||1,hor=MM.tan(-MM.asin(clamp(fy/fl,-1,1)))/MM.tan(cam.fov/2);
