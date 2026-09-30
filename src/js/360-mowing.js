@@ -1,4 +1,4 @@
 /* ===== Q-13 mowing patterns and Q-14 bevelled, varied blocks: the terrain shader reads each block's surface (the physics' own cells): fairway stripes STRIPE_W wide across the hole's line, the first cut a tone lighter, deep rough darker, the fringe a mown collar, the green a checkerboard, sand raked; on Medium and up each block gets a soft lit edge and its own tone. Drawing only ===== */
 const STRIPE_W=4,STRIPE_K=.07,STRIPE_WINTER=.35,CHECK_W=2,CHECK_K=.035,RAKE_W=.25,BEVEL_W=.12,VARY_K=.04,BEVEL_FAR=120;
 /* the uniforms: stripe amplitude (muted in winter), which grid axis the stripes cross, the checkerboard, and the bevel's tier */
-function mowSet(){if(!PT||!PT.u.uMow||!W)return;const p=W.pin||{x:0,z:1};gl.uniform4f(PT.u.uMow,STRIPE_K*(W.season===3?STRIPE_WINTER:1),Math.abs(p.z)>=Math.abs(p.x)?1:0,CHECK_K,GFX.level>=1?1:0)}
+function mowSet(){if(!PT||!PT.u.uMow||!W)return;const p=W.pin||{x:0,z:1};gl.uniform4f(PT.u.uMow,STRIPE_K*(W.season===3?(tryOn()?STRIPE_WINTER7:STRIPE_WINTER):1),Math.abs(p.z)>=Math.abs(p.x)?1:0,CHECK_K,(GFX.level>=1?1:0)*(tryOn()?2:1))}

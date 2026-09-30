@@ -20,23 +20,23 @@ function wearAt(x,z){if(!W||W.cv<4||!W.wear)return 0;terrainAt(W,x,z);return wea
 const STANCE={tilt:1.5,loft:2,speed:.4,cap:.2};
 function stanceAt(x,z,yaw){terrainAt(W,x,z);if(!W.cv||W.cv<2)return{along:0,side:0};const nx=TQ.nx,ny=TQ.ny||1,nz=TQ.nz,dx=MM.sin(yaw),dz=MM.cos(yaw);
   return{along:clamp(MM.atan(-(nx*dx+nz*dz)/ny),-STANCE.cap,STANCE.cap),side:clamp(MM.atan(-(nx*dz-nz*dx)/ny),-STANCE.cap,STANCE.cap)}}
-function strike(c,pow,acc,yaw,shape=0,traj=1,mis=0){MM=W.M||NM;if(B===PB&&!EXACT){contactFX(c,pow,acc,mis);impactFX(c,yaw,mis)}
+function strike(c,pow,acc,yaw,shape=0,traj=1,mis=0){MM=W.M||NM;if(B===PB&&!EXACT){contactFX(c,pow,acc,mis);impactFX(c,yaw,mis)}const G8=B.G||G_TEST;B.G=null;const gm=G8?golfMods(G8,c):null;if(gm){acc*=gm.acc;if(mis>0)mis=Math.min(MIS_CAP,mis*gm.fat);else if(mis<0)mis=Math.max(-MIS_CAP,mis*gm.thin)}B.windK=gm?gm.wind:1;
   const st=c.putter?{along:0,side:0}:stanceAt(B.x,B.z,yaw);terrainAt(W,B.x,B.z);const hs=B.hand?-1:1,ty=TQ.ty,L=LIE[ty],dir=yaw+hs*acc*(c.putter?.012:.045),dx=MM.sin(dir),dz=MM.cos(dir),T=TRAJ[traj],sh=SHAPE[shape].k;
   B.sx=B.x;B.sz=B.z;B.dx=B.x;B.dz=B.z;B.t=0;B.acc=0;B.lip=false;B.cup=false;B.rim=0;B.creep=0;B.tree=null;B.apex=B.y;B.trail.length=0;B.ev.length=0;
-  if(c.putter){const v=c.v*pow*PUTT[ty];B.vx=dx*v;B.vz=dz*v;B.vy=0;B.sp=0;B.st='roll';return}
+  if(c.putter){const v=c.v*pow*PUTT[ty]*(gm?gm.v:1);B.vx=dx*v;B.vz=dz*v;B.vy=0;B.sp=0;B.st='roll';return}
   let df=L[0],sf=L[1],angK=1,vK=1,spK=1;if(ty===6&&(c.s==='SW'||c.s==='LW')){df=.95;sf=.9}
-  if(W.cv>=3){const bl=BALLS[B.ballType|0];vK*=W.cv>=9&&c.v9?bl.v/BALLS[0].v:bl.v;spK*=W.cv>=9&&c.v9?bl.spin/BALLS[0].spin:bl.spin;if(W.rain)spK*=RAIN.spin;
+  if(W.cv>=3){const bl=BALLS[B.ballType|0];vK*=(W.cv>=9||W.v10)&&c.v9?bl.v/BALLS[0].v:bl.v;spK*=(W.cv>=9||W.v10)&&c.v9?bl.spin/BALLS[0].spin:bl.spin;if(W.rain)spK*=RAIN.spin;
     if(c.sg){const q=SG_LIE[c.sgi][ty];df=q[0];sf=q[1];if(c.sgi===2&&TIGHT[ty]){angK*=SG.thin.ang;vK*=SG.thin.v;spK*=SG.thin.spin}}
     const ls=lieState();if(ls.sit){df*=LIES.sitDf;sf*=LIES.sitSf}if(ls.plug){df*=c.sg&&c.sgi===3?LIES.plugDf:LIES.plugDf2;sf*=LIES.plugSf}
     if(W.cv>=4){if(ls.divot){vK*=.92;angK*=.9;spK*=.9}if(ls.worn){spK*=.9;if(c.sg&&c.sgi===2&&!TIGHT[ty]){angK*=SG.thin.ang;vK*=SG.thin.v;spK*=SG.thin.spin}}
       /* F-050: contact from the click, never from chance */if(mis>0){vK*=1-FAT_V*mis;angK*=1+FAT_ANG*mis;spK*=1+FAT_SPIN*mis}else if(mis<0){angK*=1+THIN_ANG*mis;vK*=1+THIN_V*mis;spK*=1+THIN_SPIN*mis}}}
-  B.n=0;B.nb=0;if(B.k0==null)B.k0=0;
-  const L9=W.cv>=9&&c.v9?1:0,vm=L9?df*T.v*(sh?.96:1)*(1-STANCE.speed*Math.abs(st.along))*(EXACT?1:1+(B.rng()-.5)*.025)*vK:0,v=L9?c.v9*pow*MM.pow(vm,LIE9):c.v*pow*df*T.v*(sh?.96:1)*(1-STANCE.speed*Math.abs(st.along))*(EXACT?1:1+(B.rng()-.5)*.025)*vK,ang=(L9?c.ang9*(1+PART_LOFT9*(1-pow)*part9(pow)):c.ang)*T.ang*(1+.12*(1-df))*(1+STANCE.loft*st.along)*angK,vh=v*MM.cos(ang);
-  B.vx=dx*vh;B.vz=dz*vh;B.vy=v*MM.sin(ang);B.sp=c.spin*sf*T.spin*(.4+.6*pow+(L9?.3*(1-pow)*part9(pow):0))*spK;B.w9=L9?c.w9*sf*T.spin*(.4+.6*pow+.3*(1-pow)*part9(pow))*spK:null;B.sp9=B.sp;
+  if(gm)spK*=gm.sp;B.n=0;B.nb=0;if(B.k0==null)B.k0=0;
+  const L9=(W.cv>=9||W.v10)&&c.v9?1:0,vm=L9?df*T.v*(sh?.96:1)*(1-STANCE.speed*Math.abs(st.along))*(EXACT?1:1+(B.rng()-.5)*.025)*vK:0,v=L9?c.v9*pow*MM.pow(vm,LIE9):c.v*pow*df*T.v*(sh?.96:1)*(1-STANCE.speed*Math.abs(st.along))*(EXACT?1:1+(B.rng()-.5)*.025)*vK,ang=(L9?c.ang9*(1+PART_LOFT9*(1-pow)*part9(pow)):c.ang)*T.ang*(1+.12*(1-df))*(1+STANCE.loft*st.along)*angK,vg=v*(gm?gm.v:1),vh=vg*MM.cos(ang);
+  B.vx=dx*vh;B.vz=dz*vh;B.vy=vg*MM.sin(ang);B.sp=c.spin*sf*T.spin*(.4+.6*pow+(L9?.3*(1-pow)*part9(pow):0))*spK;B.w9=L9?c.w9*sf*T.spin*(.4+.6*pow+.3*(1-pow)*part9(pow))*spK:null;B.sp9=B.sp;
   const tilt=hs*(acc*.55+sh*.45+STANCE.tilt*st.side)*c.side,ct=MM.cos(tilt),sn=MM.sin(tilt);B.ax=-dz*ct;B.ay=sn;B.az=dx*ct;B.sy=B.y;B.pathDrop=false;B.st='air'}
 function nearTrees(x,z,fn){const gx=((x-W.ox)/8)|0,gz=((z-W.oz)/8)|0;for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){const l=W.tgrid.get((gx+i)+','+(gz+j));if(l)for(const t of l)fn(t)}}
 function stepAir(dt){
-  const w=W.wind,wk=W.swell?windAt(B.k0+SWING_TICKS+B.n):1,wh=wk*windH(B.y-(B.sy!=null?B.sy:B.y)),rx=B.vx-w.x*wh,ry=B.vy,rz=B.vz-w.z*wh,rs=MM.hyp(rx,ry,rz),d=(B.w9!=null?aero9(rs,dt):KD*rs*(1+.35*B.sp))*(W.rain?RAIN.drag:1)*(W.air||1),l=(B.w9!=null?F9.l:KL*B.sp*rs)*(W.air||1);
+  const w=W.wind,wk=W.swell?windAt(B.k0+SWING_TICKS+B.n):1,wh=wk*windH(B.y-(B.sy!=null?B.sy:B.y))*(B.windK||1),rx=B.vx-w.x*wh,ry=B.vy,rz=B.vz-w.z*wh,rs=MM.hyp(rx,ry,rz),d=(B.w9!=null?aero9(rs,dt):KD*rs*(1+.35*B.sp))*(W.rain?RAIN.drag:1)*(W.air||1),l=(B.w9!=null?F9.l:KL*B.sp*rs)*(W.air||1);
   B.vx+=(-d*rx+l*(B.ay*rz-B.az*ry))*dt;B.vy+=(-G-d*ry+l*(B.az*rx-B.ax*rz))*dt;B.vz+=(-d*rz+l*(B.ax*ry-B.ay*rx))*dt;
   B.x+=B.vx*dt;B.y+=B.vy*dt;B.z+=B.vz*dt;B.sp*=1-.04*dt;if(B.w9!=null)B.sp9=B.sp;if(B.y>B.apex)B.apex=B.y;
   nearTrees(B.x,B.z,t=>{
@@ -73,9 +73,9 @@ function simulate(dt){MM=W.M||NM;B.acc+=dt;let n=0;while(B.acc>=DT&&n++<4000&&(B
 function settle(){MM=W.M||NM;let n=0;while((B.st==='air'||B.st==='roll')&&n++<6000)stepOne()}
 function withBall(b,fn){const sv=B;B=b;try{return fn()}finally{B=sv}}
 const SB=newBall(),PRED={still:null,wind:null,tStill:0,tWind:0};
-function predictShot(still,force,cl){MM=W&&W.M||NM;const c=cl||curClub();if(c.putter||!W)return null;const slot=(still?'still':'wind')+(cl?'_'+c.id:''),k0=curTick(),key=[c.id,c.sg?0:S.shape,c.sg?1:S.traj,Math.round(S.yaw*4000),Math.round(PB.x*20),Math.round(PB.z*20),W.seed,W.idx,W.cv,S.ball,PB.plug?1:0,PB.lf|0,still?0:Math.round((W.wind.x||0)*100)+','+Math.round((W.wind.z||0)*100)+','+(W.swell?k0:0)].join(),old=PRED[slot];if(old&&old.key===key)return old;
+function predictShot(still,force,cl){MM=W&&W.M||NM;const c=cl||curClub();if(c.putter||!W)return null;const slot=(still?'still':'wind')+(cl?'_'+c.id:''),k0=curTick(),key=[c.id,c.sg?0:S.shape,c.sg?1:S.traj,Math.round(S.yaw*4000),Math.round(PB.x*20),Math.round(PB.z*20),W.seed,W.idx,W.cv,S.ball,PB.plug?1:0,PB.lf|0,still?0:Math.round((W.wind.x||0)*100)+','+Math.round((W.wind.z||0)*100)+','+(W.swell?k0:0),gPredK()].join(),old=PRED[slot];if(old&&old.key===key)return old;
   const now=performance.now();if(!force&&old&&now-PRED['t'+slot]<40)return old;PRED['t'+slot]=now;const svW=W.wind,svE=EXACT,dPin=MM.hyp(W.pin.x-PB.x,W.pin.z-PB.z);let pw=sgPow(c);if(still)W.wind={x:0,z:0,s:0,a:0};EXACT=true;let path,carry,rest;
-  let treeD=null,face=false;const run=p=>{path=[];carry=null;treeD=null;face=false;withBall(SB,()=>{place(PB.x,PB.z);SB.plug=PB.plug;SB.lf=PB.lf;SB.rng=mulberry32(7);SB.k0=k0;SB.ballType=S.ball;SB.hand=PB.hand|0;strike(c,p,0,S.yaw,c.sg?0:S.shape,c.sg?1:S.traj);let n=0;while((SB.st==='air'||SB.st==='roll')&&n++<9000){stepOne();if(treeD==null&&SB.tree)treeD=MM.hyp(SB.x-PB.x,SB.z-PB.z);if(!carry&&SB.ev.length)carry=[SB.x,SB.z];if(n%10===0)path.push(SB.x,SB.z)}path.push(SB.x,SB.z)});rest=[SB.x,SB.z];face=SB.ev.includes('face');carry=carry||rest;return MM.hyp(rest[0]-PB.x,rest[1]-PB.z)};
+  let treeD=null,face=false;const run=p=>{path=[];carry=null;treeD=null;face=false;withBall(SB,()=>{place(PB.x,PB.z);SB.plug=PB.plug;SB.lf=PB.lf;SB.rng=mulberry32(7);SB.k0=k0;SB.ballType=S.ball;SB.hand=PB.hand|0;SB.G=gNum();strike(c,p,0,S.yaw,c.sg?0:S.shape,c.sg?1:S.traj);let n=0;while((SB.st==='air'||SB.st==='roll')&&n++<9000){stepOne();if(treeD==null&&SB.tree)treeD=MM.hyp(SB.x-PB.x,SB.z-PB.z);if(!carry&&SB.ev.length)carry=[SB.x,SB.z];if(n%10===0)path.push(SB.x,SB.z)}path.push(SB.x,SB.z)});rest=[SB.x,SB.z];face=SB.ev.includes('face');carry=carry||rest;return MM.hyp(rest[0]-PB.x,rest[1]-PB.z)};
   try{let tot=run(pw);if(c.sg)for(let it=0;it<3&&tot>0;it++){const k=dPin/tot;if(Math.abs(k-1)<.06)break;pw=clamp(pw*Math.sqrt(k),SG.pinPow[0],SG.pinPow[1]);tot=run(pw)}}finally{W.wind=svW;EXACT=svE}
   const ux=MM.sin(S.yaw),uz=MM.cos(S.yaw),r={key,pow:pw,path,carry,rest,st:SB.st,treeD,face,carryD:MM.hyp(carry[0]-PB.x,carry[1]-PB.z),totalD:MM.hyp(rest[0]-PB.x,rest[1]-PB.z),roll:(rest[0]-carry[0])*ux+(rest[1]-carry[1])*uz};PRED[slot]=r;return r}
 function checkText(i){const c=SG_SET[i],P=predictShot(true,false,c);if(!P)return'';const r=P.roll;return r<-.5?'spins back '+Math.abs(r).toFixed(r>-10?1:0)+' m':r<1.5?'stops':r<6?'checks '+r.toFixed(1)+' m':'runs '+Math.round(r)+' m'}

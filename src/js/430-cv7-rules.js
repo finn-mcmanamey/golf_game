@@ -26,4 +26,4 @@ const CANOPY_DENSE=tuneDef('F-093','CANOPY_DENSE',.15,'phys','pass chance throug
 const CANOPY_CLASS={spruce:0,cedar:0,norfolk:0,gorse:0,buckthorn:0,banksia:0,bent:1,scots:1,oak:1,elm:1,cherry:1,teatree:1,birch:2,larch:2,paloverde:2,joshua:2,saguaro:2};
 function canopyPass(t){if(!W||W.cv<7||!W.bio)return .3;const sp=typeof tsp==='function'?tsp(t):null,cl=sp!=null&&CANOPY_CLASS[sp]!=null?CANOPY_CLASS[sp]:t.kind==='gorse'?0:t.kind==='cactus'?2:1;let p=cl===0?TUNE.CANOPY_DENSE:cl===2?TUNE.CANOPY_SPARSE:TUNE.CANOPY_MEDIUM;
   const ever=sp?!!EVERGREEN[sp]:t.kind!=='oak';if(!ever){if(W.season===3)p=TUNE.CANOPY_WINTER;else if(W.season===2)p=Math.min(1,p+TUNE.CANOPY_AUTUMN)}return p}
-const newCv=()=>(S.seed===daily()||S.weekly||S.weeklyPending)?CV:tryOn()?CV:6;
+const newCv=()=>CV;

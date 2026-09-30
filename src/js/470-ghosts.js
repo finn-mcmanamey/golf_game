@@ -2,7 +2,7 @@
 const GHOST_MAX=tuneDef('F-102','GHOST_MAX',3,'ui','ghosts at once, slot one included',1,3,1),GHOST_ALPHA_G=tuneDef('F-102','GHOST_ALPHA_G',.45,'ui','a ghost golfer\'s alpha',.2,.8,.05),GHOST_ALPHA_B=tuneDef('F-102','GHOST_ALPHA_B',.55,'ui','a ghost ball\'s alpha',.3,.9,.05),GHOST_LOAD=tuneDef('F-102','GHOST_LOAD',40,'ui','ms per house ghost per hole load the suite allows',10,120,5);
 const GHOST_COLS={1:[.55,.8,1],2:[.6,1,.6],3:[.8,.6,1],best:[1,.82,.35]},GHOST_KINDS=['none','Caddie','Member','Pro','best','code','field','weekly'];
 if(SETS.bestGhost==null)SETS.bestGhost=1;
-const bestKey3=(cv,seed,n,twist,fmt)=>cv+'.'+seed+'.'+n+(twist?'.t'+twist:'')+(fmt?'.f'+fmt:'')+(cv>=CV_ISL?'.k'+(S.kind|0):'');
+const bestKey3=(cv,seed,n,twist,fmt)=>(S.v10&&cv===S.cv?CV_NOW:cv)+'.'+seed+'.'+n+(twist?'.t'+twist:'')+(fmt?'.f'+fmt:'')+(cv>=CV_ISL?'.k'+(S.kind|0):'');
 function bookBest(seed,n,cv,twist,fmt){const B=bookGet();return B.bests&&B.bests[bestKey3(cv==null?S.cv:cv,seed,n,twist||0,fmt||0)]||null}
 function bookBestSet(seed,n,cv,s,code,twist,fmt){const B=bookGet(),k=bestKey3(cv,seed,n,twist||0,fmt||0),o=B.bests&&B.bests[k];if(o&&o.s<=s)return false;(B.bests=B.bests||{})[k]={s,code,t:Date.now()};lsSet('voxellinks.book',B);return true}
 const bestEligible=()=>(!S.casual||(S.format===1&&tryOn()))&&!S.lab&&!S.replay&&!S.range&&!S.hs&&!S.scen&&!S.tuned&&S.cv>=4&&S.n>=3;
@@ -14,7 +14,7 @@ function slotsSet(v){try{VS.setItem('voxellinks.slots',JSON.stringify(v))}catch(
 function slotName(q,seed){return q.k===4?'Your best':q.k===5?'A code':GHOST_KINDS[q.k]||'None'}
 function xgFrom(q,n,slot){if(!q||!q.k)return null;const col=q.k===4?GHOST_COLS.best:GHOST_COLS[slot]||GHOST_COLS[3];
   if(q.k>=1&&q.k<=3){const T=TIERS[q.k];return{name:T.n,kind:q.k,T,col,ball:newBall(),L:[],steps:[],k:0,full:true}}
-  const code=q.k===4?(bookBest(S.seed,n,S.cv,S.twist|0,S.format|0)||{}).code:q.code;if(!code)return null;const d=decodeRound(code);if(!d||d.seed!==S.seed||d.n!==n||(d.cv||0)!==S.cv)return null;
+  const code=q.k===4?(bookBest(S.seed,n,S.cv,S.twist|0,S.format|0)||{}).code:q.code;if(!code)return null;const d=decodeRound(code);if(!d||d.golfer||d.seed!==S.seed||d.n!==n||(d.cv||0)!==S.cv)return null;
   const nm=q.k===4?'Best':(code.split('.')[1]?(()=>{try{return decodeURIComponent(escape(atob(code.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))))}catch(e){return'Friend'}})():'Friend');
   return{name:nm,kind:q.k,code,col,ball:newBall(),L:d.log,steps:[],k:0,seat:d.seat|0,ballType:d.ball|0,full:true,hd:d}}
 function ghostSlots3(n,save){if(!tryOn()||S.hs||S.scen||S.range||S.lab)return;let xg=S.xg?S.xg.slice():[];const own=xg.length>0;if(save&&save.gk!=null&&gkUnpack(save.gk)[0]===4&&S.ghost&&!S.ghost.house){S.ghost.best=true;S.ghost.name='Best'}

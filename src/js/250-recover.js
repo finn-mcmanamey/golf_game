@@ -5,7 +5,7 @@ function s6Note(txt,btn,fn){if(typeof document==='undefined'||!document.body)ret
 function s6Catch(e){const now=performance.now();errNote(e&&e.message||e,e&&e.stack);S6.t=S6.t.filter(t=>now-t<ERR_WINDOW);S6.t.push(now);let tier='';
   if(S6.t.length>=3&&GFX.level>0){S6.t=[];try{gfxSet(GFX.level-1,true);tier=' · graphics down a tier'}catch(x){}}
   let back='';if(!S6.busy&&S.mode!=='title'&&!S.bug&&!S.replay&&!S.lab&&!S.range&&loadSave()){S6.busy=true;try{continueRound();back=' · the round is back from its last save'}catch(x){errNote(x&&x.message||x,x&&x.stack)}finally{S6.busy=false}}
-  const say=code=>s6Note('Something went wrong'+back+tier+(code?' · bug code '+code.slice(0,16)+'…':''),'Copy bug code',()=>bugKey());say(null);try{bugEncode(bugState()).then(c=>{S.lastBug=c;say(c)},()=>{})}catch(x){}}
+  const say=code=>s6Note('Something went wrong'+back+tier+(code?' · bug code '+code.slice(0,16)+'…':''),'Copy bug code',()=>bugKey());say(null);try{S6.catching=true;let st;try{st=bugState()}finally{S6.catching=false}bugEncode(st).then(c=>{S.lastBug=c;say(c)},()=>{})}catch(x){}}
 /* the frame, guarded: in a browser a throw is caught and recovered; headless (no window frame loop) it is thrown, so the suite still sees it */
 function frame(now){try{frame_(now)}catch(e){if(typeof window==='undefined'||typeof window.requestAnimationFrame!=='function')throw e;s6Catch(e)}}
 function s6Gl(){if(typeof cv==='undefined'||!cv.addEventListener)return;cv.addEventListener('webglcontextlost',e=>{e.preventDefault();pzHold(true,'gl');try{if(S.mode!=='title'&&!S.bug)saveRound()}catch(x){}s6Note('The graphics card reset · rebuilding the scene…')},false);

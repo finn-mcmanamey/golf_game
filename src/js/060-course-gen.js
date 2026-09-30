@@ -146,7 +146,7 @@ function strokeIndex(seed,pars,cv=0){if(cv>=4&&pars.length===18){/* F-057: odd i
 function gridOf(plan){const{C,hw,PD,g,gR,lane}=plan;let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;const ext=(x,z,r)=>{x0=Math.min(x0,x-r);x1=Math.max(x1,x+r);z0=Math.min(z0,z-r);z1=Math.max(z1,z+r)};
   for(const c of C)ext(c.x,c.z,hw(c.t)+2);for(const p of PD)ext(p.x,p.z,Math.max(p.rx,p.rz)+4);ext(g.x,g.z,gR+8);if(plan.twin)ext(plan.twin.x,plan.twin.z,plan.twin.r+6);if(plan.path)for(const q of plan.path.pts)ext(q.x,q.z,3);if(lane){ext(lane.ax,lane.az,lane.hw+6);ext(lane.bx,lane.bz,lane.hw+6)}
   let ms=64;while(ms>36&&Math.ceil((x1-x0+2*ms)/CS)*Math.ceil((z1-z0+80)/CS)>46000)ms-=4;return{ox:x0-ms,oz:z0-30,cols:Math.ceil((x1-x0+2*ms)/CS),rows:Math.ceil((z1-z0+80)/CS)}}
-function genHole(seed,idx,par,cv=0,setup=0,cond=S){return withMath(cv,()=>{const w=cv>=CV_ISL?islGenHole(seed,idx,par,cv,setup,cond):genHole_(seed,idx,par,cv,setup,cond);w.M=mathFor(cv);w.key=holeKey(seed,idx,cv,setup,cond);return w})}const holeKey=(seed,h,cv,setup,c)=>[seed,h,cv,cv>=3?setup|0:0,cv>=4&&c?c.season|0:0,cv>=4&&c?c.wear|0:0,cv>=4&&c?c.kind|0:0,cv>=7&&c?c.twist|0:0].join('/')+(cv>=CV_ISL&&c?'/d'+(c.islDay|0):''),holeIs=(W,h)=>!!W&&W.key===holeKey(S.seed,h,S.cv,S.setup,S);let CALCV=-1;function genHole_(seed,idx,par,cv=0,setup=0,cond=S){
+function genHole(seed,idx,par,cv=0,setup=0,cond=S){return withMath(cv,()=>{const w=cv>=CV_ISL?islGenHole(seed,idx,par,cv,setup,cond):genHole_(seed,idx,par,cv,setup,cond);w.M=mathFor(cv);w.v10=!!(cond&&cond.v10);w.key=holeKey(seed,idx,cv,setup,cond);return w})}const holeKey=(seed,h,cv,setup,c)=>[seed,h,cv,cv>=3?setup|0:0,cv>=4&&c?c.season|0:0,cv>=4&&c?c.wear|0:0,cv>=4&&c?c.kind|0:0,cv>=7&&c?c.twist|0:0].join('/')+(cv>=CV_ISL&&c?'/d'+(c.islDay|0):'')+(c&&c.v10?'/v10':''),holeIs=(W,h)=>!!W&&W.key===holeKey(S.seed,h,S.cv,S.setup,S);let CALCV=-1;function genHole_(seed,idx,par,cv=0,setup=0,cond=S){
   const bio=biomeOf(seed,cv),BI=BIOMES[bio],plan=cond&&cond.range?rangePlan(seed,cv):cv>=4&&cond&&cond.kind===1?holePlanP3(seed,idx,cv):holePlan(seed,idx,par,cv),{R,rr,N,len,step,n,C,g,gR,hw,pin,BK,PD,ta,tm,wind}=plan,lane=plan.lane,gB=plan.gBlend||[-1,7],gRise=plan.gRise||0,tRise=plan.tRise||0;
   const ed=(e,x,z)=>{if(e.cr===undefined){e.cr=MM.cos(e.rot);e.sr=MM.sin(e.rot)}const dx=x-e.x,dz=z-e.z,c=e.cr,s=e.sr,u=(dx*c+dz*s)/e.rx,v=(dz*c-dx*s)/e.rz;return Math.sqrt(u*u+v*v)};
   const laneD=lane?(x,z)=>{const ex=lane.bx-lane.ax,ez=lane.bz-lane.az,l2=ex*ex+ez*ez||1,u=clamp(((x-lane.ax)*ex+(z-lane.az)*ez)/l2,0,1);return MM.hyp(x-lane.ax-ex*u,z-lane.az-ez*u)}:null;
@@ -233,7 +233,7 @@ function makeProp(kind,x,z,y,R,BI){const rr=(a,b)=>a+R()*(b-a),s=rr(.8,1.4),t={x
 function cellColor(W,c,x,z,out){const T=W.ty[c],S=SURF[T],t=W.tC[c],col=W.pal&&W.pal[T]||S.col;let v=1+S.var*W.N.n2(x*.31+3,z*.31+1);
   if(T===2||T===5)v*=(Math.floor(t/6)&1)?1.06:.95;else if(T===4)v*=((Math.floor(x/3)+Math.floor(z/3))&1)?1.04:.965;else if(T<2)v*=1+.06*W.N.n2(x*.09,z*.09);
   if(T===8)v*=W.N.n2(x*1.7,z*1.7)>.45?.84:1;if(W.shade)v*=W.shade[c];
-  out[0]=col[0]*v;out[1]=col[1]*v;out[2]=col[2]*v;out[3]=T;if(W.cv>=4)tint4(W,c,T,x,z,out)}
+  out[0]=col[0]*v;out[1]=col[1]*v;out[2]=col[2]*v;out[3]=T;if(W.cv>=4)tint4(W,c,T,x,z,out);if(W.cutK===undefined)W.cutK=tryOn()&&W.cv>=4&&W.bio?cutKFor(W.bio,W.season|0):null;if(W.cutK&&T<=4){const q=W.cutK[T];out[0]*=q;out[1]*=q;out[2]*=q}}
 /* F-053 palette by season (summer bleached rough, winter dull and frosty until 10:00), F-059 snow above SNOW_LINE, F-055 worn patches blend toward bare earth */
 const STRAW=[.66,.60,.36],EARTH=[.52,.43,.30],FROST=[.84,.87,.86],SNOW=[.93,.95,.98];
 function tint4(W,c,T,x,z,o){const mix=(q,k)=>{o[0]=lerp(o[0],q[0],k);o[1]=lerp(o[1],q[1],k);o[2]=lerp(o[2],q[2],k)};if(T>5&&T!==8)return;const se=W.season;
@@ -274,6 +274,7 @@ function buildTerrain(W){const{cols,rows,ox,oz,H}=W,s=cols+1;
     else{T.tri(x0,h00,z0,x1,h10,z0,x0,h01,z1,r,g,b,0);T.tri(x1,h10,z0,x1,h11,z1,x0,h01,z1,r,g,b,0)}}
   return T.upload()}
 const CLOUDS={clear:9,breezy:15,overcast:34,drift:.6};
+const TEE_PAINT=[[[.13,.18,.32],[.93,.9,.82]],[[.42,.12,.14],[.93,.9,.82]],[[.9,.87,.78],[.2,.24,.2]]];/* navy, burgundy, cream: [body, cap] */
 function makeClouds(W){const R=mulberry32(thash(W.seed,W.idx+77)),rr=(a,b)=>a+R()*(b-a),wea=W.wea||WEATHER[0],flat=!!wea.flat,n=flat?CLOUDS.overcast:wea.wind>1.2?CLOUDS.breezy:CLOUDS.clear,L=W.light||[1,1,1];
   const cx=W.ox+W.cols*CS/2,cz=W.oz+W.rows*CS/2,span=Math.max(W.cols,W.rows)*CS*.5+320,wx=W.wind.x||0,wz=W.wind.z||0,ws=MM.hyp(wx,wz),ux=ws>.01?wx/ws:0,uz=ws>.01?wz/ws:1,up=ws*CLOUDS.drift*360,out=[];
   const base=flat?[.70,.72,.76]:[.97,.975,1],lo=flat?[52,66]:[70,96];
@@ -301,7 +302,7 @@ function buildMeshes(W){const{cols,rows,ox,oz,H,N}=W,s=cols+1,M={};W.shade=W.dio
   const bx=[];for(const t of W.trees)for(const b of treeBoxes(W,t))bx.push(W.cv>=4&&!b.eg?seasonBox(W,t,b):b);const n4=bx.length;if(W.cv>=4)props4(W,bx);if(W.cv>=7)props7(W,bx);if(W.dio)dioClear(W,bx,n4);
   const w=cols*CS,l=rows*CS;for(let x=ox+1;x<ox+w;x+=14)for(const z of[oz+1,oz+l-1]){terrainAt(W,x,z);bx.push([x,TQ.h+.5,z,.09,.55,.09,[.95,.95,.9]])}
   for(let z=oz+15;z<oz+l-1;z+=14)for(const x of[ox+1,ox+w-1]){terrainAt(W,x,z);bx.push([x,TQ.h+.5,z,.09,.55,.09,[.95,.95,.9]])}
-  for(const x of[-2,2]){terrainAt(W,x,0);bx.push([x,TQ.h+.16,0,.18,.16,.18,[.2,.35,.9]])}
+  {/* painted tee markers in a muted club colour, with a contrasting cap; the colour comes from a pure hash so it never touches the course RNG */const T=TEE_PAINT[(thash(W.seed,W.idx+501)>>>0)%TEE_PAINT.length];for(const x of[-2,2]){terrainAt(W,x,0);bx.push([x,TQ.h+.14,0,.18,.14,.18,T[0]]);bx.push([x,TQ.h+.3,0,.19,.025,.19,T[1]])}}
   M.boxes=buildBoxes(bx);if(W.dio){const D=dioBoxes(W);M.dboxes=buildBoxes(D.s);M.lboxes=buildBoxes(D.l)}M.clouds=buildBoxes(makeClouds(W));W.tLoad=S.t;
   const Cu=new MB(30*20);Cu.disc(W.pin.x,W.pin.y+.015,W.pin.z,CUP_R,20,[.04,.05,.03],0);M.cup=Cu.upload();
   const F=new MB(800),fc=W.flagCol||[.92,.16,.16],fv=(x,y)=>F.v(x,y,0,0,0,1,fc[0],fc[1],fc[2],2+(x/.92)*.98);
