@@ -135,7 +135,7 @@ function drawBoxes(m,L=AI){if(!m.inst){draw(m);return}gl.bindBuffer(gl.ARRAY_BUF
 function draw(m,M=ID,ov=null,mode=gl.TRIANGLES){if(!m||!m.n)return;bind(m);gl.uniformMatrix4fv(PS.u.uM,false,M);gl.uniform4fv(PS.u.uOv,ov||[0,0,0,0]);gl.drawArrays(mode,0,m.n)}
 function resize(){const d=Math.min(devicePixelRatio||1,battDpr()),w=(innerWidth*d)|0,h=(innerHeight*d)|0;if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;gl.viewport(0,0,w,h)}VP.w=w;VP.h=h;
   if(GFX.post&&(PPB.w!==w||PPB.h!==h)){if(PPB.tex){gl.deleteFramebuffer(PPB.fb);gl.deleteTexture(PPB.tex);gl.deleteRenderbuffer(PPB.rb);PPB.tex=null}const f=fboMake(w,h);if(f)Object.assign(PPB,f);else GFX.post=false}}
-function render(t){camKick();try{return render_(t)}finally{camUnkick();g3Frame()}}function render_(t){resize();const asp=VP.w/VP.h,P=hudLens(M4.persp(cam.fov,asp,.3,4000)),V=M4.look([cam.x,cam.y,cam.z],[cam.tx,cam.ty,cam.tz],[0,1,0]),vp=M4.mul(P,V);VP.m=vp;FR.P=P;FR.V=V;G3.req=null;/* the 3D golfer overlay copies this camera and waits for this frame's request */
+function render(t){camKick();try{return render_(t)}finally{camUnkick()}}function render_(t){resize();const asp=VP.w/VP.h,P=hudLens(M4.persp(cam.fov,asp,.3,4000)),V=M4.look([cam.x,cam.y,cam.z],[cam.tx,cam.ty,cam.tz],[0,1,0]),vp=M4.mul(P,V);VP.m=vp;
   const fx=cam.tx-cam.x,fy=cam.ty-cam.y,fz=cam.tz-cam.z,fl=MM.hyp(fx,fy,fz)||1,hor=MM.tan(-MM.asin(clamp(fy/fl,-1,1)))/MM.tan(cam.fov/2);
   const SU=W&&W.sun||SUN,sx=cam.x+SU[0]*1000,sy=cam.y+SU[1]*1000,sz=cam.z+SU[2]*1000,cw=vp[3]*sx+vp[7]*sy+vp[11]*sz+vp[15],sxn=(vp[0]*sx+vp[4]*sy+vp[8]*sz+vp[12])/cw,syn=(vp[1]*sx+vp[5]*sy+vp[9]*sz+vp[13])/cw;
   const sky=W&&W.sky||[.28,.50,.90],fog=W&&W.fog||FOG,light=W&&W.light||[1,1,1],ready=W&&W.meshes.terrain;
@@ -180,7 +180,7 @@ function drawWorld(M,main){gl.enable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);gl.
   if(!main){useProg(PS,A);draw(M.flag,M4.trs(W.pin.x,W.pin.y,W.pin.z,1,W.wind.s>.3?W.wind.a-Math.PI/2:.7));return}grassDraw();
   if(!W.dio){drawParts();gridDraw()}useProg(PS,A);draw(M.cup);wildDraw();
   draw(M.flag,M4.trs(W.pin.x,W.pin.y,W.pin.z,1,W.wind.s>.3?W.wind.a-Math.PI/2:.7));
-  if(W.dio)return;ballSil();if(S.mode!=='title'&&!S.ov){const g=golferAt(),th=golferPose(),lk=S.mode==='aim'&&S.lookT!=null&&S.t-S.lookT<1.6?Math.PI/2*MM.sin(Math.PI*Math.min(1,(S.t-S.lookT)/1.6)):0;if(!g3Want(g.x,g.z,g.yaw,th,lk,null))drawGolfer(g.x,g.z,g.yaw,th,lk,null)}
+  if(W.dio)return;ballSil();if(S.mode!=='title'&&!S.ov){const g=golferAt(),th=golferPose(),lk=S.mode==='aim'&&S.lookT!=null&&S.t-S.lookT<1.6?Math.PI/2*MM.sin(Math.PI*Math.min(1,(S.t-S.lookT)/1.6)):0;drawGolfer(g.x,g.z,g.yaw,th,lk,null)}
   if(S.provHide)return;if(S.gimme&&PB.st==='holed'){const u=(S.t-S.gimme.t0)/.4;if(u<1){terrainAt(W,S.gimme.x,S.gimme.z);draw(ballMesh,M4.mul(M4.trs(S.gimme.x,TQ.h+BALL_R+.25*sstep(0,1,u),S.gimme.z,BALL_R),PB.rot),ballOv(S.look))}return}
   if(S.dropA){const A=S.dropA,u=S.t-A.t0,f=u<.35?0:sstep(.35,.7,u),x=lerp(A.x0,A.x1,f),z=lerp(A.z0,A.z1,f);terrainAt(W,x,z);const y=TQ.h+BALL_R+(u<.35?DROP_H*(1-(u/.35)*(u/.35)):0);draw(ballMesh,M4.mul(M4.trs(x,y,z,BALL_R),PB.rot),ballOv(S.look));return}
   if(PB.st!=='holed'||S.t-S.holedT<.25){let sink=PB.st==='holed'?Math.min(1,(S.t-S.holedT)*4)*.25:0;if(W.cv>=3&&PB.st==='rest'){const ls=withBall(PB,()=>lieState());sink+=ls.plug?BALL_R*.55:ls.sit?BALL_R*.3:ls.divot?BALL_R*.2:0}const lift=S.placeT&&S.t-S.placeT<.5?.2*MM.sin(Math.PI*(S.t-S.placeT)/.5):0;{const br=ballR(PB.x,PB.y,PB.z);draw(ballMesh,M4.mul(M4.trs(PB.x,ballY(PB,br)-sink+lift,PB.z,br),PB.rot),ballOv(S.look))}}}
