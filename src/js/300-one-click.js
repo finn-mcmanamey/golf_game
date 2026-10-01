@@ -9,3 +9,4 @@ function prebuild(sv){try{const t=$('title');if(!t||t.classList.contains('hide')
     else if(S.frontSeed){const I=dioInputs(S.frontSeed);seed=I.seed;n=I.n;kind=I.cond.kind|0;cv=I.cv;setup=I.setup;cond=I.cond}else{[n,kind]=lastMode();seed=Math.max(1,(+seedIn.value|0)||1);cv=CV;setup=setupFor(seed);cond={v10:1,season:S.seasonPick>=0?S.seasonPick:courseSeason(seed),wear:seed===daily()?WEAR_LEVEL.daily:S.condPick|0,kind,twist:kind?0:twistFor(seed,cv)}}
     const par=parsFor(n,cv,kind)[h],key=holeKey(seed,h,cv,setup,cond)+'/'+par;if(PRE.key===key)return;PRE.key=key;PRE.W=genHole(seed,h,par,cv,setup,cond)}catch(e){PRE.key='';PRE.W=null}}
 function preTake(seed,i,par,cv,setup){if(!PRE.W)return null;const key=holeKey(seed,i,cv,setup,S)+'/'+par,w=PRE.key===key?PRE.W:null;PRE.key='';PRE.W=null;return w}
+VL.feature({id:'q08.tee',kind:'shell',deps:['core.game'],f:['Q-08']});

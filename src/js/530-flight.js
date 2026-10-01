@@ -18,3 +18,4 @@ function partRoll(c,pow,cv){const sv=W,svB=B;EXACT=true;W={flat:2,M:mathFor(cv),
   try{place(0,0);strike(c,pow,0,0,0,1);const y0=B.y;let carry=0,land=0,pv=[0,0,0];while(B.st==='air'){pv=[B.vx,B.vy,B.vz];stepAir(DT);if(!carry&&(B.nb|0||B.st!=='air'||B.y<=y0)){carry=B.z;land=MM.atan2(-pv[1],Math.hypot(pv[0],pv[2]))/DEG}}let n=0;while(B.st==='roll'&&n++<12000)stepRoll(DT);return{carry,roll:B.z-carry,land}}finally{W=sv;B=svB;EXACT=false}}
 const FLIGHT_NOTE='voxellinks.flight9';
 function flightNote(){if(lsGet(FLIGHT_NOTE,0))return'';try{VS.setItem(FLIGHT_NOTE,'1')}catch(e){}return'<br><i>Validated flight: your wedges carry further and land steeper; the club row shows the new carries.</i>'}
+VL.feature({id:'v6m2.flight',kind:'sim',deps:['v6m1.island'],f:['F-122']});

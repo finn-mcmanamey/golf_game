@@ -20,7 +20,7 @@ function wearAt(x,z){if(!W||W.cv<4||!W.wear)return 0;terrainAt(W,x,z);return wea
 const STANCE={tilt:1.5,loft:2,speed:.4,cap:.2};
 function stanceAt(x,z,yaw){terrainAt(W,x,z);if(!W.cv||W.cv<2)return{along:0,side:0};const nx=TQ.nx,ny=TQ.ny||1,nz=TQ.nz,dx=MM.sin(yaw),dz=MM.cos(yaw);
   return{along:clamp(MM.atan(-(nx*dx+nz*dz)/ny),-STANCE.cap,STANCE.cap),side:clamp(MM.atan(-(nx*dz-nz*dx)/ny),-STANCE.cap,STANCE.cap)}}
-function strike(c,pow,acc,yaw,shape=0,traj=1,mis=0){MM=W.M||NM;if(B===PB&&!EXACT){contactFX(c,pow,acc,mis);impactFX(c,yaw,mis)}const G8=B.G||G_TEST;B.G=null;const gm=G8?golfMods(G8,c):null;if(gm){acc*=gm.acc;if(mis>0)mis=Math.min(MIS_CAP,mis*gm.fat);else if(mis<0)mis=Math.max(-MIS_CAP,mis*gm.thin)}B.windK=gm?gm.wind:1;
+function strike(c,pow,acc,yaw,shape=0,traj=1,mis=0){MM=W.M||NM;if(B===PB&&!EXACT){contactFX(c,pow,acc,mis);impactFX(c,yaw,mis)}const G8=B.G||G_TEST;B.G=null;const gm=G8?strikeMods(G8,c):null;if(gm){acc*=gm.acc;if(mis>0)mis=Math.min(MIS_CAP,mis*gm.fat);else if(mis<0)mis=Math.max(-MIS_CAP,mis*gm.thin)}B.windK=gm?gm.wind:1;
   const st=c.putter?{along:0,side:0}:stanceAt(B.x,B.z,yaw);terrainAt(W,B.x,B.z);const hs=B.hand?-1:1,ty=TQ.ty,L=LIE[ty],dir=yaw+hs*acc*(c.putter?.012:.045),dx=MM.sin(dir),dz=MM.cos(dir),T=TRAJ[traj],sh=SHAPE[shape].k;
   B.sx=B.x;B.sz=B.z;B.dx=B.x;B.dz=B.z;B.t=0;B.acc=0;B.lip=false;B.cup=false;B.rim=0;B.creep=0;B.tree=null;B.apex=B.y;B.trail.length=0;B.ev.length=0;
   if(c.putter){const v=c.v*pow*PUTT[ty]*(gm?gm.v:1);B.vx=dx*v;B.vz=dz*v;B.vy=0;B.sp=0;B.st='roll';return}
@@ -86,3 +86,4 @@ function calibrate(cv=0){const sv=W;EXACT=true;W={flat:2,M:mathFor(cv),rk:ONES,b
   const fly=(c,shape,traj)=>{place(0,0);strike(c,1,0,0,shape,traj);let carry=0,cx=0;while(B.st==='air'){stepAir(DT);if(!carry&&(B.st!=='air'||B.y<=BALL_R+1e-6)){carry=B.z;cx=B.x}}let n=0;while(B.st==='roll'&&n++<12000)stepRoll(DT);return{carry:c.putter?0:carry,total:B.z,cx}};
   for(const c of CLUB_SET){W.flat=c.putter?4:2;c.carryT=[];c.totalT=[];for(let t=0;t<TRAJ.length;t++){const r=fly(c,0,t);c.carryT.push(Math.round(r.carry));c.totalT.push(Math.round(r.total))}
     c.carry=c.carryT[1];c.total=c.totalT[1];c.curve=c.putter?0:Math.abs(fly(c,2,1).cx)}W=sv;EXACT=false}
+VL.feature({id:'core.sim',kind:'sim',deps:['b2.maths'],f:['F-030','F-031','F-046','F-049','F-053','F-057','F-058','F-059','F-060']});

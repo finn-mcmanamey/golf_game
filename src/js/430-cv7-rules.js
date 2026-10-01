@@ -24,6 +24,7 @@ function obsRoll(){for(const o of W.obs){const dx=B.x-o.x,dz=B.z-o.z;if(o.k==='s
     B.x=o.x+nlx*c+nlz*s;B.z=o.z-nlx*s+nlz*c;B.vx=lvx*c+lvz*s;B.vz=-lvx*s+lvz*c;B.sp*=.5;B.ev.push('wall')}}
 const CANOPY_DENSE=tuneDef('F-093','CANOPY_DENSE',.15,'phys','pass chance through a dense canopy',0,1,.05),CANOPY_MEDIUM=tuneDef('F-093','CANOPY_MEDIUM',.30,'phys','medium',0,1,.05),CANOPY_SPARSE=tuneDef('F-093','CANOPY_SPARSE',.55,'phys','sparse',0,1,.05),CANOPY_WINTER=tuneDef('F-093','CANOPY_WINTER',.90,'phys','a bare deciduous canopy in winter',0,1,.05),CANOPY_AUTUMN=tuneDef('F-093','CANOPY_AUTUMN',.15,'phys','added to a deciduous canopy in autumn',0,.5,.05);
 const CANOPY_CLASS={spruce:0,cedar:0,norfolk:0,gorse:0,buckthorn:0,banksia:0,bent:1,scots:1,oak:1,elm:1,cherry:1,teatree:1,birch:2,larch:2,paloverde:2,joshua:2,saguaro:2};
-function canopyPass(t){if(!W||W.cv<7||!W.bio)return .3;const sp=typeof tsp==='function'?tsp(t):null,cl=sp!=null&&CANOPY_CLASS[sp]!=null?CANOPY_CLASS[sp]:t.kind==='gorse'?0:t.kind==='cactus'?2:1;let p=cl===0?TUNE.CANOPY_DENSE:cl===2?TUNE.CANOPY_SPARSE:TUNE.CANOPY_MEDIUM;
+function canopyPass(t){if(!W||W.cv<7||!W.bio)return .3;const sp=VL.has('q.draw')?tsp(t):null,cl=sp!=null&&CANOPY_CLASS[sp]!=null?CANOPY_CLASS[sp]:t.kind==='gorse'?0:t.kind==='cactus'?2:1;let p=cl===0?TUNE.CANOPY_DENSE:cl===2?TUNE.CANOPY_SPARSE:TUNE.CANOPY_MEDIUM;
   const ever=sp?!!EVERGREEN[sp]:t.kind!=='oak';if(!ever){if(W.season===3)p=TUNE.CANOPY_WINTER;else if(W.season===2)p=Math.min(1,p+TUNE.CANOPY_AUTUMN)}return p}
 const newCv=()=>CV;
+VL.feature({id:'v5m2.rules',kind:'sim',deps:['core.sim','f114.tune'],f:['F-087','F-089','F-093'],rules:{from:'R7'}});

@@ -1,5 +1,5 @@
 /* ===== S-1 bug key: one code carries the round (with a swing still in the air), the settings, the window, the sound, the last error, the last frame times and a picture; pasting it replays that moment and never touches the player's own save ===== */
-const BUILD='v8-m2',BUG_FRAMES=240,BUG_SHOT=[320,180,.55],FT=new Float32Array(BUG_FRAMES),ERR={last:null,log:[]};let FTi=0;
+const BUILD='v8-m3',BUG_FRAMES=240,BUG_SHOT=[320,180,.55],FT=new Float32Array(BUG_FRAMES),ERR={last:null,log:[]};let FTi=0;
 function errNote(m,st){const e={m:String(m).slice(0,200),s:String(st||'').split('\n').slice(0,4).join(' | ').slice(0,400),t:Math.round(performance.now()),mode:S.mode,hi:S.hi};ERR.last=e;ERR.log.push(e);if(ERR.log.length>8)ERR.log.shift();return e}
 addEventListener('error',e=>{errNote(e.message||'error',e.error&&e.error.stack)});addEventListener('unhandledrejection',e=>{const r=e.reason;errNote('promise: '+(r&&r.message||r),r&&r.stack)});
 function bugShot(){try{if(W&&!S6.catching)render(S.t);const c=document.createElement('canvas');c.width=BUG_SHOT[0];c.height=BUG_SHOT[1];c.getContext('2d').drawImage(cv,0,0,c.width,c.height);return c.toDataURL('image/jpeg',BUG_SHOT[2])}catch(e){return null}}
@@ -29,3 +29,4 @@ async function bugOpen(c){const p=await bugDecode(c);if(!p)return false;const d=
   else if(W&&p.club!=null){const ci=CLUBS.findIndex(c=>c.id===p.club);if(ci>=0)S.club=ci;if(p.yaw!=null){S.yaw=p.yaw;S.autoAim=false}S.shape=p.shape|0;S.traj=p.traj==null?1:p.traj}
   msg('Replaying a bug code','captured at '+(p.hud?p.hud.w+'×'+p.hud.h:'?')+' · build '+p.build+' · nothing is saved',4);updateHud(true);return true}
 function bugLeave(){const B=S.bug;if(!B)return;S.bug=null;try{Object.assign(SETS,JSON.parse(B.sets))}catch(e){}if(B.gfx!=null)gfxSet(B.gfx,true);auSet(B.au,false);S.swing=B.swing;S.watchAll=B.watchAll}
+VL.feature({id:'s1.bug',kind:'shell',deps:['core.game'],f:['S-1']});

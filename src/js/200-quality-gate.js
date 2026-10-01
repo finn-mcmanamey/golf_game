@@ -33,3 +33,4 @@ function gatePick(seed,idx,par,cv){const key=seed+'/'+idx+'/'+par+'/'+cv;let r=G
   r={k:best,sc};GATE.set(key,r);return r}
 /* the first plan's score (the suite's measure of the gate) */
 const gateFirst=(seed,idx,par,cv)=>withMath(cv,()=>{GATE_K=0;try{return gateScore(holePlan_(seed,idx,par,cv,false),seed,idx,par,cv)}finally{GATE_K=-1}});
+VL.feature({id:'q09.gate',kind:'sim',deps:['core.sim'],f:['Q-09']});

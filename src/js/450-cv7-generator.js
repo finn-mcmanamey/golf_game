@@ -97,3 +97,4 @@ const holeLineKind=W=>!W||W.cv<7?null:W.twin?'twin':W.crest?'crest':(W.obs||[]).
 function ybSyn7(out){const along=(x,z)=>ybAlong(x,z);const row=(id,name,t0,t1,x,z)=>{const a=along(x,z);out.push({id,syn:true,name,n:YB_MIN,t:0,nt:a.t,nd:0,ax:x,az:z,side:0,fc:(ox,oz)=>{const o=along(ox,oz);return[Math.max(0,t0-o.t),Math.max(0,t1-o.t)]}})};
   if(W.crest){const c=W.crest,q=W.C.reduce((b,p)=>Math.abs(p.t-c.t)<Math.abs(b.t-c.t)?p:b,W.C[0]);row('crest','Crest',c.t-c.w*.6,c.t+c.w*.3,q.x,q.z)}
   for(const o of W.obs||[])if(o.kind==='wall'){const a=along(o.x,o.z);row('wall'+a.t.toFixed(0),'Wall',a.t-.3,a.t+TUNE.WALL_T+.5,o.x,o.z);break}}
+VL.feature({id:'v5m2.gen',kind:'sim',deps:['core.sim','f114.tune'],f:['F-090','F-091','F-092','F-094'],rules:{from:'R7',caps:{history:['gen7','S.cv>=7']}}});

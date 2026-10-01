@@ -16,6 +16,8 @@ The guide above sets how to work with the person developing this game. This file
   or separate `<script src>` tags: `vqWorker` in `160-people.js` builds a Worker from the inline script's own text.
 - Load order is filename order. A new feature gets a new file with an in-between prefix, e.g. `545-caddie-chat.js`.
 - Top-level code must only use names defined in earlier files. Functions may reference anything.
+- A new feature file registers itself with `VL.feature({id,kind,deps,f})` (see the end of any slice) and must load before
+  `VL.boot(...)`, which runs at the end of `640-input.js`: give it a number below 640, or boot refuses the late registration.
 - CSS goes in `src/styles/`, markup in `src/index.html`.
 - The worker runs the game script headless, with no DOM, WebGL or libraries. Nothing at load time may assume they exist.
 

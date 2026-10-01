@@ -8,3 +8,4 @@ function auUnlock(){AU.init();if(AU.ctx&&AU.ctx.state==='suspended'&&!AU.hidden)
 /* a hidden tab (or a sleeping laptop) fades out over AUDIO_FADE and suspends; coming back resumes and fades in */
 function auVisible(hidden){AU.hidden=hidden;const c=AU.ctx;if(!c)return;clearTimeout(AU.susT);if(hidden){auRamp(0,AUDIO_FADE);AU.susT=setTimeout(()=>{if(AU.hidden)c.suspend().catch(()=>{})},AUDIO_FADE*1000+20)}else c.resume().then(()=>auRamp(AU.on?1:0,AUDIO_FADE)).catch(()=>{})}
 if(typeof document!=='undefined'&&typeof document.addEventListener==='function'){document.addEventListener('visibilitychange',()=>auVisible(document.visibilityState==='hidden'));addEventListener('pagehide',()=>auVisible(true));addEventListener('pageshow',()=>auVisible(document.visibilityState==='hidden'))}
+VL.feature({id:'b5.audio',kind:'view',deps:['core.view'],f:['B-5']});

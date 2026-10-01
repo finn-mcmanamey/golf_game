@@ -9,8 +9,8 @@ const REAL=typeof window!=='undefined'&&typeof window.matchMedia==='function';
 const DIO={W:null,key:'',seed:0,t0:0,tick:0,err:null,firstT:null,buildMs:0,clockAt:null,seedAt:0,boxes:0,letters:0};
 function todaySeed(){if(!gentleOn()&&dailyOnIsl())return dailyIsl().seed;if(gentleOn()){const d=new Date(),n=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5);return GENTLE_SEEDS[n%GENTLE_SEEDS.length]}return daily()}
 function frontN(){const[n,k]=lastMode();return!k&&n===18?18:9}
-function dioInputs(seed){const F=typeof frontIsl==='function'&&(FRONT.act||frontAct(loadSave()))?frontIsl():null;if(F&&(F.seed===seed||FRONT.act!=='today'))return dioInputsIsl(F);const n=frontN(),cv=newCv(),tw=twistFor(seed,cv);let setup=setupFor(seed);if(tw===3)setup=3;const cond={season:S.seasonPick>=0?S.seasonPick:courseSeason(seed),wear:seed===daily()?WEAR_LEVEL.daily:S.condPick|0,kind:0,twist:tw,v10:1};return{seed,n,cv,setup,cond,par:parsFor(n,cv,0)[0]}}
-function dioClock(){const d=new Date(),h=DIO.clockAt!=null?DIO.clockAt:d.getHours()+d.getMinutes()/60;return{t:tryOn()?islHourAt(h):clamp(h,DIO_CLOCK[0],DIO_CLOCK[1]),lit:h<DIO_LIT[0]||h>=DIO_LIT[1]}}
+function dioInputs(seed){const F=VL.has('v7m4.islands')&&(FRONT.act||frontAct(loadSave()))?frontIsl():null;if(F&&(F.seed===seed||FRONT.act!=='today'))return dioInputsIsl(F);const n=frontN(),cv=newCv(),tw=twistFor(seed,cv);let setup=setupFor(seed);if(tw===3)setup=3;const cond={season:S.seasonPick>=0?S.seasonPick:courseSeason(seed),wear:seed===daily()?WEAR_LEVEL.daily:S.condPick|0,kind:0,twist:tw,v10:1};return{seed,n,cv,setup,cond,par:parsFor(n,cv,0)[0]}}
+function dioClock(){const d=new Date(),h=DIO.clockAt!=null?DIO.clockAt:d.getHours()+d.getMinutes()/60;return{t:islHourAt(h),lit:h<DIO_LIT[0]||h>=DIO_LIT[1]}}
 const dioSeg=(x,z,ax,az,bx,bz)=>{const ex=bx-ax,ez=bz-az,l2=ex*ex+ez*ez||1,u=clamp(((x-ax)*ex+(z-az)*ez)/l2,0,1);return Math.hypot(x-ax-ex*u,z-az-ez*u)};
 function dioFront(){return DIO_L.house[1]+DIO_HOUSE.d/2}
 function dioPath(x,z){const[hx]=DIO_L.house,fw=dioFront(),h2=DIO_HOUSE.w/2;if(x>hx-h2-1&&x<hx+h2+1&&z>DIO_L.house[1]-DIO_HOUSE.d/2-.5&&z<fw+3.5)return true;return dioSeg(x,z,hx+4,fw+3,-2.2,-2.4)<1.1||dioSeg(x,z,hx-6,fw+3,DIO_L.green[0]+4,DIO_L.green[1]-3)<1.1}
@@ -44,7 +44,7 @@ function trophy(kind,x,y,z,col,out){const T=TROPHY_COL,s=1.6,B=(dx,dy,dz,hx,hy,h
   else if(kind==='pin'){B(0,.36,0,.012,.22,.012,T.white);B(.08,.5,0,.07,.045,.01,T.red)}
   else if(kind==='plaque'){B(0,.32,-.02,.13,.17,.02,T.plaque);B(0,.32,0,.085,.11,.022,T.gold)}
   else if(kind==='book'){B(0,.2,0,.14,.06,.1,T.book);B(0,.2,.1,.12,.045,.006,T.gold)}}
-function dioEarned(){const f=typeof featsGet==='function'?featsGet():[];let pp=0;try{pp=typeof ppGet==='function'?Object.keys(ppGet()||{}).length:0}catch(e){}return id=>id==='passport'?pp>0:f.includes(id)}
+function dioEarned(){const f=VL.has('m4.look')?featsGet():[];let pp=0;try{pp=VL.has('m5.round')?Object.keys(ppGet()||{}).length:0}catch(e){}return id=>id==='passport'?pp>0:f.includes(id)}
 function dioBoxes(W){const bx=[],lt=[],L=DIO_L,y0=W.dioY,P=HOUSE_PAL[W.bio|0]||HOUSE_PAL[0],wall=P[0],roof=W.season===3&&W.bio===5?[.93,.94,.96]:P[1],trim=P[2],dark=trim.map(v=>v*.55),wood=[.42,.29,.17],B=(x,y,z,hx,hy,hz,c)=>bx.push([x,y,z,hx,hy,hz,c]);
   const[hx,hz]=L.house,w2=DIO_HOUSE.w/2,d2=DIO_HOUSE.d/2,fw=dioFront(),yF=y0+.3,yR=yF+DIO_HOUSE.h;
   B(hx,y0+.15,hz,w2+.3,.3,d2+.3,dark);B(hx,yF+DIO_HOUSE.h/2,hz,w2,DIO_HOUSE.h/2,d2,wall);
@@ -94,12 +94,13 @@ function frontWire(){if(FRONT.wired||!REAL||!$('btnMain'))return;FRONT.wired=tru
   addEventListener('keydown',e=>{if(e.key!=='Escape'||!FRONT.sheet||!frontShown())return;if(document.querySelector('.ov:not(.hide):not(#title)'))return;sheetClose();e.stopImmediatePropagation();e.preventDefault()},true)}
 function frontAct(sv){if(sv)return'resume';const C=S.car;if(t8Is(C)){const N=t8Next(C);if(N&&!N.out&&!N.fin)return'career'}else if(C&&C.cur&&C.cur.ev<EVENTS&&!C.cur.done){const M=C.cur.major,maj=isMajor(C.tier,C.cur.ev);if(!(maj&&M&&M.r1!=null&&!M.made))return'career'}const T=S.tour;if(T&&T.ev<TOUR.events)return'tour';return'today'}
 function frontRefresh(sv){const a=FRONT.act=frontAct(sv);S.frontSeed=a==='today'?todaySeed():null;if(!REAL||!$('btnMain'))return;frontWire();let sub='';
-  if(a==='resume')sub=$('resumeText').textContent;else if(a==='career'){const C=S.car;sub=t8Is(C)?(()=>{const N=t8Next(C),c=t8Cond(C,C.tier,N.e,N.r);return(N.e>=6?'Q-school':F8_N[N.e])+' · season '+C.season+' · '+islName(c.seed)})():(isMajor(C.tier,C.cur.ev)?'The major · '+TIER_NAMES[C.tier]+' tour':'Career · season '+C.season+' · event '+(C.cur.ev+1)+' of '+EVENTS)+(carIsl(C)?' · '+islName(C.cur.tiers[C.tier].seeds[C.cur.ev]):'')}
+  if(a==='resume')sub=$('resumeText').textContent;else if(a==='career'){const C=S.car;sub=t8Is(C)?(()=>{const N=t8Next(C),c=t8Cond(C,C.tier,N.e,N.r);return t8Desc(C,N.e).name+' · season '+C.season+' · '+islName(c.seed)})():(isMajor(C.tier,C.cur.ev)?'The major · '+TIER_NAMES[C.tier]+' tour':'Career · season '+C.season+' · event '+(C.cur.ev+1)+' of '+EVENTS)+(carIsl(C)?' · '+islName(C.cur.tiers[C.tier].seeds[C.cur.ev]):'')}
   else if(a==='tour')sub='Classic tour · event '+(S.tour.ev+1)+' of '+TOUR.events+(S.tour.isl?' · '+islName(S.tour.seeds[S.tour.ev]):'');else{const seed=S.frontSeed,I=dioInputs(seed);sub=!gentleOn()&&dailyOnIsl()?todayLine():(gentleOn()?'A gentle course to start':seed===daily()?'Today’s course':'Course #'+seed)+' · '+BIOMES[biomeOf(seed,I.cv)].n+' · '+SEASONS[I.cond.season].n+' · '+I.n+' holes'}
   $('mainT').textContent=a==='today'?'Play today’s':'Continue';$('mainIc').innerHTML=ic(a==='today'?'play':'next');$('mainSub').textContent=sub;$('btnMain').classList.remove('busy');if(frontShown()&&!FRONT.sheet&&document.activeElement===document.body)$('btnMain').focus({preventScroll:true});
-  {const r=$('btnIslRow');if(r)r.classList.toggle('hide',!tryOn())}if(frontShown()&&(!DIO.W||DIO.seed!==todaySeed()))later(()=>dioBuild())}
+  {const r=$('btnIslRow');if(r)r.classList.remove('hide')}if(frontShown()&&(!DIO.W||DIO.seed!==todaySeed()))later(()=>dioBuild())}
 const later=f=>{if(REAL&&typeof requestAnimationFrame==='function')requestAnimationFrame(()=>setTimeout(f,0));else f()};
 function mainGo(){const b=$('btnMain');if(!b||b.classList.contains('busy'))return;AU.play('ui');teeLock();const a=FRONT.act;teeSoon(()=>teeOff(a,true))}
 
 function TK(n,a){const C=TK.c||(TK.c=new Map()),k=n+'|'+(a==null?1:a);let v=C.get(k);if(v)return v;if(!TK.g){try{const cs=getComputedStyle(document.documentElement);TK.g=q=>cs.getPropertyValue('--'+q).trim()}catch(e){TK.g=()=>''}}
   const m=/^#([0-9a-f]{6})$/i.exec(TK.g(n)),rgb=m?[parseInt(m[1].slice(0,2),16),parseInt(m[1].slice(2,4),16),parseInt(m[1].slice(4),16)]:[128,128,128];v=a==null||a>=1?'rgb('+rgb+')':'rgba('+rgb+','+a+')';C.set(k,v);return v}
+VL.feature({id:'v5.look',kind:'view',deps:['core.view'],f:['Q-21','Q-22']});

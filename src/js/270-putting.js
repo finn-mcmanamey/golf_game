@@ -11,3 +11,4 @@ function puttStrike(e,p){S.putt=null;let pow=clamp(puttPace(p.back),.05,1);const
 function puttUp(){const p=S.putt;S.putt=null;S.mark=0;if(p&&p.back>=PUTT_START)hint('Push back through the ball to putt',1.6);updateHud(true)}
 /* after the ball stops: what it rolled, and what that stroke rolls on a flat green at this speed */
 function puttReadout(){const R=S.puttRead;if(!R||!W)return;S.puttRead=null;const rolled=Math.hypot(PB.x-R.x,PB.z-R.z),v0=PUTTER.v*R.pow*PUTT[4],a=SURF[4].roll*(W.rk?W.rk[4]:1),flat=v0*v0/(2*a);setTimeout(()=>hint('Rolled '+rolled.toFixed(1)+' m · stroke for '+flat.toFixed(1)+' m',3),600)}
+VL.feature({id:'q04.putt',kind:'shell',deps:['q01.swing'],f:['Q-04']});

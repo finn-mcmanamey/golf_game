@@ -9,3 +9,4 @@ function boldTerm(p,hz){const q=boldSpots(p,hz);if(!q)return null;const{S,B}=q,p
   const E=(x,z,green)=>{const ty=tyAt(x,z,green);return expected(MM.hyp(pin.x-x,pin.z-z),ty===7?2:ty)+(ty===7?1:0)},payoff=E(S.x,S.z)-E(B.x,B.z,B.green);
   const yaw=MM.atan2(B.x,B.z),ux=MM.sin(yaw),uz=MM.cos(yaw);let n=0,bad=0;for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++){const x=B.x+uz*a*TUNE.BOLD_SPREAD+ux*b*TUNE.BOLD_SPREAD/2,z=B.z-ux*a*TUNE.BOLD_SPREAD+uz*b*TUNE.BOLD_SPREAD/2;n++;if(hz(x,z))bad++}
   const risk=bad/n,inBand=risk>=TUNE.BOLD_RISK_MIN&&risk<=TUNE.BOLD_RISK_MAX;return{payoff,risk,bold:clamp(payoff/TUNE.BOLD_MIN,0,1)*(inBand?1:.5)}}
+VL.feature({id:'f088.bold',kind:'sim',deps:['q09.gate','f114.tune'],f:['F-088'],rules:{from:'R7'}});

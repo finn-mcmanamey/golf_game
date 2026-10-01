@@ -4,3 +4,4 @@ const islHourAt=h=>ISLAND_DAY[0]+(((h%24)+24)%24)*(ISLAND_DAY[1]-ISLAND_DAY[0])/
 function islHourNow(){if(ISL.hourFix!=null)return islHourAt(ISL.hourFix);const d=new Date();return islHourAt(d.getHours()+d.getMinutes()/60)}
 const islClockOn=W=>W&&W.cv>=CV_ISL&&(S.kind&7)===6;
 const islClockText=()=>{const t=islHourNow();return String(Math.floor(t)).padStart(2,'0')+':'+String(Math.floor((t%1)*60)).padStart(2,'0')};
+VL.feature({id:'v6m3.routing',kind:'sim',deps:['v6m1.island'],f:['F-123','F-124']});

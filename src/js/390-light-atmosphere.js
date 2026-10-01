@@ -22,3 +22,4 @@ const RIPPLE_N=3,FOAM_D=.25,SPLASH_T=2.5,SPL={on:false,x:0,y:0,z:0,t0:0};
 function wnd19(wf){const w=W&&W.wind||{x:0,z:0,s:0},s=w.s||0;return s>.05?[w.x/s,w.z/s,Math.min(2,s*wf/6)]:[0,1,0]}
 function splash19(){if(!W||S.photo)return;if(PB.st==='water'){if(!SPL.on){terrainAt(W,PB.x,PB.z);SPL.on=true;SPL.x=PB.x;SPL.z=PB.z;SPL.y=TQ.wl>-1e8?TQ.wl:PB.y;SPL.t0=S.t}}else SPL.on=false;
   if(!SPL.on)return;const u=(S.t-SPL.t0)/SPLASH_T;if(u<0||u>=1)return;useProg(PS,A);for(const k of[0,.35])if(u>k)draw(ringMesh,M4.trs(SPL.x,SPL.y+.02,SPL.z,.3+2.6*(u-k)),[1,1,1,.75*(1-u)])}
+VL.feature({id:'q.draw',kind:'view',deps:['core.view'],f:['Q-05','Q-06','Q-10','Q-11','Q-12','Q-13','Q-14','Q-15','Q-16','Q-17','Q-18','Q-19','Q-20']});

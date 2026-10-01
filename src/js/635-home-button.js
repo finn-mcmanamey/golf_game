@@ -7,3 +7,5 @@ function goHomeBusy(){return S.mode==='swing'||S.mode==='shot'||!!S.replay}
 function goHome(){AU.play('ui');if(goHomeBusy()){hint('Wait for the ball to stop, then Menu',1.6);return}
   saveRound();$('btnMenu').onclick()}
 $('btnToMenu').onclick=goHome;
+
+VL.feature({id:'menu.home',kind:'view',deps:['core.view'],f:[]});
