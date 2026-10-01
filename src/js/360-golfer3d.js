@@ -105,3 +105,5 @@ function g3Frame(){if(G3.st!==2)return;const q=G3.req,R=G3.R;G3.req=null;
 /* a saved photo is the game canvas plus the golfer layer on top (photo mode's Save calls this right after rendering) */
 function g3Snapshot(){if(!G3.drawn||!G3.R)return cv;const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;
   const g=c.getContext('2d');g.drawImage(cv,0,0);g.drawImage(G3.R.domElement,0,0);return c}
+
+VL.feature({id:'golfer.3d',kind:'view',deps:['core.view'],f:[]});

@@ -26,3 +26,5 @@ function teeRestore(){if(frontShown())return;try{$('btnMenu').onclick()}catch(e)
 /* the button's two states, set directly so they cannot fail with the rest of the menu */
 function teeLock(){const b=$('btnMain');if(!b)return;b.classList.add('busy');$('mainT').textContent='Teeing off…'}
 function teeUnlock(){const b=$('btnMain');if(!b)return;b.classList.remove('busy');$('mainT').textContent=FRONT.act==='today'?'Play today’s':'Continue'}
+
+VL.feature({id:'tee.off',kind:'view',deps:['core.view'],f:[]});
