@@ -6,14 +6,27 @@ import { createServer } from 'node:http';
 import { exec } from 'node:child_process';
 import vm from 'node:vm';
 
+// Three.js and the golfer model, bundled into their own <script> placed before the game script (see CLAUDE.md "Using 3D libraries").
+// If the packages are not installed (no `npm install` yet) the page builds without them and the classic golfer draws.
+async function vendor() {
+  try {
+    const { build } = await import('esbuild');
+    const out = await build({ entryPoints: ['src/vendor/three-entry.js'], bundle: true, format: 'iife', minify: true, legalComments: 'none', write: false });
+    const glb = readFileSync('assets/golfer.glb').toString('base64');
+    const js = out.outputFiles[0].text + `window.GOLFER_GLB="${glb}";`;
+    return '<script>' + js.replace(/<\/script/gi, '<\\/script') + '</script>';
+  } catch (e) { console.warn('3D golfer left out:', e.message.split('\n')[0]); return '' }
+}
+
 const cat = (dir, ext) => readdirSync(dir).filter(f => f.endsWith(ext)).sort()
   .map(f => readFileSync(`${dir}/${f}`, 'utf8')).join('');
 
-function build() {
-  const js = cat('src/js', '.js');
+async function build() {
+  const js = cat('src/js', '.js'), three = await vendor();
   try { new vm.Script(js, { filename: 'game.js' }) } catch (e) { return console.error('syntax error:', e.message) }
   const html = readFileSync('src/index.html', 'utf8')
     .replace('{{styles}}', () => cat('src/styles', '.css'))
+    .replace('{{vendor}}', () => three)
     .replace('{{script}}', () => js);
   mkdirSync('dist', { recursive: true });
   writeFileSync('dist/index.html', html);
