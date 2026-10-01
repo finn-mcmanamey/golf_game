@@ -30,9 +30,14 @@ function doStrike(){S.landed=false;FX.cls=clubClass(curClub());const c=curClub()
   hint(mi>.5?'Fat!':mi>0?'Heavy':mi<-.5?'Thin!':mi<0?'Skinny':a<.12?(S.pow>.97?'Pured!':'Sweet'):a<.5?'Solid':c.putter?(S.acc>0?'Pulled':'Pushed'):a<1.1?(S.acc>0?'Hook':'Slice'):(S.acc>0?'Snap hook!':'Big slice!'),1.8);updateHud(true)}
 const edgeDist=(x,z)=>Math.min(x-W.ox-1,W.ox+W.cols*CS-1-x,z-W.oz-1,W.oz+W.rows*CS-1-z);
 function record(x,z,r){const e=S.pend;if(!e)return;e.r=r;e.x=qPos(x);e.z=qPos(z);e.g=!!PB.plug;S.log[S.hi].push(e);S.pend=null;S.swingSave=null;saveRound()}
-function endShot(){S.shotEnd=S.t;if(B===PB&&!S.lab&&!S.range)trailKeep4(PB);const st=B.st;if(S.lab){labResolve();return}if(S.range){rangeResolve();return}if(S.replay){replayEnd();return}if(S.cv>=4)return endShot4();
+function endShot(){S.shotEnd=S.t;if(B===PB&&!S.lab&&!S.range)trailKeep4(PB);const st=B.st;if(S.lab){labResolve();return}if(S.range){rangeResolve();return}if(S.replay){replayEnd();return}if(S.R.caps.flow4)return endShot4();
   if(st==='holed'){AU.play('cup');S.holedT=S.t;S.holedA=MM.atan2(cam.x-B.x,cam.z-B.z);S.holedFrom=MM.hyp(B.sx-W.pin.x,B.sz-W.pin.z);record(W.pin.x,W.pin.z,1);S.strokes[S.hi]=S.stroke;S.wait=1.4;S.mode='holed';updateHud(true);return}
   if(st==='water'){AU.play('splash');S.stroke++;msg('Splash!','+1 penalty stroke');const[x,z]=dropPointLive();record(x,z,2);S.wait=1.2;S.next=()=>{place(uPos(qPos(x)),uPos(qPos(z)));afterShot();cutTo(snapCam)};S.mode='wait';return}
   if(st==='oob'){AU.play('bad');S.stroke++;msg('Out of bounds','+1 penalty · replay from previous spot');record(B.sx,B.sz,3);S.wait=1.2;S.next=()=>{place(uPos(qPos(B.sx)),uPos(qPos(B.sz)));afterShot();cutTo(snapCam)};S.mode='wait';return}
   const plug=!!B.plug,C=S.shotCam;record(B.x,B.z,0);place(uPos(qPos(B.x)),uPos(qPos(B.z)));B.plug=plug;
   if(C&&C.rev){S.rev=2;S.wait=CAM3.rev;S.mode='wait';S.next=()=>{S.rev=null;afterShot();cutTo(snapCam)};return}afterShot();if(C&&!C.follow)cutTo(snapCam)}
+//#region MANIFESTS.v8
+VL.feature({id:'v8m2.tour',kind:'shell',deps:['v8m1.golfer','v6m6.leaders','v7m4.islands'],f:['F-149','F-150','F-151','F-152','F-153','F-154','F-155','F-156']});
+VL.feature({id:'v8m3.rules',kind:'shell',deps:['v8m2.tour'],f:['F-165'],flags:{'m3.field':{kind:'experiment',stage:'experimental',owner:'F-165–F-170',lock:'season',key:'field',expires:'v8-m4'}},on:[['career:event',20,d=>srHooks(d,'event')],['career:season',20,d=>srHooks(d,'season')]],api:{SEASON_RULES,SR,derive,FORMATS,EV8,Q8,pairId,poId,evSeeds}});
+VL.feature({id:'v8m3.field',kind:'shell',deps:['v8m3.rules'],f:['F-166','F-167','F-168','F-169','F-170'],tuning:Object.fromEntries(Object.entries({AGE_GROW,AGE_GROW_MAX,AGE_PLATEAU,PEAK,DECLINE,WOBBLE_SD,WOBBLE_CAP,RET_FORCE,PROSPECT_P,ARCH_P,ARCH_EDGE,ARCH_REF,SKILL_LO,SKILL_HI,RIVAL_SETTLE,RIVAL_LAPSE,RIVAL_PAY,VOICE_GAP,WR_STEP,WR_MIN_DIV,VH_MAX}).map(([n,v])=>[n,{v,sim:false,panel:false,note:'M3: the t9 season ruleset (bookkeeping; no ball, no record)'}])),api:{FIELD_T9,VENUES_T9,RANK_T9,RIVAL_T9,skillAt,ageDelta,wobble,rotaOf,wrTable,rvOn,m3Label,RV_LINES}});
+//#endregion MANIFESTS.v8

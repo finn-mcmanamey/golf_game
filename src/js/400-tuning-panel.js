@@ -21,3 +21,4 @@ function tuneRender(){const el=$('tune');if(!el)return;const groups=new Map();fo
   el.querySelectorAll('input[data-num]').forEach(i=>i.onchange=()=>{tuneSet(byN[i.dataset.num],i.value);tuneRender()});
   el.querySelectorAll('button[data-reset]').forEach(b=>b.onclick=()=>{for(const m of TUNE_META)if(m.f===b.dataset.reset)tuneSet(m,m.d);tuneRender()});
   el.querySelectorAll('button[data-act]').forEach(b=>b.onclick=()=>{const a=b.dataset.act;if(a==='close')el.style.display='none';else if(a==='reset'){for(const m of TUNE_META)tuneSet(m,m.d);tuneRender()}else{const t=tuneRows(),o=$('tuneOut');o.value=t;o.style.display='block';o.select();try{if(navigator.clipboard)navigator.clipboard.writeText(t)}catch(e){}hint('Tuning rows copied',1.8)}})}
+VL.feature({id:'f114.tune',kind:'sim',deps:['core.game'],f:['F-114'],rules:{hooks:[['round:setup',1,()=>tuneRoundStart()]]}});

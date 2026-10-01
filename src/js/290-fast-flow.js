@@ -5,3 +5,4 @@ function ffUp(t){if(!FF.down)return false;FF.down=false;if(S.mode==='shot'&&t-FF
 if(typeof addEventListener==='function')addEventListener('keyup',e=>{if(e.key===' '||e.key==='Enter')ffUp(e.timeStamp)});
 function ffResult(){FF.res=!S.lab&&!S.replay&&!S.hs&&!S.bug?performance.now()+RESULT_T*1000:0}
 function ffTick(){if(FF.res&&S.mode==='result'&&performance.now()>=FF.res){FF.res=0;const b=$('btnCont');if(b&&b.onclick)b.onclick()}}
+VL.feature({id:'q07.flow',kind:'view',deps:['core.game'],f:['Q-07']});

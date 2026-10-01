@@ -56,6 +56,7 @@ function holePath(L,pin,seat=0,cv){const T=holeTally(L,seat,cv),out=[];let pos=[
     else{o.start=pos.slice();o.end=[pin.x,pin.z]}
     out.push(o)}
   out.pos=pos;out.plug=plug;out.lf=lf;out.T=T;out.prev=prev;return out}
+VL.feature({id:'core.codec',kind:'sim',deps:['core.sim'],f:['F-007'],rules:{caps:{ghostCond:['gen4','d.cv>=4']}}});
 /* ===== F-048 relief: the drop and the options ===== */
 const DB=newBall();
 function dropSim(x,z){MM=W.M||NM;return withBall(DB,()=>{const sw=W.wind;W.wind=CALM;place(x,z);DB.y+=DROP_H;DB.st='air';DB.rng=mulberry32(4242);DB.k0=0;DB.n=0;DB.nb=1;DB.t=0;settle();W.wind=sw;let rx=DB.x,rz=DB.z;terrainAt(W,rx,rz);
@@ -101,3 +102,4 @@ function verifyRound6(d){{const tw=twistCheck5(d);if(tw)return{ok:false,why:tw,f
   for(let h=0;h<d.n;h++){W=genHole(d.seed,h,pars[h],d.cv,d.setup,d);const R=holeReplay(d.log[h]||[],h,d);if(!R.ok)return{ok:false,why:R.why,failHole:h+1};holes.push(holeTally(d.log[h]||[],d.seat,d.cv).n)}
   for(let s=0;s<d.n;s+=9)if(mullCount(d.log,s,Math.min(d.n,s+9))>MULL_PER_NINE)return{ok:false,why:'more than '+MULL_PER_NINE+' mulligan in a nine'};
   const total=holes.reduce((a,b)=>a+b,0),par=pars.reduce((a,b)=>a+b,0);return{ok:true,holes,total,par,rel:total-par}}
+VL.feature({id:'f048.relief',kind:'sim',deps:['core.sim'],f:['F-048']});

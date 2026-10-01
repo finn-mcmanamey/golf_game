@@ -27,3 +27,4 @@ function battGfx(){const on=battOn();if(on===BATT.wasOn)return;BATT.wasOn=on;let
 
 /* the canvas pixel ratio the renderer's resize() uses */
 function battDpr(){return battOn()?BATT_DPR:2}
+VL.feature({id:'gfx',kind:'view',deps:['core.view'],f:[]});

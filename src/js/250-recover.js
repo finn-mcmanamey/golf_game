@@ -12,3 +12,4 @@ function s6Gl(){if(typeof cv==='undefined'||!cv.addEventListener)return;cv.addEv
   cv.addEventListener('webglcontextrestored',()=>{VS.setItem('voxellinks.autoresume','1');location.reload()},false)}
 /* after a reload for a lost context, straight back into the round */
 function s6Boot(){s6Gl();if(VS.getItem('voxellinks.autoresume')==='1'){VS.removeItem('voxellinks.autoresume');if(loadSave()){continueRound();s6Note('The graphics card reset · the round is back where it was')}}}
+VL.feature({id:'s6.recover',kind:'shell',deps:['core.game'],f:['S-6']});

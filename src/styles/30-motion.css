@@ -1,6 +1,6 @@
 /* Motion: one shared timing so every panel and message eases in the same calm way instead of popping */
 :root{--ease-out:cubic-bezier(.2,.8,.2,1);--dur-1:90ms;--dur-2:180ms;--dur-3:320ms}
-.ov:not(.hide) .box{animation:ovIn var(--dur-2) var(--ease-out)}
+.ov:not(.hide) .box{animation:ovIn var(--dur-2) var(--ease-out)}body.vsup .ov{padding-top:100px}body.vsup .ov .box{max-height:calc(100vh - 116px)}
 @keyframes ovIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
 #hint{transform:translate(-50%,6px);transition:opacity var(--dur-2) var(--ease-out),transform var(--dur-2) var(--ease-out)}
 #hint.on{transform:translate(-50%,0)}

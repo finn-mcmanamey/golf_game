@@ -10,3 +10,4 @@ function botBunker(L){if(W.cv<6)return null;terrainAt(W,GB.x,GB.z);if(TQ.ty!==6)
   if(n<2)return null;const ctx=reliefCtx('unplay',[GB.x,GB.z],[GB.x,GB.z]),opts=reliefOptions(ctx).filter(q=>q.o!==0);if(!opts.length)return null;const b=opts.find(q=>q.o===3)||opts.reduce((a,q)=>q.exp<a.exp-1e-9?q:a),e={kind:1,o:b.o,x:qPos(b.fin[0]),z:qPos(b.fin[1])};if(b.o){e.ox=qPos(b.spot[0]);e.oz=qPos(b.spot[1])}return e}
 /* the target for a shot at the green: the flag, or on version 6 the middle of an island green */
 function botGreen(px,pz){const P=W.cv>=6?W.PD.find(p=>p.ring):null;return P?{x:P.x,z:P.z}:{x:px,z:pz}}
+VL.feature({id:'bots.v6',kind:'sim',deps:['core.game'],f:[]});

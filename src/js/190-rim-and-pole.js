@@ -17,3 +17,4 @@ function flag5air(){const dx=B.x-W.pin.x,dz=B.z-W.pin.z,d=MM.hyp(dx,dz);if(d<FLA
 /* version 6: a ball barely moving on a slope its friction almost holds is at rest after CREEP_T below CREEP_V (the grass holds it; versions 4 and 5 run such balls to the 45 s cap) */
 const CREEP_V=.06,CREEP_T=1.5;
 function creep5(sp,dt){if(sp<CREEP_V){B.creep=(B.creep||0)+dt;if(B.creep>=CREEP_T){B.vx=B.vy=B.vz=0;B.st='rest'}}else B.creep=0}
+VL.feature({id:'q03.rim',kind:'sim',deps:['core.sim'],f:['Q-03']});

@@ -4,3 +4,4 @@ const pzHold=(on,why)=>{PZ.on=on;PZ.why=on?why:''};
 if(typeof document!=='undefined'&&typeof document.addEventListener==='function'){document.addEventListener('visibilitychange',()=>pzHold(document.visibilityState==='hidden','hidden'));addEventListener('blur',()=>pzHold(true,'blur'));addEventListener('focus',()=>{if(document.visibilityState!=='hidden')pzHold(false)})}
 /* true when this frame must not advance the round; a gap also moves the meter's clock on by the gap, so a running meter resumes where it was */
 function pzSkip(fms){const gap=fms>PAUSE_GAP&&PZ.last<=PAUSE_GAP;PZ.last=fms;if(gap&&S.ph>0&&MT.pause==null){MT.t1+=fms;MT.t2+=fms}return PZ.on||gap}
+VL.feature({id:'s5.pause',kind:'shell',deps:['core.game'],f:['S-5']});

@@ -1,4 +1,87 @@
 'use strict';
+//#region KERNEL
+/* ===== FW1 kernel: F-157 registry and two-phase boot, F-158 hook channels, F-159 rules table, F-160 modes and fence surfaces, F-161 flags, F-162 save slices. VL.feature(manifest) before VL.boot(); boot validates, sorts (depth, then id), merges tuning, builds and freezes RULES, MODES, FLAGS and the slices, loads the slices, then runs the game's boot steps in their old order. Simulation hooks come from the round's bundle (S.R) or the world's; events run in (at, registry) order; messages drain once a frame. Nothing here moves the ball. ===== */
+const BUS_DRAIN_MAX=256,FLAGS_MAX=8,FENCE=['shared','career','none'],SIMH=['round:setup','hole:setup','shot:strike','shot:settle','round:score'],EVI=['round:finished','card:render','title:refresh','career:event','career:season','save:failed','hole:loaded'],EVQ=['round:started','shot:struck','ball:stopped','hole:holed','idle'],RULE_IDS=['R0','R1','R2','R3','R4','R5','R6','R7','R8','R9','R10n','R10i'],
+  CAPF={gen1:R=>R.gen>=1,gen2:R=>R.gen>=2,gen3:R=>R.gen>=3,gen4:R=>R.gen>=4,gen7:R=>R.gen>=7,island:R=>R.gen>=CV_ISL,r10:R=>R.v===CV_NOW,golfer:R=>R.v===CV_NOW},FLK=['batch','release','experiment','ops','permission'],FLS=['experimental','default','retired'],
+  PENDK={carPending:'car',cupPending:'cup',weeklyPending:'weekly',xgPending:'xg',scenPending:'scen',hsPending:'hs',golferPending:'golfer',forceCv:'forceCv',recvOverride:'recv',fmtNext:'fmt'},LIVEK=['carRound','weekly','cup','hs','scen','range','lab','drill','replay','tourRound'];
+const VL=window.VL=window.VL||{},K={F:[],id:{},up:0,on:{},q:[],sfx:[],surf:{},modes:{},frame:{},rb:[],rules:{},caps:{},ev:0,fl:{},sl:{},ro:{},rec:{}},PEND={},LIVE={},NOOP=()=>{},NULLO=new Proxy({},{get:(t,k)=>k==='then'||typeof k==='symbol'?undefined:NOOP});
+const RULES=K.rules,MODES=K.modes,RULES_NOW=10;/* RULES_NOW equals CV_NOW; both tables fill and freeze at boot */
+const vlLate=w=>{const e='VL: '+w+' after boot';if(devOn())throw Error(e);console.warn(e)};
+VL.feature=m=>{if(K.up)return vlLate('feature '+(m&&m.id));K.F.push(m);if(m&&m.id&&!K.id[m.id])K.id[m.id]=m;for(const i in m&&m.flags||{})K.fl[i]=K.fl[i]||Object.assign({id:i,f:m.id},m.flags[i])};
+VL.surface=(id,d)=>{if(K.up)return vlLate('surface '+id);K.sfx.push([id,d||{},''])};
+VL.has=id=>!!K.id[id];
+VL.get=id=>K.id[id]&&K.id[id].api||NULLO;
+/* F-161 flags {id,kind,stage,owner,lock,expires}: VL.flag(id) is the only reader. The try switch turns on every experimental flag; a season-locked flag is copied into C.cur.flags[key] when a season is made and never read by it again. No flag changes the simulation (the switch matrix) */
+VL.flag=id=>{const f=K.fl[id];if(!f){if(K.up&&devOn())throw Error('VL: no flag '+id);return false}return f.read?!!f.read():f.stage==='experimental'?VL.flag('try'):f.stage==='default'};
+VL.flags=()=>Object.values(K.fl);
+/* channels: an event or message listener may not call a simulation hook or replace W, B, MM or S.play (dev builds throw) */
+function vlCall(l,d,e,dev){if(!dev)return l.fn(d);const g=[W,B,MM,S.play];l.fn(d);if(g[0]!==W||g[1]!==B||g[2]!==MM||g[3]!==S.play)throw Error('VL: '+l.f+' wrote W, B, MM or S.play in '+e)}
+VL.emit=(e,d,st)=>{const L=K.on[e];if(!L)return d;const dev=devOn(),m=S.play.mode&&S.play.mode.id;K.ev++;try{for(const l of L)if(l.st===(st|0)&&(!l.m||l.m.includes(m)))vlCall(l,d,e,dev)}finally{K.ev--}return d};
+VL.post=(e,d)=>{K.q.push([e,d])};
+VL.drain=()=>{const dev=devOn();let n=0;K.ev++;try{while(K.q.length&&n<BUS_DRAIN_MAX){const[e,d]=K.q.shift();n++;for(const l of K.on[e]||[])vlCall(l,d,e,dev)}}finally{K.ev--}if(K.q.length&&dev)throw Error('VL: '+K.q.length+' messages over BUS_DRAIN_MAX')};
+VL.on=(e,fn,at)=>{const L=K.on[e]=K.on[e]||[],l={at:at==null?1e9:at,fn,f:'panel',m:null,st:0};L.push(l);L.sort((a,b)=>a.at-b.at);return()=>{const i=L.indexOf(l);if(i>=0)L.splice(i,1)}};
+function simRun(n,s,a,b,c){if(K.ev&&devOn())throw Error('VL: '+n+' from a listener');for(const h of S.R.hooks[n])if(h.s===s)h.fn(a,b,c)}
+/* a world's own bundle: v10 is R10n/R10i (the range strikes as R10n), older worlds their generation's */
+const wRules=w=>w.v10?(w.R&&w.R.v===CV_NOW?w.R:K.rb[10]):w.R||rulesFor(w.cv|0);
+/* shot:strike: the swing's golfer (B.G for one swing, or G_TEST) goes to the world's strike hooks, which return the ball's modifiers or null */
+function strikeMods(G,c){const R=wRules(W);let m=null;for(const h of R.hooks['shot:strike'])m=h.fn(G,c,m,R);return m}
+function playFrame(dt){const M=S.play.mode||K.modes.casual;if(M)for(const f of M.frame)f(dt)}
+/* rules: R0-R9 play their generation; R10n/R10i are version 10 on generation 7 or 9 (S.cv keeps the generation, S.v10 the ruleset) */
+function rulesFor(cv,v10,kind){const R=K.rb;return v10&&kind!=null?R[kind>=2?11:10]:v10&&cv===CV?R[10]:v10&&cv===CVX?R[11]:R[Math.max(0,Math.min(9,cv|0))]}
+function withRules(R,fn){const s=[W,B,MM,EXACT,CALCV,G_TEST],c=CALCV!==R.v;MM=R.math==='VM'?VM:NM;if(c)useCalib(R.v);try{return fn()}finally{W=s[0];B=s[1];MM=s[2];EXACT=s[3];G_TEST=s[5];if(c)useCalib(s[4])}}
+/* modes: S.play={mode,cfg}; the old pending slots are the next play's cfg (staged here until startRound opens the play), the live flags live in S.play.st */
+function playInit(S){for(const n in PENDK){const k=PENDK[n];Object.defineProperty(S,n,{get:()=>k in PEND?PEND[k]:null,set:v=>{PEND[k]=v},enumerable:true})}for(const n of LIVEK)Object.defineProperty(S,n,{get:()=>S.play.st[n],set:v=>{S.play.st[n]=v},enumerable:true});Object.defineProperty(S,'R',{get:()=>rulesFor(S.cv,S.v10)});S.play={mode:null,cfg:Object.freeze({}),st:LIVE}}
+function playOpen(sv){const c=Object.assign({},PEND),id=c.mode||(c.car?'career':c.cup?'cup':(sv?sv.weekly:c.weekly)?'weekly':sv&&sv.hs||c.hs?'hotseat':c.scen?'scenario':S.tourRound!=null?'tour':'casual');delete c.mode;for(const k in PEND)delete PEND[k];return S.play={mode:K.modes[id]||null,cfg:Object.freeze(c),st:LIVE}}
+VL.play=(id,c)=>{const M=K.modes[id];if(!M)throw Error('VL.play: no mode '+id);if(K.ev&&devOn())throw Error('VL.play from a listener');if(c.save)for(const k in PEND)delete PEND[k];PEND.mode=id;applyConditions(c);return startRound(c.n,c.ghost||null,c.save||null,c.opp===undefined&&M.oppFor?M.oppFor(c):c.opp)};
+/* the fence: a record's class is career for format 9, shared otherwise; a live round's is the class of the record it writes */
+const vlClass=x=>x==null||x===S?(S.golfer?'career':'shared'):x.golfer||x.ver===9?'career':'shared';
+VL.may=(s,x)=>{const d=K.surf[s];if(!d){if(devOn())throw Error('VL: no surface '+s);return false}return d.accepts.includes(vlClass(x))};
+/* F-162 slices and voxellinks.meta={v:1,slices,fixes,seen,lastExport}: a save is {key,v,ok,kept,backup,migrate:{n:fn},fixes:{name:fn},budget} or a part {key,part,init}. A load runs the pure chain from the value's own v (else 0) and writes back once; a newer slice is read-only (VL.ro); a named fix runs once a profile */
+const META='voxellinks.meta';let MET=null,MET0=null;
+function metaGet(){if(!MET){let m=null;MET0=VS.getItem(META);try{m=JSON.parse(MET0)}catch(e){}if(m&&m.v>1)K.ro[META]='newer';MET=m&&m.v>=1&&m.slices&&Array.isArray(m.fixes)&&Array.isArray(m.seen)?m:{v:1,slices:{},fixes:[],seen:[],lastExport:null}}return MET}
+function metaPut(keep){const s=JSON.stringify(metaGet());if(s!==MET0&&!K.ro[META]){VS.setItem(META,s,keep);MET0=s}}
+VL.ro=k=>K.ro[k]||null;
+function slLoad(k,wr){const D=K.sl[k],raw=VS.getItem(k);if(K.ro[k]==='broken')delete K.ro[k];if(raw==null)return null;let c=null;try{c=JSON.parse(raw)}catch(e){}const v=c&&typeof c==='object'&&c.v!=null?c.v|0:0;
+  if(c&&v>D.v){K.ro[k]='newer';return c}if(!c||typeof c!=='object'||D.ok&&!D.ok(c)){if(wr&&D.kept&&VS.getItem(D.kept)!==raw)VS.setItem(D.kept,raw,1);return null}
+  /* a migration that throws leaves the stored value as it was and opens the slice read-only ('broken', with a banner and Export); the rest of the profile boots */
+  if(v<D.v){const b=D.backup&&D.backup[v];if(wr&&b&&VS.getItem(b)==null)VS.setItem(b,raw,1);try{for(let n=v+1;n<=D.v;n++)c=D.migrate[n](c)}catch(e){K.ro[k]='broken';(K.roWhy=K.roWhy||{})[k]=String(e&&e.message||e).slice(0,120);return null}c.v=D.v}for(const p of D.parts)if(c[p.part]==null)c[p.part]=p.init();
+  if(wr&&v<D.v&&!K.ro[k])VS.setItem(k,JSON.stringify(c),1);return c}
+function slBoot(){const me=metaGet();for(const k in K.sl){const D=K.sl[k],c=slLoad(k,!K.ro[k]);if(K.ro[k]!=='broken')me.slices[k]=K.ro[k]==='newer'?c.v:D.v;
+    for(const n in D.fixes||{})if(!me.fixes.includes(n)&&!K.ro[k]){const x=slLoad(k,1);if(x)VS.setItem(k,JSON.stringify(D.fixes[n](x)||x),1);me.fixes.push(n)}}}
+VL.boot=B=>{if(K.up)throw Error('VL.boot twice');K.up=1;const F=K.F,E=[],id={},st={},seen={},ss={},ms={},fs={};
+  for(const m of F){if(!m||!m.id){E.push('a feature without an id');continue}if(id[m.id])E.push('duplicate id '+m.id);id[m.id]=m;if(!['sim','view','shell'].includes(m.kind))E.push(m.id+': no kind')}
+  for(const m of F)for(const x of m.deps||[])if(!id[x])E.push(m.id+': missing dependency '+x);
+  const dep=m=>{if(st[m.id]===2)return m.depth;if(st[m.id]===1){E.push('dependency cycle at '+m.id);return 0}st[m.id]=1;let d=0;for(const x of m.deps||[])if(id[x])d=Math.max(d,dep(id[x])+1);st[m.id]=2;return m.depth=d};
+  for(const m of F)if(m&&m.id)dep(m);
+  for(const m of F)for(const n in m.tuning||{})if(!(n in TUNE)&&m.tuning[n].panel!==false){const t=m.tuning[n];tuneDef((m.f||[m.id])[0],n,t.v,t.sim?'phys':'ui',t.note||'',t.lo,t.hi,t.step)}
+  for(const t of TUNE_META){const m=F.find(m=>m&&(m.f||[]).includes(t.f));if(!m){E.push('tuning '+t.n+' ('+t.f+') has no feature');continue}(m.tuning=m.tuning||{})[t.n]={v:t.d,sim:t.kind!=='ui',lo:t.lo,hi:t.hi,step:t.step,note:t.note}}
+  for(const m of F){if(!m||!m.id)continue;const r=m.rules||{};if(m.kind!=='sim'&&Object.values(m.tuning||{}).some(t=>t.sim))E.push(m.id+': a sim tuning key in a '+m.kind+' feature');if(m.kind==='view'&&(r.hooks||[]).length)E.push(m.id+': a view feature declares a simulation hook');
+    if(r.from&&!RULE_IDS.includes(r.from))E.push(m.id+': no bundle '+r.from);for(const h of r.hooks||[])if(!SIMH.includes(h[0]))E.push(m.id+': no simulation hook '+h[0]);
+    for(const c in r.caps||{}){if(!CAPF[r.caps[c][0]])E.push(m.id+': no cap family '+r.caps[c][0]);if(seen[c])E.push('cap '+c+' twice');seen[c]=1}
+    for(const o of m.on||[])if(!EVI.includes(o[0])&&!EVQ.includes(o[0]))E.push(m.id+': no event '+o[0]);Object.assign(K.frame,m.view&&m.view.frame);for(const s in m.surfaces||{})K.sfx.push([s,m.surfaces[s],m.id]);
+    for(const i in m.flags||{}){const x=m.flags[i];if(fs[i])E.push('flag '+i+' twice');fs[i]=1;if(!FLK.includes(x.kind))E.push('flag '+i+' has no kind');if(!x.read&&!FLS.includes(x.stage))E.push('flag '+i+' has no stage');if(x.lock==='season'&&!x.key)E.push('flag '+i+': a season lock without a key')}
+    for(const n in m.record||{}){if(K.rec[n])E.push('record format '+n+' twice');K.rec[n]=Object.freeze(Object.assign({f:m.id},m.record[n]))}
+    for(const d of[].concat(m.save||[]))if(!d.part){if(K.sl[d.key])E.push('slice '+d.key+' twice');K.sl[d.key]=Object.assign({},d,{f:m.id,parts:[]});for(let n=1;n<=d.v;n++)if(n>(d.from|0)&&typeof(d.migrate||{})[n]!=='function')E.push('slice '+d.key+': no migration to v'+n)}}
+  for(const m of F)for(const d of[].concat(m&&m.save||[]))if(d.part){if(!K.sl[d.key])E.push(m.id+': a part of no slice '+d.key);else K.sl[d.key].parts.push(Object.freeze(Object.assign({f:m.id},d)))}
+  for(const[s,d]of K.sfx){const a=d.accepts;if(ss[s])E.push('surface '+s+' twice');ss[s]=1;if(!Array.isArray(a)||!a.length||a.some(x=>!FENCE.includes(x)))E.push('surface '+s+' has no fence class');else if(a.includes('career')&&!d.watch)E.push('surface '+s+' takes career rounds and is not watch-only')}
+  for(const m of F)for(const i in m&&m.modes||{}){const d=m.modes[i];if(ms[i])E.push('mode '+i+' twice');ms[i]=1;if(!FENCE.includes(d.fence))E.push('mode '+i+' has no fence class');for(const n of d.frame||[])if(!K.frame[n])E.push('mode '+i+': no frame hook '+n);if(d.resume!=null&&typeof d.resume!=='function'&&typeof d.resume!=='string'||d.valid!=null&&typeof d.valid!=='function')E.push('mode '+i+': resume or valid is not a function')}
+  for(const m of F)for(const i in m&&m.modes||{}){const r=m.modes[i].resume;if(typeof r==='string'&&!ms[r])E.push('mode '+i+' resumes as '+r+', which is no mode')}
+  if(E.length)throw Error('VL.boot: '+E.join('; '));
+  F.sort((a,b)=>a.depth-b.depth||(a.id<b.id?-1:a.id>b.id?1:0));B.calibrate();
+  const RB=K.rb;RULE_IDS.forEach((r,i)=>{const gen=i<10?i:i>10?CVX:CV,v=i<10?i:CV_NOW;RB.push({id:r,v,gen,math:gen>=5?'VM':'NM',calib:v>=9?3:v>=5?2:v>=4?1:0,caps:{},tune:{},hooks:Object.fromEntries(SIMH.map(n=>[n,[]]))})});
+  for(const m of F){const r=m.rules;if(!r)continue;const f0=RULE_IDS.indexOf(r.from||'R0');RB.forEach((R,i)=>{for(const c in r.caps||{}){K.caps[c]=Object.freeze([r.caps[c][0],r.caps[c][1]||null,m.id,r.from||'R0']);R.caps[c]=i>=f0&&CAPF[r.caps[c][0]](R)}if(i<f0)return;for(const[n,at,fn]of r.hooks||[])R.hooks[n].push(Object.freeze({at,s:Math.floor(at),fn,f:m.id}));for(const k in m.tuning||{})if(m.tuning[k].sim)R.tune[k]=k in TUNE?TUNE[k]:m.tuning[k].v})}
+  for(const R of RB){for(const n in R.hooks)Object.freeze(R.hooks[n].sort((a,b)=>a.at-b.at));Object.freeze(R.caps);Object.freeze(R.tune);Object.freeze(R.hooks);K.rules[R.id]=Object.freeze(R)}Object.freeze(RB);Object.freeze(K.rules);Object.freeze(K.caps);
+  for(const m of F)for(const i in m.modes||{}){const d=m.modes[i];K.modes[i]=Object.freeze(Object.assign({},d,{id:i,f:m.id,frame:Object.freeze((d.frame||[]).map(n=>K.frame[n]))}))}Object.freeze(K.modes);
+  for(const[s,d,f]of K.sfx)K.surf[s]=Object.freeze({id:s,f,accepts:Object.freeze(d.accepts.slice()),watch:!!d.watch});Object.freeze(K.surf);
+  for(const m of F)for(const[e,at,fn,md,s]of m.on||[])(K.on[e]=K.on[e]||[]).push(Object.freeze({at,fn,f:m.id,m:md||null,st:s|0}));for(const e in K.on)K.on[e].sort((a,b)=>a.at-b.at);
+  for(const i in K.fl)Object.freeze(K.fl[i]);for(const k in K.sl)Object.freeze(K.sl[k]);Object.freeze(K.fl);Object.freeze(K.sl);Object.freeze(K.rec);for(const m of F)Object.freeze(m);Object.freeze(F);
+  /* the tab lock, the slices, the game's load, load hooks (read-only), init once a profile (meta.seen), the UI */
+  B.lock();slBoot();B.load();for(const m of F)if(m.load)m.load();const me=metaGet();for(const m of F)if(!me.seen.includes(m.id)){if(m.init)m.init(me);me.seen.push(m.id)}metaPut(1);for(const m of F)if(m.view&&m.view.mount)m.view.mount();B.title();B.after()};
+VL.dump=()=>{if(!devOn())return null;const me=metaGet(),o={features:K.F.map(m=>m.id+' '+m.kind+' d'+m.depth+(m.deps&&m.deps.length?' < '+m.deps.join(','):'')),hooks:{},events:{},modes:Object.keys(K.modes).map(i=>i+' '+K.modes[i].fence),surfaces:Object.keys(K.surf).map(s=>s+' '+K.surf[s].accepts.join('/')),caps:{},
+    flags:VL.flags().map(f=>f.id+' '+(VL.flag(f.id)?'on':'off')+' '+f.kind+(f.stage?' '+f.stage:'')+(f.lock==='season'?' season:'+f.key:'')),slices:Object.keys(K.sl).map(k=>k+' v'+K.sl[k].v+' stored v'+me.slices[k]+(K.ro[k]?' '+K.ro[k]:'')),meta:{fixes:me.fixes,seen:me.seen.length,lastExport:me.lastExport}};
+  for(const n of SIMH){const h=new Map;for(const R of K.rb)for(const x of R.hooks[n]){const k=x.at+' '+x.f;h.set(k,(h.get(k)||[]).concat(R.id))}o.hooks[n]=[...h].map(([k,b])=>k+' '+(b.length===12?'all':b.join(',')))}
+  for(const e in K.on)o.events[e]=K.on[e].map(l=>l.at+' '+l.f+(l.m?' '+l.m:'')+(l.st?' @'+l.st:''));for(const c in K.caps)o.caps[c]=K.caps[c][0]+' '+K.rb.map(R=>R.caps[c]?1:0).join('');console.log('VL.dump '+JSON.stringify(o,null,1));return o};
+//#endregion KERNEL
 /* ===== B-2 the game's own maths: course version 5 generates, simulates, drops and plays its bots on sin, cos, tan, atan, atan2, asin, exp, log, pow and hypot written from +, −, ×, ÷ and square root only (fdlibm's algorithms), so every browser computes the same bits; versions 0–4 keep the engine's functions and stay byte-identical ===== */
 const VM=(()=>{const DV=new DataView(new ArrayBuffer(8)),HI=x=>{DV.setFloat64(0,x);return DV.getInt32(0)},LO=x=>{DV.setFloat64(0,x);return DV.getUint32(4)},W2=(h,l)=>{DV.setInt32(0,h|0);DV.setUint32(4,l>>>0);return DV.getFloat64(0)},setHI=(x,h)=>{DV.setFloat64(0,x);DV.setInt32(0,h|0);return DV.getFloat64(0)};
   const S1=-1.66666666666666324348e-01,S2=8.33333333332248946124e-03,S3=-1.98412698298579493134e-04,S4=2.75573137070700676789e-06,S5=-2.50507602534068634195e-08,S6=1.58969099521155010221e-10;
@@ -49,3 +132,4 @@ const VM=(()=>{const DV=new DataView(new ArrayBuffer(8)),HI=x=>{DV.setFloat64(0,
 const NM=Object.freeze({sin:Math.sin,cos:Math.cos,tan:Math.tan,atan:Math.atan,atan2:Math.atan2,asin:Math.asin,exp:Math.exp,log:Math.log,pow:Math.pow,hyp:Math.hypot});
 let MM=NM;const mathFor=cv=>cv>=5?VM:NM;
 const withMath=(cv,fn)=>{const m0=MM;MM=mathFor(cv);try{return fn()}finally{MM=m0}};
+VL.feature({id:'b2.maths',kind:'sim',deps:[],f:['B-2']});

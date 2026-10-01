@@ -7,3 +7,4 @@ function tierFor7(hcp,name,id,t){const P=TIERS[3],M=TIERS[2],C=TIERS[1];if(t==nu
 const botLevels=()=>BOT_HCPS.map((h,i)=>({hcp:h,T:tierFor7(h,'hcp '+h,400+i)}));
 function potEscape(){if(!W||W.cv<7||!W.obs)return null;terrainAt(W,GB.x,GB.z);if(TQ.ty!==6)return null;let best=null;for(const o of W.obs){if(o.kind!=='face')continue;const d=MM.hyp(GB.x-o.x,GB.z-o.z);if(d<TUNE.LIP_D+.3&&(!best||d<best.d))best={o,d}}if(!best)return null;
   const b=best.o.b,gx=b.gx,gz=b.gz;let tgt=null,bd=1e9;for(const c of W.C){const d=MM.hyp(c.x-GB.x,c.z-GB.z);if(d<8||d>45)continue;const side=((c.x-GB.x)*gx+(c.z-GB.z)*gz)/d;if(side>.5)continue;if(d<bd){bd=d;tgt=c}}if(!tgt)return null;return{x:tgt.x,z:tgt.z}}
+VL.feature({id:'f115.bots',kind:'sim',deps:['core.game','f114.tune'],f:['F-115']});

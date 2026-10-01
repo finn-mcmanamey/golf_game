@@ -1,11 +1,11 @@
 /* ===== M3 · F-102 up to three ghosts and F-103 your best by default. Slot one is S.ghost as it always was; slots two and three are S.xg entries promoted to full ghosts (a golfer, a ball with its shadow, a trail and a gap). The record format 7 (course version 7 rounds) carries who was there, plus room for M5's format and twist and M6's hand ===== */
 const GHOST_MAX=tuneDef('F-102','GHOST_MAX',3,'ui','ghosts at once, slot one included',1,3,1),GHOST_ALPHA_G=tuneDef('F-102','GHOST_ALPHA_G',.45,'ui','a ghost golfer\'s alpha',.2,.8,.05),GHOST_ALPHA_B=tuneDef('F-102','GHOST_ALPHA_B',.55,'ui','a ghost ball\'s alpha',.3,.9,.05),GHOST_LOAD=tuneDef('F-102','GHOST_LOAD',40,'ui','ms per house ghost per hole load the suite allows',10,120,5);
 const GHOST_COLS={1:[.55,.8,1],2:[.6,1,.6],3:[.8,.6,1],best:[1,.82,.35]},GHOST_KINDS=['none','Caddie','Member','Pro','best','code','field','weekly'];
-if(SETS.bestGhost==null)SETS.bestGhost=1;
-const bestKey3=(cv,seed,n,twist,fmt)=>(S.v10&&cv===S.cv?CV_NOW:cv)+'.'+seed+'.'+n+(twist?'.t'+twist:'')+(fmt?'.f'+fmt:'')+(cv>=CV_ISL?'.k'+(S.kind|0):'');
+setDef('bestGhost',1);
+const bestKey3=(cv,seed,n,twist,fmt)=>(S.R.caps.bestNow&&cv===S.cv?CV_NOW:cv)+'.'+seed+'.'+n+(twist?'.t'+twist:'')+(fmt?'.f'+fmt:'')+(cv>=CV_ISL?'.k'+(S.kind|0):'');
 function bookBest(seed,n,cv,twist,fmt){const B=bookGet();return B.bests&&B.bests[bestKey3(cv==null?S.cv:cv,seed,n,twist||0,fmt||0)]||null}
 function bookBestSet(seed,n,cv,s,code,twist,fmt){const B=bookGet(),k=bestKey3(cv,seed,n,twist||0,fmt||0),o=B.bests&&B.bests[k];if(o&&o.s<=s)return false;(B.bests=B.bests||{})[k]={s,code,t:Date.now()};lsSet('voxellinks.book',B);return true}
-const bestEligible=()=>(!S.casual||(S.format===1&&tryOn()))&&!S.lab&&!S.replay&&!S.range&&!S.hs&&!S.scen&&!S.tuned&&S.cv>=4&&S.n>=3;
+const bestEligible=()=>(!S.casual||S.format===1)&&!S.lab&&!S.replay&&!S.range&&!S.hs&&!S.scen&&!S.tuned&&S.cv>=4&&S.n>=3;
 const gkPack=k=>((k&&k[0])|0)|(((k&&k[1])|0)<<3)|(((k&&k[2])|0)<<6),gkUnpack=v=>[v&7,(v>>3)&7,(v>>6)&7];
 const ghostKind1=()=>{const g=S.ghost;return!g?0:g.best?4:g.house?(typeof g.house==='object'?(g.house.id!=null&&g.house.id>=400?6:g.house.id===1||g.house.id===2||g.house.id===3?g.house.id:6):g.house):5};
 const xgFull=()=>(S.xg||[]).filter(x=>x.full);
@@ -14,10 +14,10 @@ function slotsSet(v){try{VS.setItem('voxellinks.slots',JSON.stringify(v))}catch(
 function slotName(q,seed){return q.k===4?'Your best':q.k===5?'A code':GHOST_KINDS[q.k]||'None'}
 function xgFrom(q,n,slot){if(!q||!q.k)return null;const col=q.k===4?GHOST_COLS.best:GHOST_COLS[slot]||GHOST_COLS[3];
   if(q.k>=1&&q.k<=3){const T=TIERS[q.k];return{name:T.n,kind:q.k,T,col,ball:newBall(),L:[],steps:[],k:0,full:true}}
-  const code=q.k===4?(bookBest(S.seed,n,S.cv,S.twist|0,S.format|0)||{}).code:q.code;if(!code)return null;const d=decodeRound(code);if(!d||d.golfer||d.seed!==S.seed||d.n!==n||(d.cv||0)!==S.cv)return null;
+  const code=q.k===4?(bookBest(S.seed,n,S.cv,S.twist|0,S.format|0)||{}).code:q.code;if(!code)return null;const d=decodeRound(code);if(!d||!VL.may('xghost',d)||d.seed!==S.seed||d.n!==n||(d.cv||0)!==S.cv)return null;
   const nm=q.k===4?'Best':(code.split('.')[1]?(()=>{try{return decodeURIComponent(escape(atob(code.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))))}catch(e){return'Friend'}})():'Friend');
   return{name:nm,kind:q.k,code,col,ball:newBall(),L:d.log,steps:[],k:0,seat:d.seat|0,ballType:d.ball|0,full:true,hd:d}}
-function ghostSlots3(n,save){if(!tryOn()||S.hs||S.scen||S.range||S.lab)return;let xg=S.xg?S.xg.slice():[];const own=xg.length>0;if(save&&save.gk!=null&&gkUnpack(save.gk)[0]===4&&S.ghost&&!S.ghost.house){S.ghost.best=true;S.ghost.name='Best'}
+function ghostSlots3(n,save){if(S.hs||S.scen||S.range||S.lab)return;let xg=S.xg?S.xg.slice():[];const own=xg.length>0;if(save&&save.gk!=null&&gkUnpack(save.gk)[0]===4&&S.ghost&&!S.ghost.house){S.ghost.best=true;S.ghost.name='Best'}
   const wants=save?(save.gk?gkUnpack(save.gk).slice(1).map(k=>({k:k>=1&&k<=3?k:k===4?4:0,code:''})):[]):own?[]:slotsGet();
   if(!own&&!wants.some(q=>q.k)&&S.ghost&&!S.ghost.house&&S.ghost.data&&S.ghost.data.ghosts){for(const k of gkUnpack(S.ghost.data.ghosts).slice(1))wants.push({k:k>=1&&k<=3?k:k===4?4:0,code:''})}
   for(const q of wants){if(xg.length>=TUNE.GHOST_MAX-1)break;const e=xgFrom(q,n,xg.length+2);if(e)xg.push(e)}
@@ -39,12 +39,12 @@ function xgDraw3(){for(const x of S.xg||[]){const b=x.ball;if(b.st==='holed')con
 function ghostTrail3(pts,c,a){const n=pts.length/3;if(n<2)return;if(trailArr.length<n*5)trailArr=new Float32Array(n*10);for(let i=0;i<n;i++){trailArr[i*5]=pts[i*3];trailArr[i*5+1]=pts[i*3+1];trailArr[i*5+2]=pts[i*3+2];trailArr[i*5+3]=0;trailArr[i*5+4]=0}gl.bindBuffer(gl.ARRAY_BUFFER,trailBuf);gl.bufferData(gl.ARRAY_BUFFER,trailArr.subarray(0,n*5),gl.DYNAMIC_DRAW);draw({buf:trailBuf,n},ID,[c[0],c[1],c[2],a],gl.LINE_STRIP)}
 function ghostTrails3(){const each=(b,keep,keepT,c)=>{if(b.st==='air'||b.st==='roll'){if(b.trail.length>=6)ghostTrail3(b.trail,c,.35)}else if(keep&&keep.length>=6&&S.t-keepT<2)ghostTrail3(keep,c,.35*(1-(S.t-keepT)/2))};
   if(S.ghost)each(GB,S.gTrail,S.gTrailT,ghostCol1());for(const x of xgFull())each(x.ball,x.trailKeep,x.trailT,x.col)}
-function xgSettle3(x){const b=x.ball;if(b.trail.length>=6){x.trailKeep=b.trail.slice();x.trailT=S.t}if(typeof trailKeep4==='function'&&x.full)trailKeep4(b,x.col,true)}
-function ghostSettleKeep3(){if(GB.trail.length>=6){S.gTrail=GB.trail.slice();S.gTrailT=S.t}if(typeof trailKeep4==='function')trailKeep4(GB,ghostCol1(),true)}
+function xgSettle3(x){const b=x.ball;if(b.trail.length>=6){x.trailKeep=b.trail.slice();x.trailT=S.t}if(VL.has('m4.moments')&&x.full)trailKeep4(b,x.col,true)}
+function ghostSettleKeep3(){if(GB.trail.length>=6){S.gTrail=GB.trail.slice();S.gTrailT=S.t}if(VL.has('m4.moments'))trailKeep4(GB,ghostCol1(),true)}
 function bestAfterRound3(code,s){if(!bestEligible())return null;const cz=casualStats();if(cz.mull||cz.gim)return null;return bookBestSet(S.seed,S.n,S.cv,S.format===1?-stabTotal():s,code,S.twist|0,S.format|0)?'New best on this seed · it plays alongside next time':null}
 function keepGB(fn){const k=Object.assign({},GB),rot=GB.rot,tr=GB.trail,ev=GB.ev;k.rot=rot.slice?rot.slice():rot;k.trail=tr.slice();k.ev=ev.slice();try{return fn()}finally{Object.assign(GB,k)}}
 let GHOST_LOAD_MS=0;const ghostLoadMs=()=>GHOST_LOAD_MS;
-function buildSlots(){const el=$('slots');if(!el||!el.parentElement)return;el.innerHTML='';const on=tryOn();el.parentElement.style.display=on?'':'none';if(!on)return;const v=slotsGet(),seed=+seedIn.value||S.seed,hasBest=[3,9,18].some(n=>bookBest(seed,n,newCv(),twistFor(seed,newCv()),tryOn()?S.formatPick|0:0));
+function buildSlots(){const el=$('slots');if(!el||!el.parentElement)return;el.innerHTML='';el.parentElement.style.display='';const v=slotsGet(),seed=+seedIn.value||S.seed,hasBest=[3,9,18].some(n=>bookBest(seed,n,newCv(),twistFor(seed,newCv()),S.formatPick|0));
   v.forEach((q,i)=>{const sel=document.createElement('select');sel.className='slot';[[0,'None'],[1,'Caddie'],[2,'Member'],[3,'Pro'],[4,'Your best'+(hasBest?'':' (none yet)')],[5,'A code…']].forEach(([k,n])=>{const o=document.createElement('option');o.value=k;o.textContent=n;if(k===q.k)o.selected=true;sel.appendChild(o)});
     const inp=document.createElement('input');inp.placeholder='paste a round code';inp.value=q.code;inp.style.display=q.k===5?'':'none';inp.style.width='150px';
     sel.onchange=()=>{q.k=+sel.value;inp.style.display=q.k===5?'':'none';slotsSet(v);AU.play('ui')};inp.onchange=()=>{q.code=inp.value.trim().replace(/^.*#/,'');slotsSet(v)};
@@ -52,3 +52,4 @@ function buildSlots(){const el=$('slots');if(!el||!el.parentElement)return;el.in
   const note=$('slotsNote');if(note)note.textContent='Up to three ghosts play the hole shot for shot beside you; your best on a seed joins by itself (Settings)'}
 function settingsM3(el){const d=document.createElement('div');d.innerHTML='<div class="setrow"><span>Your best round on a seed plays alongside in gold (F-103)</span><div class="seg" data-k3="bestGhost">'+['Off','On'].map((o,i)=>'<button data-v="'+i+'" class="'+(i===(SETS.bestGhost?1:0)?'sel':'')+'">'+o+'</button>').join('')+'</div></div>';
   el.appendChild(d);d.querySelectorAll('.seg[data-k3] button').forEach(bt=>bt.onclick=()=>{SETS.bestGhost=+bt.dataset.v;setSave();AU.play('ui');settingsPanel()})}
+VL.feature({id:'m3.ghosts',kind:'sim',deps:['core.game','f114.tune'],f:['F-102','F-103'],rules:{caps:{bestNow:['r10','S.v10']},hooks:[['round:setup',3,(n,sv)=>ghostSlots3(n,sv)]]},on:[['round:finished',50,c=>{const bl=c.strict&&VL.may('best')?bestAfterRound3(c.code,c.s):null;if(bl)S.bookNews.push(bl)}]],view:{frame:{xg:dt=>{if(S.xg){xgPump(false);xgStep(dt*S.ff)}}}},surfaces:{xghost:{accepts:['shared']}}});

@@ -27,3 +27,4 @@ function hudLayout(){if(!HUDL.on)return;const $=id=>document.getElementById(id),
 /* the projection's lens shift, eased once a frame so the view never jumps; the reflection pass uses the same value */
 function hudEase(dt){HUDL.sy+=(HUDL.syT-HUDL.sy)*Math.min(1,dt*9);if(Math.abs(HUDL.syT-HUDL.sy)<1e-4)HUDL.sy=HUDL.syT}
 const hudLens=P=>{P[9]=HUDL.sy;return P};
+VL.feature({id:'b4.hud',kind:'view',deps:['core.view'],f:['B-4']});
