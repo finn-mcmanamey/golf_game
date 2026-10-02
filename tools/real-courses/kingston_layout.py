@@ -27,7 +27,7 @@ CARD = [(3, 162), (4, 311), (4, 340), (4, 322), (4, 393), (5, 488), (3, 120), (3
 LANE_Z = (55, 97, 139, 181, 223, 265, 307, 349)        # east-west lanes across the bowl
 EXTRA = {'WEST': [(-330, 45), (-316, 150), (-250, 262)], 'EAST': [(328, 170), (322, 330)]}
 START = (25, -10)         # the 3rd green: hole 3 runs from the real tee by the river along the north of the bowl
-WALK = 170                # the longest walk from a green to the next tee
+WALK = 240                # the longest walk from a green to the next tee
 GAP = 40                  # metres between one hole's green and the next hole's tee in the same lane
 
 
@@ -114,7 +114,7 @@ def search(fit, scale, deadline):
                         free = n - sum(b2 - a2 for a2, b2 in busy) - L      # best fit: fill the fullest lane first
                         out.append((w * .5 + free * .6, lane, (a, b), line))
         out.sort(key=lambda o: o[0])
-        return out[:6]
+        return out[:8]
 
     def dfs(k, prev, used, route):
         if time.time() > deadline:
@@ -137,8 +137,8 @@ def search(fit, scale, deadline):
 
 def main():
     fit = Fit(*setup())
-    for scale in (.9, .88, .86, .84, .82, .8, .78):
-        route, best = search(fit, scale, time.time() + 150)
+    for scale in (.86, .82):
+        route, best = search(fit, scale, time.time() + 400)
         print(f'scale {scale}: ' + ('found' if route else f'reached hole {best["n"] + 3}'))
         if route:
             for i, lane, line in route:
