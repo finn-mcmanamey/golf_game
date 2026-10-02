@@ -8,7 +8,7 @@ function islShare(seed,first){seed=Math.max(1,seed|0);const codes=islLinkCodes(s
 function islBanner(c){const P=islLinkDecode(c);if(!P)return false;const seed=P.seed;ISL.seed=seed;lsSet('voxellinks.isl.last',seed);const inp=$('islSeed');if(inp)inp.value=seed;
   chTab('pGhosts');$('ghostBanner').classList.remove('hide');$('hcpSel').style.display='none';$('btnGhost').style.display='none';
   $('ghostText').textContent=islName(seed)+' · an island link · '+(P.G.length?P.G.length+' ghost nine'+(P.G.length>1?'s':''):'no ghosts attached');
-  $('bannerX').innerHTML=P.G.map((g,i)=>{const pars=parsFor(g.d.n,g.d.cv,g.d.kind),t=roundTotal(g.d.log,pars,g.d.cv);return'<button class="sec" data-ig="'+i+'">vs '+esc(islRoutingName(g.d.kind,g.d.n))+' · '+(t.done<g.d.n?'unfinished':relS(t.s-t.p))+'</button>'}).join('')+'<button class="big" id="islLinkOpen" style="font-size:15px;padding:9px 16px">Open the island</button>';
+  $('bannerX').innerHTML=P.G.map((g,i)=>{const pars=parsFor(g.d.n,g.d.cv,g.d.kind,g.d.real),t=roundTotal(g.d.log,pars,g.d.cv);return'<button class="sec" data-ig="'+i+'">vs '+esc(islRoutingName(g.d.kind,g.d.n))+' · '+(t.done<g.d.n?'unfinished':relS(t.s-t.p))+'</button>'}).join('')+'<button class="big" id="islLinkOpen" style="font-size:15px;padding:9px 16px">Open the island</button>';
   $('bannerX').querySelectorAll('[data-ig]').forEach(b=>b.onclick=()=>{AU.play('ui');islGhostPlay(seed,P.G[+b.dataset.ig])});$('islLinkOpen').onclick=()=>{AU.play('ui');islOpen(seed)};return true}
 function islGhostPlay(seed,g){ISL.seed=seed;islPrep(seed,g.d.kind,g.d.islDay);seedIn.value=seed;S.seed=seed;S.over=false;startRound(g.d.n,g.code)}
 VL.feature({id:'v6m5.links',kind:'shell',deps:['v6m1.island','m5.people'],f:['F-126'],surfaces:{islLink:{accepts:['shared']}}});
