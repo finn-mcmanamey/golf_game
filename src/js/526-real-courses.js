@@ -137,7 +137,7 @@ function realWater(H,ty,sea,cols,rows,ox,oz,Cl,cellAt,teeH){const s=cols+1,nc=co
     mx/=cells.length;mz/=cells.length;let level=rim<1e8?rim-.25:-teeH;if(isSea)level=Math.min(level,-teeH);
     let sxx=0,szz=0,sxz=0;for(const c of cells){const dx=ox+(c%cols+.5)*CS-mx,dz=oz+(((c/cols)|0)+.5)*CS-mz;sxx+=dx*dx;szz+=dz*dz;sxz+=dx*dz}sxx/=cells.length;szz/=cells.length;sxz/=cells.length;
     const mid=(sxx+szz)/2,dev=Math.sqrt((sxx-szz)*(sxx-szz)/4+sxz*sxz),crosses=Cl.some(p=>{const c=cellAt(p.x,p.z);return c>=0&&pond[c]===id});
-    PD.push({x:mx,z:mz,rx:2*Math.sqrt(mid+dev)+CS,rz:2*Math.sqrt(Math.max(0,mid-dev))+CS,rot:.5*MM.atan2(2*sxz,sxx-szz),depth:REAL_WATER_DEPTH,level,pen:!isSea&&crosses?'Y':'R'});
+    PD.push({x:mx,z:mz,rx:2*Math.sqrt(mid+dev)+CS,rz:2*Math.sqrt(Math.max(0,mid-dev))+CS,rot:.5*MM.atan2(2*sxz,sxx-szz),depth:REAL_WATER_DEPTH,level,pen:!isSea&&crosses?'Y':'R',sea:isSea});
     for(const c of cells){const k=((c/cols)|0)*s+c%cols;for(const v of[k,k+1,k+s,k+s+1])H[v]=Math.min(H[v],level-.15)}
     for(const c of cells){const i=c%cols,j=(c/cols)|0,k=j*s+i;let inner=true;for(let b=j-1;b<=j+1&&inner;b++)for(let a=i-1;a<=i+1;a++)if(a<0||b<0||a>=cols||b>=rows||ty[b*cols+a]!==7){inner=false;break}if(inner)H[k]=Math.min(H[k],level-REAL_WATER_DEPTH)}}
   /* the bank cells know their water's level too, as an invented hole's do */
@@ -159,6 +159,37 @@ function realPins(W,setup,id,idx){const g=W.green,RP=mulberry32(thash(id,idx+500
 /* the course's trees that stand on this hole's grid, each grown from its own seed so it looks the same from every hole */
 function realPlant(W,C,F,BI){for(const t of C.trees){const[x,z]=realToLocal(F,t.x,t.z);if(x<W.ox+4||z<W.oz+4||x>W.ox+W.cols*CS-4||z>W.oz+W.rows*CS-4)continue;
   terrainAt(W,x,z);if(TQ.ty>1)continue;const p=makeProp(t.kind,x,z,TQ.h-.2,mulberry32(t.seed),BI);W.trees.push(p);const key=(((x-W.ox)/8)|0)+','+(((z-W.oz)/8)|0);(W.tgrid.get(key)||W.tgrid.set(key,[]).get(key)).push(p)}}
+
+/* ---- drawing only: the scorecard's shot maps and the property map ---- */
+const REAL_PLANS=new Map();
+/* a real hole's shape in the form the shot maps read from holePlan, cut from the hole itself */
+function realPlan(h){const key=holeKey(S.seed,h,S.cv,S.setup,S);if(!REAL_PLANS.has(key)){if(REAL_PLANS.size>24)REAL_PLANS.clear();const W=genHole(S.seed,h,S.pars[h],S.cv,S.setup,S);
+  REAL_PLANS.set(key,{C:W.C,hw:W.hw,g:{x:W.green.x,z:W.green.z},gR:W.green.r,pin:W.pin,PD:W.PD.filter(p=>!p.sea),BK:[]})}return REAL_PLANS.get(key)}
+
+const REAL_MAP_FILL=[null,'rough','fairway','green','tee','bunker','water','water','wood','house'];
+/* the property map for a real course: the map's own shapes, north up, every hole's line and number, the ball and the wind */
+function drawRealMap(){const C=realCourse(S.real),src=C.src,cvs=$('pmapC'),hole=C.holes.slice(0,S.n),pal=W.pal||{};
+  let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;for(const p of C.polys)if(p.c===0)for(const[x,z]of p.p){x0=Math.min(x0,x);x1=Math.max(x1,x);z0=Math.min(z0,z);z1=Math.max(z1,z)}x0-=40;x1+=40;z0-=40;z1+=40;
+  const Wd=Math.min(innerWidth*.94-ybWidth(),1100),Hd=Math.min(innerHeight*.78,760),sc=Math.min(Wd/(x1-x0),Hd/(z1-z0)),w=Math.ceil((x1-x0)*sc),h=Math.ceil((z1-z0)*sc),d=Math.min(devicePixelRatio||1,2);
+  cvs.width=w*d;cvs.height=h*d;cvs.style.width=w+'px';cvs.style.height=h+'px';const g=cvs.getContext('2d');g.setTransform(d,0,0,d,0,0);
+  const X=x=>(x-x0)*sc,Z=z=>(z-z0)*sc,rgb=t=>{const c=pal[t]||SURF[t].col;return`rgb(${c[0]*255|0},${c[1]*255|0},${c[2]*255|0})`};
+  const fill={rough:rgb(0),fairway:rgb(2),green:rgb(4),tee:rgb(5),bunker:rgb(6),water:TK('map-water',.95),wood:'rgba(20,60,25,.35)',house:'rgba(120,115,105,.85)'};
+  g.fillStyle=rgb(1);g.fillRect(0,0,w,h);
+  for(const p of C.polys){const f=p.c===0?fill.rough:fill[REAL_MAP_FILL[p.c]];if(!f)continue;g.fillStyle=f;g.beginPath();p.p.forEach(([x,z],k)=>k?g.lineTo(X(x),Z(z)):g.moveTo(X(x),Z(z)));g.closePath();g.fill()}
+  hole.forEach((L,i)=>{const cur=i===S.hi;g.lineCap='round';g.lineJoin='round';g.strokeStyle=cur?TK('gold300'):TK('white',.55);g.lineWidth=cur?2.5:1.5;g.setLineDash(cur?[]:[4,4]);
+    g.beginPath();L.forEach(([x,z],k)=>k?g.lineTo(X(x),Z(z)):g.moveTo(X(x),Z(z)));g.stroke();g.setLineDash([]);
+    const[tx,tz]=L[0];g.fillStyle=cur?TK('gold300'):TK('white',.9);g.font='bold '+Math.max(11,Math.min(16,3.2*sc*4))+'px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';
+    g.lineWidth=3;g.strokeStyle=TK('black',.5);g.strokeText(String(i+1),X(tx),Z(tz)-10);g.fillText(String(i+1),X(tx),Z(tz)-10)});
+  const[bx,bz]=realToCourse(W.frame,PB.x,PB.z);g.fillStyle=TK('white');g.beginPath();g.arc(X(bx),Z(bz),3.5,0,TAU);g.fill();g.strokeStyle=TK('black');g.lineWidth=1;g.stroke();
+  const P=coursePlan(S.seed,S.cv),wd=P.wind;if(wd.s>.3){g.save();g.translate(w-34,34);g.rotate(Math.atan2(wd.x,-wd.z));g.fillStyle=TK('white',.9);g.beginPath();g.moveTo(0,-16);g.lineTo(9,4);g.lineTo(3,4);g.lineTo(3,16);g.lineTo(-3,16);g.lineTo(-3,4);g.lineTo(-9,4);g.closePath();g.fill();g.restore()}
+  g.fillStyle=TK('white',.8);g.font='11px system-ui,sans-serif';g.textAlign='left';g.fillText('N ↑',10,14);g.font='10px system-ui,sans-serif';g.fillStyle=TK('white',.65);g.fillText('© OpenStreetMap contributors',10,h-8);
+  const from=['N','NE','E','SE','S','SW','W','NW'][Math.round(((Math.atan2(-wd.x,wd.z)%TAU+TAU)%TAU)/(Math.PI/4))%8];
+  $('pmapT').textContent=src.name+' · '+SEASONS[W.season].n+' · '+P.wea.n+(wd.s>.3?' · wind '+Math.round(wd.s*3.6)+' km/h from '+from:' · calm')+(W.clock!=null?' · '+String(Math.floor(W.clock)).padStart(2,'0')+':'+String(Math.round((W.clock%1)*60)).padStart(2,'0'):'')+' · hole '+(S.hi+1)+' of '+S.n+' · V to close'}
+
+/* Courses → Play: a real course plays as a casual round; the Course # box (or Today's) deals the day's weather and pins */
+function realGo(id,n){const seed=Math.max(1,(+$('seed').value|0)||1);
+  VL.play('casual',{seed,box:seed,setup:setupFor(seed),season:S.seasonPick>=0?S.seasonPick:courseSeason(seed),wear:S.condPick|0,casual:S.casualOn?1:0,kind:0,real:id,fmt:{format:0,twist:0},n,ghost:null,opp:oppArg()})}
+$('btnRealC18').onclick=()=>realGo(1,18);$('btnRealC9').onclick=()=>realGo(1,9);
 
 /* the rest of a real round's code, after the island header's kind 7 and course id: it reads as any v10 round */
 function realDecode(r,seed,n,hcp,V10,id,g9,GF){if(!V10||!realSrc(id+1)||(n!==9&&n!==18))return null;const d=decodeRound6(r,seed,n,hcp,CV,7);if(!d)return null;

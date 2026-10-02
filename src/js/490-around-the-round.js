@@ -26,7 +26,7 @@ const gentleSeed=()=>GENTLE_SEEDS[Math.floor(Math.random()*GENTLE_SEEDS.length)]
 const ARCH_NAMES5=[...new Set(ARCH7.map(a=>a.n))],PASSPORT_N=(BIOMES.length-1)+ARCHITECT_NAMES.length+ARCH_NAMES5.length+LM_NAMES.length;
 const ppGet=()=>lsGet('voxellinks.passport',{}),ppSet=v=>lsSet('voxellinks.passport',v);
 function ppScan(seed,cv,n){const P=coursePlan(seed,cv),ar=new Set();for(let i=0;i<n;i++){const H=courseHole(seed,cv,cv>=CV_ISL?islJ(S,i):i);if(H&&H.arch&&H.arch.n)ar.add(H.arch.n)}let lm=null;try{lm=landmarkOf(seed,cv)}catch(e){}return{b:BIOMES[biomeOf(seed,cv)].n,a:P.architect||'',ar:[...ar],lm:lm&&!lm.none?lm.name:null,lmk:!!lm,n,cv,t:Date.now()}}
-function ppAdd(seed,cv,n){if(cv<4)return null;const PP=ppGet(),k=String(seed),old=PP[k];if(old&&old.n>=n&&old.lmk)return old;const st=ppScan(seed,cv,n);if(old&&old.t)st.t=old.t;PP[k]=st;ppSet(PP);return st}
+function ppAdd(seed,cv,n){if(cv<4||S.real)return null;const PP=ppGet(),k=String(seed),old=PP[k];if(old&&old.n>=n&&old.lmk)return old;const st=ppScan(seed,cv,n);if(old&&old.t)st.t=old.t;PP[k]=st;ppSet(PP);return st}
 function ppSeeds(){const B=bookGet(),out=new Map();for(const x of B.rounds)if(!out.has(x.seed)||x.t<out.get(x.seed))out.set(x.seed,x.t);for(const[k,x]of Object.entries(B.records||{})){if(x.who!=='You')continue;const p=k.split('.'),seed=+p[p.length-2];if(seed&&(!out.has(seed)||x.t<out.get(seed)))out.set(seed,x.t)}return out}
 function passport(){const PP=ppGet(),have={b:new Map(),a:new Map(),ar:new Map(),lm:new Map()},seeds=[...ppSeeds()].sort((p,q)=>p[1]-q[1]);let missing=0;
   for(const[seed,t]of seeds){const q=PP[String(seed)];if(!q){missing++;continue}const add=(m,k)=>{if(k&&!m.has(k))m.set(k,{seed,t,cv:q.cv})};add(have.b,q.b);add(have.a,q.a);for(const z of q.ar)add(have.ar,z);add(have.lm,q.lm)}
@@ -66,7 +66,7 @@ function thumb5(seed,cv,n){if(typeof document==='undefined'||!document.createEle
   g.strokeStyle=TK('map-fair');for(const H of HS)for(let i=0;i+1<H.C.length;i++){const a=H.C[i],b=H.C[i+1],[ax,az]=toWorld(H,a.x,a.z),[bx,bz]=toWorld(H,b.x,b.z);g.lineWidth=Math.max(2.5,H.hw(a.t)*2*sc);g.beginPath();g.moveTo(...X(ax,az));g.lineTo(...X(bx,bz));g.stroke()}
   g.fillStyle=TK('map-green');for(const H of HS){const[gx,gz]=toWorld(H,H.g.x,H.g.z),[sx,sy]=X(gx,gz);g.beginPath();g.arc(sx,sy,Math.max(1.5,H.gR*sc),0,TAU);g.fill()}
   try{return cvs.toDataURL('image/png')}catch(e){return null}}
-function galAdd5(rel){if(S.lab||S.replay||S.range||S.hs||S.scen||S.tuned||S.cv<4)return null;const G=galGet(),k=String(S.seed),old=G[k]||{};let name='',a='';try{const H=courseHistory(S.seed,S.cv);name=H.name;a=H.architect||''}catch(e){}
+function galAdd5(rel){if(S.real||S.lab||S.replay||S.range||S.hs||S.scen||S.tuned||S.cv<4)return null;const G=galGet(),k=String(S.seed),old=G[k]||{};let name='',a='';try{const H=courseHistory(S.seed,S.cv);name=H.name;a=H.architect||''}catch(e){}
   const png=thumb5(S.seed,S.cv,S.n)||old.png||null;G[k]={png,name,bio:biomeOf(S.seed,S.cv),a,n:S.n,cv:S.cv,rel,star:old.star|0,fav:!!old.fav,t:Date.now(),first:old.first||Date.now()};
   const keys=Object.keys(G);if(keys.length>TUNE.GALLERY_MAX){const drop=keys.filter(q=>!G[q].fav).sort((p,q)=>G[p].t-G[q].t).slice(0,keys.length-TUNE.GALLERY_MAX);for(const q of drop)delete G[q]}galSet(G);return G[k]}
 function galStar5(seed,star,fav){const G=galGet(),k=String(seed);if(!G[k])return;if(star!=null)G[k].star=clamp(star|0,0,5);if(fav!=null)G[k].fav=!!fav;galSet(G)}

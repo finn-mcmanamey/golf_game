@@ -336,7 +336,7 @@ function lmBoxes(bio,se,gy=()=>0){const S1=[.56,.54,.5],D=[.2,.18,.16],W1=[.92,.
     for(let t=6;t<sp*n;t+=12)b(0,cy(t)+.1,-t,.08,.08,6.1,[.2,.2,.22]);for(const t of[1.5,3.5])b(0,cy(sp*t)-2.3,-sp*t,1.1,1.3,1.5,R1);b(0,(top+ge-3)/2+.5,e-5,4.5,(top-ge+3)/2+.5,4.5,[.46,.3,.2]);b(0,top+1.3,e-5,5.2,.4,5.2,P)}
   else{b(0,-5,0,6,5,5.5,[.42,.4,.38]);b(1.8,-3,-2.2,4.2,4,4,[.36,.34,.32]);b(0,1.2,0,3,1.2,3,S1);for(let k=0;k<6;k++){const w=2.3-.12*k;b(0,5.6+3.2*k,0,w,1.6,w,k%2?R1:[.95,.95,.93])}b(0,24.6,0,2.5,.2,2.5,D);b(0,25.8,0,1.2,1,1.2,[1,.92,.55]);b(0,27.2,0,1.4,.4,1.4,[.6,.12,.1])}return B}
 /* the landmark's mesh for this hole: null = the routing isn't finished yet, 0 = none from here */
-function lmMesh(W){if(W.cv<4||(W.arch&&W.arch.n==='Range'))return 0;const L=landmarkOf(W.seed,W.cv);if(!L)return null;if(L.none)return 0;
+function lmMesh(W){if(W.cv<4||W.real||(W.arch&&W.arch.n==='Range'))return 0;const L=landmarkOf(W.seed,W.cv);if(!L)return null;if(L.none)return 0;
   const H=holeFrame(W),[lx,lz]=fromWorld(H,L.x,L.z);if(Math.min(MM.hyp(lx,lz),MM.hyp(lx-W.green.x,lz-W.green.z))>LM_SEE+(L.bio===2?500:0))return 0;
   const R=ringSpec(W),K=LM_K[L.bio],a=L.a-H.h,c=MM.cos(a),s=MM.sin(a),rh=(x,z)=>{/* the ring as drawn: bilinear on its lattice */const u=(x-R.x0)/R.S,v=(z-R.z0)/R.S,i=Math.floor(u),j=Math.floor(v),X=R.x0+i*R.S,Z=R.z0+j*R.S;return lerp(lerp(R.h(X,Z),R.h(X+R.S,Z),u-i),lerp(R.h(X,Z+R.S),R.h(X+R.S,Z+R.S),u-i),v-j)};
   let y0=rh(lx,lz);if(L.bio===5&&W.sea!=null)y0=Math.max(y0,W.sea+CLIFF_H);
