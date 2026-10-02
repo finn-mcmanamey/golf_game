@@ -116,7 +116,7 @@ function realHole(seed,idx,par,cv,setup,cond){const id=cond.real,C=realCourse(id
   const P=coursePlan(seed,cv),w0=P.wind,wl={x:w0.x*F.c-w0.z*F.s,z:w0.x*F.s+w0.z*F.c,s:w0.s,a:0};wl.a=MM.atan2(wl.x,wl.z);
   W.wind=cond.twist===2?gale5(wl):wl;W.swell=P.swell;W.phase=thash(seed,idx+900)/4294967296*TAU;W.rain=!!P.wea.rain;W.marks=[];
   {let lo=1e9;for(let q=0;q<H.length;q+=7)if(H[q]<lo)lo=H[q];W.hlow=lo}
-  W.laneD=null;W.hist={name:src.name,year:src.est,line:src.town+' · the real course, from the map',v:0};
+  W.laneD=null;W.hist={name:src.name,year:src.est,line:src.note||src.town+' · the real course, from the map',v:0};
   realPlant(W,C,F,BI);return W}
 
 /* sand dished in, tees raised and flat, greens eased toward a gentle tilt: the map knows where, the terrain model is too coarse to */
@@ -182,14 +182,15 @@ function drawRealMap(){const C=realCourse(S.real),src=C.src,cvs=$('pmapC'),hole=
     g.lineWidth=3;g.strokeStyle=TK('black',.5);g.strokeText(String(i+1),X(tx),Z(tz)-10);g.fillText(String(i+1),X(tx),Z(tz)-10)});
   const[bx,bz]=realToCourse(W.frame,PB.x,PB.z);g.fillStyle=TK('white');g.beginPath();g.arc(X(bx),Z(bz),3.5,0,TAU);g.fill();g.strokeStyle=TK('black');g.lineWidth=1;g.stroke();
   const P=coursePlan(S.seed,S.cv),wd=P.wind;if(wd.s>.3){g.save();g.translate(w-34,34);g.rotate(Math.atan2(wd.x,-wd.z));g.fillStyle=TK('white',.9);g.beginPath();g.moveTo(0,-16);g.lineTo(9,4);g.lineTo(3,4);g.lineTo(3,16);g.lineTo(-3,16);g.lineTo(-3,4);g.lineTo(-9,4);g.closePath();g.fill();g.restore()}
-  g.fillStyle=TK('white',.8);g.font='11px system-ui,sans-serif';g.textAlign='left';g.fillText('N ↑',10,14);g.font='10px system-ui,sans-serif';g.fillStyle=TK('white',.65);g.fillText('© OpenStreetMap contributors',10,h-8);
+  g.fillStyle=TK('white',.8);g.font='11px system-ui,sans-serif';g.textAlign='left';g.fillText('N ↑',10,14);g.font='10px system-ui,sans-serif';g.fillStyle=TK('white',.65);g.fillText('© OpenStreetMap contributors'+(src.note?' · '+src.note:''),10,h-8);
   const from=['N','NE','E','SE','S','SW','W','NW'][Math.round(((Math.atan2(-wd.x,wd.z)%TAU+TAU)%TAU)/(Math.PI/4))%8];
   $('pmapT').textContent=src.name+' · '+SEASONS[W.season].n+' · '+P.wea.n+(wd.s>.3?' · wind '+Math.round(wd.s*3.6)+' km/h from '+from:' · calm')+(W.clock!=null?' · '+String(Math.floor(W.clock)).padStart(2,'0')+':'+String(Math.round((W.clock%1)*60)).padStart(2,'0'):'')+' · hole '+(S.hi+1)+' of '+S.n+' · V to close'}
 
 /* Courses → Play: a real course plays as a casual round; the Course # box (or Today's) deals the day's weather and pins */
 function realGo(id,n){const seed=Math.max(1,(+$('seed').value|0)||1);
   VL.play('casual',{seed,box:seed,setup:setupFor(seed),season:S.seasonPick>=0?S.seasonPick:courseSeason(seed),wear:S.condPick|0,casual:S.casualOn?1:0,kind:0,real:id,fmt:{format:0,twist:0},n,ghost:null,opp:oppArg()})}
-$('btnRealC18').onclick=()=>realGo(1,18);$('btnRealC9').onclick=()=>realGo(1,9);
+$('btnRealC18').onclick=()=>realGo(1,18);$('btnRealC9').onclick=()=>realGo(1,9);$('btnRealK18').onclick=()=>realGo(2,18);$('btnRealK9').onclick=()=>realGo(2,9);
+if(!realSrc(2))for(const b of['btnRealK18','btnRealK9'])$(b).style.display='none';   /* hidden until its data is built */
 
 /* the rest of a real round's code, after the island header's kind 7 and course id: it reads as any v10 round */
 function realDecode(r,seed,n,hcp,V10,id,g9,GF){if(!V10||!realSrc(id+1)||(n!==9&&n!==18))return null;const d=decodeRound6(r,seed,n,hcp,CV,7);if(!d)return null;

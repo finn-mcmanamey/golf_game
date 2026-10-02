@@ -15,8 +15,9 @@ from pathlib import Path
 
 import shapely
 from shapely import wkb
-from shapely.affinity import affine_transform
+from shapely.affinity import affine_transform, rotate, scale, translate
 from shapely.geometry import LineString, MultiPoint, Point, box as rect
+from shapely.ops import unary_union
 
 import overture
 import terrain
@@ -117,6 +118,34 @@ def centre_line(fairway, tee, green):
     return path[::-1]
 
 
+def oval(cx, cz, along, across, heading):
+    """an ellipse with its long axis along the heading (radians, 0 = +z)"""
+    return translate(rotate(scale(Point(0, 0).buffer(1, 24), across, along), -heading, origin=(0, 0), use_radians=True), cx, cz)
+
+
+def fill_gap(i, par, line, tee, green, fairway, land):
+    """The pieces the map is missing for one hole, laid along its line: a tee box, an oval green with a bunker or two,
+    and a fairway from the landing area to the green. Sizes vary with the hole number so no two greens match."""
+    out = []
+    head = lambda a, b: math.atan2(b[0] - a[0], b[1] - a[1])
+    first, last = head(line[0], line[1]), head(line[-2], line[-1])
+    if tee:
+        out.append(('tee', oval(*line[0], 9, 5, first).minimum_rotated_rectangle))
+    if green:
+        gx, gz = line[-1]
+        along, across = 14 + i % 3, 10.5 + (i * 7 % 3) * .8
+        out.append(('green', oval(gx, gz, along, across, last)))
+        side = 1 if i % 2 else -1    # one bunker beside the green, and on longer holes a second short of it on the other side
+        for a in [last + side * (1.2 + .2 * (i % 3))] + ([last + math.pi - side * .7] if par > 3 and i % 3 != 1 else []):
+            out.append(('bunker', oval(gx + math.sin(a) * (across + 5), gz + math.cos(a) * (across + 5), 5 + i % 2, 3, a + math.pi / 2)))
+    if fairway and par > 3:
+        L = LineString(line)
+        spine = LineString([L.interpolate(110)] + [Point(p) for p in line[1:-1] if L.project(Point(p)) > 110] + [L.interpolate(L.length - 16)])
+        strip = spine.buffer(16).intersection(land.buffer(-4))
+        out += [('fairway', p) for p in polygons(strip) if p.area > 200]
+    return out
+
+
 def hole_line(tee, green, fairway):
     a, b = tee.centroid, green.centroid
     mid = centre_line(fairway, tee, green) if fairway is not None else []
@@ -200,6 +229,18 @@ def build(course):
     box = (math.floor(x0 - MARGIN), math.floor(z0 - MARGIN), math.ceil(x1 + MARGIN), math.ceil(z1 + MARGIN))
     clip, near_course = rect(*box), course_area.buffer(120)
 
+    land = course_area.difference(unary_union([p for c, p in feats if c in ('water', 'sea')]))
+    holes = []
+    for i, (par, tee, green, fw, *bends) in enumerate(course['holes']):
+        if isinstance(tee, str) and isinstance(green, str) and fw != 'est' and not bends:
+            line = hole_line(by_osm[tee], by_osm[green], by_osm.get(fw) if fw else None)
+        else:
+            a, b = (by_osm[s].centroid if isinstance(s, str) else Point(s) for s in (tee, green))
+            line = [(a.x, a.y)] + list(bends[0] if bends else []) + [(b.x, b.y)]
+            feats += fill_gap(i, par, line, isinstance(tee, tuple), isinstance(green, tuple), fw == 'est', land)
+        holes.append(dict(par=par, line=line, m=round(LineString(line).length)))
+    si = stroke_index(holes)
+
     polys = []
     for cls, p in feats:
         if cls == 'building':
@@ -211,12 +252,6 @@ def build(course):
             if q.area > 4:
                 polys.append((CLASS.index(cls), list(q.exterior.coords)[:-1]))
     polys.sort(key=lambda t: t[0])
-
-    holes = []
-    for par, tee, green, fw in course['holes']:
-        line = hole_line(by_osm[tee], by_osm[green], by_osm.get(fw) if fw else None)
-        holes.append(dict(par=par, line=line, m=round(LineString(line).length)))
-    si = stroke_index(holes)
 
     cols, rows, g = height_grid(box, to_lonlat)
     lo = math.floor(min(min(r) for r in g))
@@ -232,6 +267,7 @@ def build(course):
 
     report(course, holes)
     return dict(id=course['id'], key=course['key'], name=course['name'], town=course['town'], est=course['est'],
+                **({'note': course['note']} if course.get('note') else {}),
                 par=[h['par'] for h in holes], si=si, m=[h['m'] for h in holes], box=list(box),
                 poly=varints(poly_ints), holes=varints(hole_ints),
                 dem=dict(x0=box[0], z0=box[1], step=DEM_STEP, cols=cols, rows=rows, lo=lo, d=varints(deltas)),
