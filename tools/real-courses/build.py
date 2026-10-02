@@ -141,7 +141,7 @@ def fill_gap(i, par, line, tee, green, fairway, land):
     if fairway and par > 3:
         L = LineString(line)
         spine = LineString([L.interpolate(110)] + [Point(p) for p in line[1:-1] if L.project(Point(p)) > 110] + [L.interpolate(L.length - 16)])
-        strip = spine.buffer(16).intersection(land.buffer(-4))
+        strip = spine.buffer(14).intersection(land.buffer(-4))
         out += [('fairway', p) for p in polygons(strip) if p.area > 200]
     return out
 

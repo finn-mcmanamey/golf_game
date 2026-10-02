@@ -151,3 +151,51 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+# ---------- finishing: holes the lanes can't take may cross others (Finn's choice) ----------
+
+def finish(fit, route, scale):
+    """Put each missing hole on the straight line with the least fairway overlap, its green on free land."""
+    have = {i: line for i, lane, line in route}
+    greens = [Point(l[-1]) for l in have.values()]
+    fairways = unary_union([LineString(l).buffer(14) for l in have.values()])
+    for i in range(3, 17):
+        if i in have:
+            continue
+        par, L = CARD[i][0], round(CARD[i][1] * scale)
+        prev = have.get(i - 1, [START])[-1]
+        best = None
+        for r in range(20, 241, 20):
+            for k in range(24):
+                a = k / 24 * 2 * math.pi
+                t = (prev[0] + math.sin(a) * r, prev[1] + math.cos(a) * r)
+                for d in range(36):
+                    h = d / 36 * 2 * math.pi
+                    g = Point(t[0] + math.sin(h) * L, t[1] + math.cos(h) * L)
+                    if not fit.green_ok.contains(g.buffer(14)) or any(g.distance(q) < 25 for q in greens):
+                        continue
+                    line = [t, (g.x, g.y)]
+                    if not fit.inside.contains(LineString(line)) or not fit.fairway_ok.contains(Point(t).buffer(5)):
+                        continue
+                    cost = LineString(line).buffer(14).intersection(fairways).area + r * 3
+                    if best is None or cost < best[0]:
+                        best = (cost, line)
+        have[i] = best[1]
+        greens.append(Point(best[1][-1]))
+        fairways = fairways.union(LineString(best[1]).buffer(14))
+        print(f'  {i + 1:2d} placed crossing: overlap cost {best[0]:.0f}')
+    return have
+
+
+def emit(have):
+    """The hole list for courses.py: real holes 1-2, the real 3rd tee, estimated 4-17, the hill 18th."""
+    r = lambda p: (round(p[0], 1), round(p[1], 1))
+    rows = ["(3, 'w842097396', 'w842097408', None)", "(4, 'w842097397', 'w842097413', 'w842097414')",
+            f"(4, 'w842097398', {r(START)}, 'est')"]
+    for i in range(3, 17):
+        line = have[i]
+        mid = f', {[r(p) for p in line[1:-1]]}' if len(line) > 2 else ''
+        rows.append(f"({CARD[i][0]}, {r(line[0])}, {r(line[-1])}, {'est' if CARD[i][0] > 3 else None!r}{mid})")
+    rows.append('(3, (60, -450), (-20, -355), None)')
+    return '\n'.join(f'            {row},   # {n + 1}' for n, row in enumerate(rows))
