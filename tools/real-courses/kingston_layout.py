@@ -4,7 +4,7 @@ OpenStreetMap has Kingston Beach's boundary, river, ponds, 11 tees and 2 greens,
 also smaller than the real 5803 m card needs with normal gaps between fairways, so (Finn's choice) holes keep their real
 par and number but play at one shared fraction of their card length, the largest that fits.
 
-How: east-west lanes 42 m apart cross the river bowl, plus a lane on the west bank and one down the east side. A depth-first
+How: east-west lanes 38 m apart cross the river bowl, plus a lane on the west bank and one down the east side. A depth-first
 search puts holes 4-17 into lanes in card order, each tee near the last green, best-fitting lane first. Holes 1-3 and 18
 are the real ones. Prints the result for courses.py.
 
@@ -24,7 +24,7 @@ import terrain
 KINGSTON_BOX = (147.3139, -42.9796, 147.3242, -42.9701)   # west, south, east, north
 CARD = [(3, 162), (4, 311), (4, 340), (4, 322), (4, 393), (5, 488), (3, 120), (3, 207), (5, 470),
         (4, 336), (5, 479), (4, 309), (4, 388), (4, 374), (4, 353), (3, 153), (5, 471), (3, 127)]
-LANE_Z = (55, 97, 139, 181, 223, 265, 307, 349)        # east-west lanes across the bowl
+LANE_Z = (55, 93, 131, 169, 207, 245, 283, 321, 359, 397)   # east-west lanes across the bowl, 38 m apart
 EXTRA = {'WEST': [(-330, 45), (-316, 150), (-250, 262)], 'EAST': [(328, 170), (322, 330)]}
 START = (25, -10)         # the 3rd green: hole 3 runs from the real tee by the river along the north of the bowl
 WALK = 240                # the longest walk from a green to the next tee
@@ -44,7 +44,7 @@ def setup():
     bd = max((p for c, p in feats if c == 'boundary'), key=lambda p: p.area)
     land = bd.difference(unary_union([p for c, p in feats if c in ('water', 'sea') and p.area > 400]))
     lanes = {}
-    for name, z in zip('ABCDEFGH', LANE_Z):
+    for name, z in zip('ABCDEFGHIJ', LANE_Z):
         seg = land.buffer(-11).intersection(LineString([(-600, z), (305, z)]))
         parts = sorted([g for g in getattr(seg, 'geoms', [seg]) if g.length > 100], key=lambda g: -g.length)
         if parts:
@@ -137,8 +137,8 @@ def search(fit, scale, deadline):
 
 def main():
     fit = Fit(*setup())
-    for scale in (.86, .82):
-        route, best = search(fit, scale, time.time() + 400)
+    for scale in (.84, .82, .8, .78):
+        route, best = search(fit, scale, time.time() + 200)
         print(f'scale {scale}: ' + ('found' if route else f'reached hole {best["n"] + 3}'))
         if route:
             for i, lane, line in route:
