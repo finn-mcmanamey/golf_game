@@ -260,7 +260,7 @@ function buildGrid(nx,nz,x0,z0,S,hAt,keep,diag,color){const s=nx+1,nv=s*(nz+1);c
 function ringSpec(W){const S=40,x0=W.ox-1400,z0=W.oz-1400,nx=Math.ceil((W.cols*CS+2800)/S),nz=Math.ceil((W.rows*CS+2800)/S),ix0=W.ox+20,ix1=W.ox+W.cols*CS-20,iz0=W.oz+20,iz1=W.oz+W.rows*CS-20,rc=W.ringCol||[.27,.44,.20];
   const R={S,x0,z0,nx,nz,rc,h:(x,z)=>W.hb(x,z)-1.6,keep:(i,j)=>{const x=x0+i*S,z=z0+j*S;return!(x>=ix0&&x+S<=ix1&&z>=iz0&&z+S<=iz1)},v:(x,z)=>1+.1*W.N.n2(x*.01,z*.01)};
   if(W.cv>=4&&W.sea!=null){const P=coursePlan(W.seed,W.cv),H=courseHole(W.seed,W.cv,W.idx),c=MM.cos(H.h),s=MM.sin(H.h),wet=(x,z)=>seaExcess(P,H.ox+x*c+z*s,H.oz-x*s+z*c)>0,h0=R.h,wc=W.waterCol||[.2,.45,.7];R.h=(x,z)=>wet(x,z)?W.sea-.05:h0(x,z);R.col=(x,z,o)=>{if(wet(x,z)){o[0]=wc[0]*.9;o[1]=wc[1]*.95;o[2]=wc[2];return true}return false}}
-  return R}
+  if(W.real)realRing(W,R);return R}
 function buildRing(W){const R=ringSpec(W);
   if(PT&&(R.nx+1)*(R.nz+1)<65536)return buildGrid(R.nx,R.nz,R.x0,R.z0,R.S,(i,j)=>R.h(R.x0+i*R.S,R.z0+j*R.S),R.keep,()=>0,(i,j,o)=>{if(R.col&&R.col(R.x0+(i+.5)*R.S,R.z0+(j+.5)*R.S,o))return;const v=R.v(R.x0+i*R.S,R.z0+j*R.S);o[0]=R.rc[0]*v;o[1]=R.rc[1]*v;o[2]=R.rc[2]*v});
   const mb=new MB(R.nx*R.nz*60);for(let j=0;j<R.nz;j++)for(let i=0;i<R.nx;i++){if(!R.keep(i,j))continue;const x=R.x0+i*R.S,z=R.z0+j*R.S,S=R.S,h=R.h,v=R.v(x,z),r=R.rc[0]*v,g=R.rc[1]*v,b=R.rc[2]*v;
@@ -299,7 +299,7 @@ function buildMeshes(W){const{cols,rows,ox,oz,H,N}=W,s=cols+1,M={};W.shade=W.dio
     const x0=ox+i*CS,z0=oz+j*CS,x1=x0+CS,z1=z0+CS,wv=(x,z,h)=>{const v=1+.05*N.n2(x*.2,z*.2),sh=1-sstep(.05,1.6,L-h),fm=.65*(1-sstep(.02,FOAM_D,L-h));Wt.v(x,L,z,0,1,0,lerp(lerp(wc[0],.34,sh*.75)*v,.92,fm),lerp(lerp(wc[1],.64,sh*.75)*v,.94,fm),lerp(lerp(wc[2],.62,sh*.6)*v,.93,fm),1)};
     wv(x0,z0,H[k]);wv(x1,z0,H[k+1]);wv(x1,z1,H[k+s+1]);wv(x0,z0,H[k]);wv(x1,z1,H[k+s+1]);wv(x0,z1,H[k+s])}
   M.water=Wt.upload();
-  const bx=[];for(const t of W.trees)for(const b of treeBoxes(W,t))bx.push(W.cv>=4&&!b.eg?seasonBox(W,t,b):b);const n4=bx.length;if(W.cv>=4)props4(W,bx);if(W.cv>=7)props7(W,bx);if(W.dio)dioClear(W,bx,n4);
+  const bx=[];for(const t of W.trees)for(const b of treeBoxes(W,t))bx.push(W.cv>=4&&!b.eg?seasonBox(W,t,b):b);const n4=bx.length;if(W.cv>=4)props4(W,bx);if(W.cv>=7)props7(W,bx);if(W.real)realProps(W,bx);if(W.dio)dioClear(W,bx,n4);
   const w=cols*CS,l=rows*CS;for(let x=ox+1;x<ox+w;x+=14)for(const z of[oz+1,oz+l-1]){terrainAt(W,x,z);bx.push([x,TQ.h+.5,z,.09,.55,.09,[.95,.95,.9]])}
   for(let z=oz+15;z<oz+l-1;z+=14)for(const x of[ox+1,ox+w-1]){terrainAt(W,x,z);bx.push([x,TQ.h+.5,z,.09,.55,.09,[.95,.95,.9]])}
   {/* painted tee markers in a muted club colour, with a contrasting cap; the colour comes from a pure hash so it never touches the course RNG */const T=TEE_PAINT[(thash(W.seed,W.idx+501)>>>0)%TEE_PAINT.length];for(const x of[-2,2]){terrainAt(W,x,0);bx.push([x,TQ.h+.14,0,.18,.14,.18,T[0]]);bx.push([x,TQ.h+.3,0,.19,.025,.19,T[1]])}}

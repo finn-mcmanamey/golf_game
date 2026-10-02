@@ -109,7 +109,7 @@ function realHole(seed,idx,par,cv,setup,cond){const id=cond.real,C=realCourse(id
   const gR=Math.max(6,Math.sqrt(gn*CS*CS/Math.PI)),N=makeNoise(mulberry32(thash(id,idx+4500)));
   const ed=(e,x,z)=>{if(e.cr===undefined){e.cr=MM.cos(e.rot);e.sr=MM.sin(e.rot)}const dx=x-e.x,dz=z-e.z,u=(dx*e.cr+dz*e.sr)/e.rx,v=(dz*e.cr-dx*e.sr)/e.rz;return Math.sqrt(u*u+v*v)};
   const src=C.src,W={seed,idx,par:src.par[idx],cv,bio:REAL_BIO,len,cols,rows,ox,oz,H,ty,pond,diag,tC,dC,levels:PD.map(p=>p.level),pin:{x:G[0],z:G[1],y:0},green:{x:G[0],z:G[1],r:gR,h:gh},
-    C:Cl,hw,hb:(x,z)=>{const[cx,cz]=realToCourse(F,x,z);return realHeight(C,cx,cz)-teeH},N,BK:[],PD,ed,arch:{n:'Par '+src.par[idx]},trees:[],tgrid:new Map(),meshes:{},crest:null,post:null,gs:null,twin:null,obs:[],bridge:false,
+    C:Cl,hw,hb:(x,z)=>{const[cx,cz]=realToCourse(F,x,z);return realGround(C,cx,cz)-teeH},teeH,N,BK:[],PD,ed,arch:{n:'Par '+src.par[idx]},trees:[],tgrid:new Map(),meshes:{},crest:null,post:null,gs:null,twin:null,obs:[],bridge:false,
     rk:firmArr(BI.roll,cv),bk:firmArr(BI.bf,cv),pal:BI.pal,fog:BI.fog,sky:BI.sky,hillCols:BI.hillCols,ringCol:BI.ringCol,waterCol:BI.waterCol,real:id,frame:F};
   cond4(W,BI,cond,null,{BK:[]});W.architect=src.town;
   realPins(W,setup,id,idx);
@@ -159,6 +159,23 @@ function realPins(W,setup,id,idx){const g=W.green,RP=mulberry32(thash(id,idx+500
 /* the course's trees that stand on this hole's grid, each grown from its own seed so it looks the same from every hole */
 function realPlant(W,C,F,BI){for(const t of C.trees){const[x,z]=realToLocal(F,t.x,t.z);if(x<W.ox+4||z<W.oz+4||x>W.ox+W.cols*CS-4||z>W.oz+W.rows*CS-4)continue;
   terrainAt(W,x,z);if(TQ.ty>1)continue;const p=makeProp(t.kind,x,z,TQ.h-.2,mulberry32(t.seed),BI);W.trees.push(p);const key=(((x-W.ox)/8)|0)+','+(((z-W.oz)/8)|0);(W.tgrid.get(key)||W.tgrid.set(key,[]).get(key)).push(p)}}
+
+/* ---- drawing only: the real land and water around a hole, and the buildings on it ---- */
+/* the coarse far height grid, decoded on first use (the checking worker never draws, so never pays for it) */
+function realFar(C){if(!C.far)C.far=realDem(C.src.far);return C.far}
+/* ground height anywhere: the fine grid near the course, the far one beyond it */
+function realGround(C,x,z){const D=C.dem;if(x>=D.x0&&z>=D.z0&&x<=D.x0+(D.cols-1)*D.step&&z<=D.z0+(D.rows-1)*D.step)return realHeight(C,x,z);return realHeight({dem:realFar(C)},x,z)}
+/* is this point river or sea? the map knows near the course; further out, land below half a metre is water */
+function realWet(C,x,z){const M=C.map;if(x>=M.x0&&z>=M.z0&&x<M.x0+M.w&&z<M.z0+M.h){const s=realSurf(C,x,z)&15;return s===REAL_SEA||s===7}return realGround(C,x,z)<.5}
+/* the far ring around a hole: real hills, and real water drawn as water */
+function realRing(W,R){const C=realCourse(W.real),F=W.frame,h0=R.h,wc=W.waterCol||[.24,.46,.62],wet=(x,z)=>{const[cx,cz]=realToCourse(F,x,z);return realWet(C,cx,cz)};
+  R.h=(x,z)=>wet(x,z)?-W.teeH-.05:Math.max(h0(x,z),-W.teeH+.3);R.col=(x,z,o)=>{if(!wet(x,z))return false;o[0]=wc[0]*.9;o[1]=wc[1]*.95;o[2]=wc[2];return true}}
+/* the map's buildings as voxel blocks: the clubhouse, sheds and the houses next door */
+function realProps(W,bx){const C=realCourse(W.real),F=W.frame,cx=W.ox+W.cols*CS/2,cz=W.oz+W.rows*CS/2;
+  for(const p of C.polys){if(p.c!==9)continue;const pts=p.p.map(([x,z])=>realToLocal(F,x,z));let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;for(const[x,z]of pts){x0=Math.min(x0,x);x1=Math.max(x1,x);z0=Math.min(z0,z);z1=Math.max(z1,z)}
+    const mx=(x0+x1)/2,mz=(z0+z1)/2;if(Math.hypot(mx-cx,mz-cz)>700)continue;const hx=(x1-x0)*.42,hz=(z1-z0)*.42,area=hx*hz*4;
+    const k=(thash(Math.round(mx),Math.round(mz),31)>>>0)/4294967296,hy=area>600?4:2.4+k*1.6,y=W.hb(mx,mz)+hy;
+    bx.push([mx,y,mz,hx,hy,hz,k<.5?[.86,.84,.78]:[.78,.74,.68]]);bx.push([mx,y+hy+.3,mz,hx*1.04,.3,hz*1.04,k<.3?[.55,.22,.18]:k<.7?[.32,.34,.38]:[.45,.42,.36]])}}
 
 /* ---- drawing only: the scorecard's shot maps and the property map ---- */
 const REAL_PLANS=new Map();

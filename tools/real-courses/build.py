@@ -27,6 +27,7 @@ HERE = Path(__file__).parent
 OUT = HERE.parents[1] / 'src' / 'js' / '525-real-data.js'
 MARGIN = 250         # metres of land and water kept around a course for the scenery
 DEM_STEP = 16        # metres between height samples (the source model is coarser than this)
+FAR, FAR_STEP = 1600, 64   # the far scenery: real hills and water this far around the course, coarser
 CLASS = ['boundary', 'rough', 'fairway', 'green', 'tee', 'bunker', 'water', 'sea', 'wood', 'building']
 GOLF = {'golf_course': 'boundary', 'rough': 'rough', 'fairway': 'fairway', 'green': 'green', 'tee': 'tee',
         'bunker': 'bunker', 'water_hazard': 'water', 'lateral_water_hazard': 'water'}
@@ -155,10 +156,11 @@ def hole_line(tee, green, fairway):
 
 # ---------- terrain ----------
 
-def height_grid(box, to_lonlat):
+def height_grid(box, to_lonlat, step=None):
+    step = step or DEM_STEP
     x0, z0, x1, z1 = box
-    cols, rows = int((x1 - x0) // DEM_STEP) + 1, int((z1 - z0) // DEM_STEP) + 1
-    g = [[terrain.height(*to_lonlat(x0 + i * DEM_STEP, z0 + j * DEM_STEP)) for i in range(cols)] for j in range(rows)]
+    cols, rows = int((x1 - x0) // step) + 1, int((z1 - z0) // step) + 1
+    g = [[terrain.height(*to_lonlat(x0 + i * step, z0 + j * step)) for i in range(cols)] for j in range(rows)]
     # the source has the odd spike: replace any sample far from its neighbours' median
     for j in range(rows):
         for i in range(cols):
@@ -258,6 +260,12 @@ def build(course):
     q = [round((h - lo) * 4) for r in g for h in r]
     deltas = [q[0]] + [b - a for a, b in zip(q, q[1:])]
 
+    far_box = (box[0] - FAR, box[1] - FAR, box[2] + FAR, box[3] + FAR)
+    fcols, frows, fg = height_grid(far_box, to_lonlat, FAR_STEP)
+    flo = math.floor(min(min(r) for r in fg))
+    fq = [round((h - flo) * 2) for r in fg for h in r]
+    far_deltas = [fq[0]] + [b - a for a, b in zip(fq, fq[1:])]
+
     poly_ints = [len(polys)]
     for cls, pts in polys:
         poly_ints += [cls] + path_ints(pts)
@@ -271,6 +279,7 @@ def build(course):
                 par=[h['par'] for h in holes], si=si, m=[h['m'] for h in holes], box=list(box),
                 poly=varints(poly_ints), holes=varints(hole_ints),
                 dem=dict(x0=box[0], z0=box[1], step=DEM_STEP, cols=cols, rows=rows, lo=lo, d=varints(deltas)),
+                far=dict(x0=far_box[0], z0=far_box[1], step=FAR_STEP, cols=fcols, rows=frows, lo=flo, d=varints(far_deltas)),
                 credit=f"Map data © OpenStreetMap contributors (ODbL), via Overture Maps {data['release'].split('/')[-1]} · terrain: AWS Terrain Tiles")
 
 
