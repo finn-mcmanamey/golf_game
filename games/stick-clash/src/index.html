@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stick Clash</title>
+<meta name="description" content="Wobbly physics stickman duels with floppy weapons, skills and power-ups.">
+<!--STYLE-->
+</head>
+<body>
+<!-- The arena is one full-bleed canvas. Every menu, pause and results panel is built by 95-ui.js inside #ui. -->
+<canvas id="c" aria-label="Stick Clash arena"></canvas>
+<div id="ui"></div>
+<!-- On-screen controls for touch devices; 90-input.js shows them only during play on a coarse pointer. -->
+<div id="touch" hidden>
+  <div class="tpad tpad-l">
+    <button data-act="left" aria-label="Move left">&#9664;</button>
+    <button data-act="right" aria-label="Move right">&#9654;</button>
+  </div>
+  <div class="tpad tpad-r">
+    <button data-act="skill1" aria-label="Skill 1">S1</button>
+    <button data-act="skill2" aria-label="Skill 2">S2</button>
+    <button data-act="dash" aria-label="Dash">&raquo;</button>
+    <button data-act="attack" class="big" aria-label="Attack">&#9876;</button>
+    <button data-act="jump" class="big" aria-label="Jump">&#9650;</button>
+  </div>
+  <button data-act="pause" class="tpause" aria-label="Pause">II</button>
+</div>
+<!-- Portrait phones: the 16:9 arena would be a thin strip, so 90-input.js asks the player to turn the device. -->
+<div id="rotate" hidden>
+  <div class="rotate-card">
+    <div class="rotate-phone" aria-hidden="true"></div>
+    <h2>Turn your device sideways</h2>
+    <p>The arena is wide: landscape gives you a much bigger view. The fight is paused.</p>
+    <button type="button" class="rotate-skip">Play in portrait anyway</button>
+  </div>
+</div>
+<!--SCRIPT-->
+</body>
+</html>

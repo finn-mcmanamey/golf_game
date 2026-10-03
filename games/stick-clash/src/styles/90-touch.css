@@ -1,0 +1,27 @@
+/* 90-touch.css: on-screen touch controls polish (owned by the juice slice). Buttons are see-through so fighters
+   behind them stay visible. Skill buttons show the skill's icon in its colour (--sc) with a dark sweep for the
+   remaining cooldown (--cd, 1 = just used, 0 = ready). */
+#touch button { position: relative; overflow: hidden; background: rgba(20, 22, 44, .26); border-color: rgba(170, 180, 255, .3);
+  -webkit-user-select: none; user-select: none; transition: transform .06s; }
+#touch button[data-act^="skill"] { border-color: var(--sc, rgba(160, 170, 255, .35)); color: var(--sc, var(--fg)); font-family: var(--body); font-size: 24px; }
+#touch button[data-act^="skill"]::after { content: ''; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(rgba(5, 6, 12, .55) calc(var(--cd, 0) * 360deg), transparent 0); }
+#touch button[hidden] { display: none; }
+#touch .tpad-l button { width: 76px; height: 76px; font-size: 22px; }
+#touch button.on { transform: scale(.93); background: rgba(255, 216, 74, .3); }
+
+/* Portrait phones: the pause button sits in the empty band above the arena instead of between the thumb pads. */
+@media (orientation: portrait) {
+  #touch .tpause { bottom: auto; top: max(12px, env(safe-area-inset-top)); }
+}
+
+/* "Turn your device" card (90-input.js shows it on portrait touch screens during a fight). */
+#rotate { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: #05060d; }
+#rotate[hidden] { display: none; }
+.rotate-card { max-width: 320px; display: grid; gap: 14px; justify-items: center; text-align: center; }
+.rotate-card h2 { font: 400 24px var(--display); color: var(--gold); }
+.rotate-card p { font-size: 15px; color: var(--dim); }
+.rotate-phone { width: 46px; height: 78px; border: 4px solid var(--p1); border-radius: 10px; box-shadow: 0 0 18px rgba(46, 230, 255, .5);
+  animation: rotate-hint 2.2s ease-in-out infinite; }
+@keyframes rotate-hint { 0%, 25% { transform: rotate(0); } 55%, 100% { transform: rotate(-90deg); } }
+@media (prefers-reduced-motion: reduce) { .rotate-phone { animation: none; transform: rotate(-90deg); } }
