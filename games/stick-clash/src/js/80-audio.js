@@ -207,4 +207,4 @@ on('attack', f => {
   else if (f.w.chain) sfx('swing-chain');
 });
 // The crowd roars for every K.O., loudest for the one that ends the round.
-on('ko', victim => { if (!victim.summon) sfx('cheer', aliveTeams().length <= 1 ? 1 : .55); });
+on('ko', victim => { if (!victim.summon && SETTINGS.crowd !== false) sfx('cheer', aliveTeams().length <= 1 ? 1 : .55); });   // crowd: 83

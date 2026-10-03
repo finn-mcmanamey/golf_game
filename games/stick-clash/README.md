@@ -126,6 +126,18 @@ Pick one in the loadout (the **Class** tab). Every class wins 44-54% against the
 | **Weapon Roulette** | Random weapons every round, re-spun every 15 s mid-fight. Adapt fast! First to 5. |
 | **King of the Hill** | Stand in the glowing zone to score. It moves, and KOs respawn. First to 15 takes the round. |
 | **Training** | An unkillable dummy, a damage meter and instant swaps: 1 weapon, 2/3 skills, 4 dummy mode, 5 dummy weapon. |
+| **Ranked** | Climb Bronze, Silver, Gold, Platinum, Diamond, Master and Grandmaster (three divisions each) against CPUs that get tougher with your rank. Best of 3; wins gain points (more on a streak), losses cost some, and you never drop out of a tier you reached. Your rank shows on the title screen. |
+| **Capture the Flag** | 2v2 up to 4v4. Grab the other team's flag and run it to your base; touch your dropped flag to return it. First to 3 captures. |
+| **Soccer** | A giant physics ball and two goals. Kick it, swing at it, shoot it or blast it in. First to 3 goals. |
+| **Hot Potato** | One fighter carries a ticking bomb; hit or grab someone to pass it on. Plain hits barely hurt: the bomb decides. |
+| **Gun Game** | Every K.O. moves you up a 7-weapon ladder that ends on a frying pan. First K.O. with the last weapon wins. |
+| **Juggernaut** | One giant against everyone. K.O. it to become it. Points for K.O.s as the giant and for felling it; first to 5. |
+| **Zombie Horde** | You and a CPU ally against 5 waves of shamblers (they grab), runners, bloaters (they burst) and a grave brute. |
+| **Battle Royale** | Eight fighters, one winner. A storm closes in from the edges and supply drops (a weapon and health) fall inside the safe zone. |
+| **Lava Rising** | The floor is lava and it keeps rising; new platforms appear above it. Last one up scores; first to 2. |
+
+Boss Rush bosses now have **phases**: at half health and at a quarter they change their attacks and the arena
+(spikes or lava at the edges, rock and hail storms, sliding platforms, summoned guards, a howling wind).
 
 The CPU has four levels: **Easy**, **Normal**, **Hard** and **Insane**. Each one beats the level below it in roughly
 70–80% of rounds.

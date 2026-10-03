@@ -41,6 +41,7 @@ function focusCamera(x, y, seconds = 1.1) { CAM.fx = x; CAM.fy = y; CAM.focusT =
 
 // Frames every living fighter, zooming in gently when they are close together.
 function updateCamera(dt) {
+  if (photoCamera()) return;   // photo mode's free camera (86)
   let tx = W / 2, ty = H / 2, tz = 1;
   const live = F.filter(f => f.alive);
   if (CAM.follow && live.length) {
@@ -230,7 +231,7 @@ function drawBody(f, color, width) {
   ctx.strokeStyle = color; ctx.lineWidth = width; ctx.beginPath();
   for (const [a, b] of BODY_LINKS) { ctx.moveTo(P[a].x, P[a].y); ctx.lineTo(P[b].x, P[b].y); }
   ctx.stroke();
-  circle(ctx, P[0].x, P[0].y, HEAD_R * f.scale, color);
+  circle(ctx, P[0].x, P[0].y, HEAD_R * f.scale * (f.headMul || 1), color);
 }
 
 function drawHat(f) {
@@ -240,7 +241,8 @@ function drawHat(f) {
   ctx.save();
   ctx.translate(head.x, head.y);
   ctx.rotate(Math.atan2(head.y - neck.y, head.x - neck.x) + Math.PI / 2);
-  hook(hat, 'draw', ctx, f, { r: HEAD_R * f.scale, face: f.face, scale: f.scale, color: f.color });
+  const hm = f.headMul || 1;
+  hook(hat, 'draw', ctx, f, { r: HEAD_R * f.scale * hm, face: f.face, scale: f.scale * hm, color: f.color });
   ctx.restore();
 }
 
@@ -276,6 +278,7 @@ function drawFighter(f) {
   if (!f.alive && f.shatterT > 0) return;          // K.O.'d: the body burst into neon pieces (36-shatter)
   const P = f.P, sc = f.scale, base = fighterAlpha(f);
   ctx.save();
+  postfxSquash(ctx, f);                            // squash and stretch on hits (84)
   ctx.globalAlpha = base; ctx.lineCap = ctx.lineJoin = 'round';
   drawTrail(f, base);
   drawFighterUnder(f);                             // v3: hoverboard, dragon (22-moves dispatches)
@@ -284,10 +287,13 @@ function drawFighter(f) {
     ctx.save(); ctx.translate(-f.face * 16 * sc, 0); drawBody(f, f.color, 6 * sc); ctx.restore();
     ctx.globalAlpha = base;
   }
+  const look = lookOf(f), hm = f.headMul || 1;      // 78-outfits: outfit, weapon skins; 79: big-heads mutator
+  outfitDraw(ctx, f, look, 'back', G_STATE.t);
   glow(ctx, auraColor(f), f.alive ? (f.status.rage ? 22 : 10) : 0, () => drawBody(f, bodyColor(f), 7 * sc));
-  circle(ctx, P[0].x + f.face * 6 * sc, P[0].y - 2 * sc, (f.alive ? 3 : 1.5) * sc, '#0b0c18');   // eye
+  outfitDraw(ctx, f, look, 'front', G_STATE.t);
+  circle(ctx, P[0].x + f.face * 6 * sc * hm, P[0].y - 2 * sc * hm, (f.alive ? 3 : 1.5) * sc * hm, '#0b0c18');   // eye
   drawHat(f);
-  for (const rig of rigsOf(f)) hook(rig.w, 'draw', ctx, f, weaponView(f, rig));
+  for (const rig of rigsOf(f)) skinDrawWeapon(ctx, f, rig, weaponView(f, rig), look);
   drawStatusOverlays(f);
   for (const key of f.skills) if (key && SKILLS[key] && SKILLS[key].draw) hook(SKILLS[key], 'draw', ctx, f);
   drawFighterOver(f);                              // v3: guard arc, element glow, Lv3 trail, mech/jetpack, ultimates
@@ -317,7 +323,7 @@ function hatReach(key) {
 }
 
 function drawTags(f) {
-  const lift = Math.max(HEAD_R + 20, hatReach(f.hat) * HEAD_R + 13);
+  const lift = Math.max(HEAD_R + 20, hatReach(f.hat) * HEAD_R + 13) * (f.headMul || 1);
   const head = f.P[0], y = head.y - lift * f.scale, keys = Object.keys(f.status);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   if (f.ctrl === 'human' && !G_STATE.demo && fighterAlpha(f) > .3) {
@@ -325,6 +331,7 @@ function drawTags(f) {
     ctx.fillText(f.name, head.x, y - (keys.length ? 20 : 0));
     ctx.globalAlpha = 1;
   }
+  if (!f.summon) accessTagMark(f, head.x, y - (keys.length ? 20 : 0));   // colour-blind marker (92-access)
   keys.slice(0, 5).forEach((k, i) => {
     const def = STATUS[k], s = f.status[k], x = head.x + (i - (Math.min(keys.length, 5) - 1) / 2) * 19;
     circle(ctx, x, y, 8, 'rgba(8,9,20,.82)');
@@ -436,11 +443,14 @@ function drawCard(f, x, y, w, right) {
   ctx.font = `600 14px ${FONT_BODY}`; ctx.fillStyle = f.element && ELEMENTS[f.element] ? ELEMENTS[f.element].color : '#c9cdee';
   const wl = weaponLabel(f) + (f.off && !f.off.w.hidden ? ' + ' + f.off.w.name : '');
   ctx.fillText(wl, ax + dir * (nw + 12), y - 8);
-  if (f.lvl > 1) drawLevelTag(f, ax + dir * (nw + 18 + ctx.measureText(wl).width), y - 13, dir);
+  const wlEnd = nw + 18 + ctx.measureText(wl).width;
+  if (f.lvl > 1) drawLevelTag(f, ax + dir * wlEnd, y - 13, dir);
+  aiPersonaHudTag(f, ax + dir * (wlEnd + (f.lvl > 1 ? 34 : 2)), y - 13, dir);   // the CPU rival's title (67)
   ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x - 3, y - 3, w + 6, 24);
   ctx.fillStyle = 'rgba(255,255,255,.45)'; fillBar(x, y, w, 18, f.hpShow / f.maxHp, right);
   ctx.fillStyle = f.alive ? f.color : '#444a66'; fillBar(x, y, w, 18, frac, right);
   if (f.alive && frac < .25) { ctx.fillStyle = `rgba(255,60,90,${.25 + .2 * Math.sin(G_STATE.t * 10)})`; fillBar(x, y, w, 18, frac, right); }
+  accessCardMark(f, x, y, w, 18, right);   // colour-blind marker + pattern (92-access)
   ctx.font = `700 12px ${FONT_BODY}`; ctx.textBaseline = 'middle'; ctx.textAlign = right ? 'left' : 'right';
   ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(7,8,15,.85)'; ctx.fillStyle = '#ffffff'; ctx.lineJoin = 'round';
   const hpText = f.alive ? String(Math.ceil(f.hp)) : 'K.O.', hx = right ? x + 6 : x + w - 6;
@@ -516,10 +526,13 @@ function drawCompactCard(f, x, y, w) {
   ctx.font = `13px ${FONT_DISPLAY}`; ctx.fillStyle = f.color; ctx.fillText(f.name, x + cw, y - 5);
   const nw = ctx.measureText(f.name).width + cw;
   ctx.font = `600 11px ${FONT_BODY}`; ctx.fillStyle = '#9096c2';
-  ctx.fillText(weaponLabel(f) + (f.lvl > 1 ? ' LV' + f.lvl : '') + (f.mount ? ' · ' + MOUNTS[f.mount.key].name : ''), x + nw + 8, y - 5);
+  const cwl = weaponLabel(f) + (f.lvl > 1 ? ' LV' + f.lvl : '') + (f.mount ? ' · ' + MOUNTS[f.mount.key].name : '');
+  ctx.fillText(cwl, x + nw + 8, y - 5);
+  aiPersonaHudTag(f, x + nw + 14 + ctx.measureText(cwl).width, y - 9, 1);   // the CPU rival's title (67)
   ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x - 2, y - 2, w + 4, 16);
   ctx.fillStyle = 'rgba(255,255,255,.4)'; fillBar(x, y, w, 12, f.hpShow / f.maxHp, false);
   ctx.fillStyle = f.alive ? f.color : '#444a66'; fillBar(x, y, w, 12, frac, false);
+  accessCardMark(f, x, y, w, 12, false);   // colour-blind marker + pattern (92-access)
   ctx.font = `700 10px ${FONT_BODY}`; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#ffffff';
   ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(7,8,15,.85)';
   const hpText = f.alive ? String(Math.ceil(f.hp)) : 'K.O.';
@@ -578,6 +591,7 @@ function drawHUD() {
   }
   ctx.translate(0, (rows - 1) * rowH + (compact ? rowH - 84 : 8) + (two && !midGap ? 54 : 0));   // mode HUDs sit below the (taller) card block
   hook(G_STATE.mode, 'hud', ctx);
+  miniDraw(ctx);                 // party mini-game scoreboard (79)
 }
 
 // ---------- banners ----------
@@ -638,20 +652,29 @@ function render(dt) {
   for (const f of F) if (!f.alive) drawFighter(f);
   for (const f of F) if (f.alive) drawFighter(f);
   shatterDraw(ctx);          // neon limbs of K.O.'d fighters (36)
+  koFxDraw(ctx); petsDraw(ctx); miniDrawWorld(ctx);   // K.O. effects, pets (78), mini-game props (79)
   drawProjectiles();
   drawFx(ctx);
   hook(MAP, 'drawFg', ctx, t);
+  worldDrawTop(ctx, t);      // weather, darkness and lights (58)
+  postfxDrawWorld(ctx);      // dynamic lights, impact sparks and flashes (84)
   hook(G_STATE.mode, 'drawWorld', ctx);
+  aiTalkDraw(ctx);           // CPU speech bubbles (67)
   setArenaTransform();
   drawScreenOverlays(dt);
   juiceDrawScreen(ctx, dt);   // K.O. chroma/vignette, low-health heartbeat (87)
   drawOffscreen();
   ctx.restore();             // the HUD may sit outside the world viewport (portrait: in the band above it)
   ctx.save();
-  drawHUD();
+  if (!photoHidesHud()) {     // photo mode (86) can hide the HUD, banners and cut-ins
+    drawHUD();
+    setArenaTransform();
+    drawBanner(dt);
+    powerDrawScreen(ctx, dt);   // the ultimate's cut-in band, above banners (33)
+  }
   setArenaTransform();
-  drawBanner(dt);
-  powerDrawScreen(ctx, dt);   // the ultimate's cut-in band, above banners (33)
   kcDrawOverlay(ctx);   // replay letterbox (88)
+  photoDrawScreen(ctx);       // photo filters' overlays and frames (86)
   ctx.restore();
+  postfxFrame(dt);            // bloom (84), after the frame is complete
 }

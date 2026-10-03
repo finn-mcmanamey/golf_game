@@ -150,7 +150,8 @@ function aiGuardStep(f, L) {
   }
   let up = t >= (a.guardAt || 0) && t < (a.guardUntil || 0) && f.stamina > AI_GUARD_MIN * .5;
   // A foe left open after its swing: drop the guard and punish instead.
-  if (up && foe && foe.atkCd > .22 && Math.abs(foe.P[2].x - f.P[2].x) < aiReach(f) && chance(L.punish || 0)) { up = false; a.guardUntil = t; }
+  // (Not while a habit read (68) holds the guard for a swing it saw coming: a.guardLock.)
+  if (up && foe && foe.atkCd > .22 && t >= (a.guardLock || 0) && Math.abs(foe.P[2].x - f.P[2].x) < aiReach(f) && chance(L.punish || 0)) { up = false; a.guardUntil = t; }
   if (up && shot && shot.vx * f.face > 0) up = false;                  // a shot from behind: a front guard won't help
   f.inp.blockHeld = up;
 }

@@ -172,7 +172,7 @@ function factoryDrawHead(ctx, x, w, bottom, warn, t) {
   ctx.fillStyle = '#1a1a1a';
   for (let k = x - 20; k < x + w; k += 24) poly(ctx, [[k, bottom], [k + 12, bottom], [k + 28, bottom - 16], [k + 16, bottom - 16]], '#1a1a1a');
   ctx.restore();
-  const lit = warn && Math.sin(t * 30) > 0;
+  const lit = warn && (SETTINGS.reduceFlash || Math.sin(t * 30) > 0);
   for (const lx of [x + 18, x + w - 18]) {
     if (lit) mapGlow(ctx, lx, bottom - 40, 60, '#ff3a3a', .6);
     circle(ctx, lx, bottom - 40, 7, lit ? '#ff4a4a' : '#5a1a1a');
@@ -329,7 +329,7 @@ function stormAim() {
 }
 
 // A brief background lightning flash every few seconds (decoration only).
-const stormFlash = t => { const ph = mapWrap(t, 4.3); return ph < .12 && Math.sin(ph * 90) > 0 ? 1 : 0; };
+const stormFlash = t => { const ph = mapWrap(t, 4.3); return !SETTINGS.reduceFlash && ph < .12 && Math.sin(ph * 90) > 0 ? 1 : 0; };
 
 function stormDrawBolt(ctx, hz, t) {
   if (mapParked(hz) || !hz.ref) return;

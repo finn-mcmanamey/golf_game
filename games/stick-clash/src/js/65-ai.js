@@ -39,7 +39,9 @@ function aiArmorMul(B, A) {
   const L = aiLevel(B);
   return (L.armor || 1) * (B.w.ranged ? L.gunArmor || 1 : 1);
 }
-const aiLevel = f => AI_LEVELS[f.aiLevel] || AI_LEVELS[G_STATE.cfg && G_STATE.cfg.diff] || AI_LEVELS.normal;
+const aiBaseLevel = f => AI_LEVELS[f.aiLevel] || AI_LEVELS[G_STATE.cfg && G_STATE.cfg.diff] || AI_LEVELS.normal;
+// The knobs this CPU plays with right now: its level shaped by persona, adaptive difficulty and habits (aiTuned, 67).
+const aiLevel = f => (f.ai && f.ai.L) || aiBaseLevel(f);
 // Difficulty `steps` levels above (or below) `key`, clamped to the table: used by modes that ramp up.
 function aiShift(key, steps) {
   const i = AI_ORDER.indexOf(AI_LEVELS[key] ? key : 'normal');
@@ -51,14 +53,17 @@ const aiUpright = f => f.P[0].y < f.P[2].y - 20 * f.scale;
 
 function think(f, dt) {
   if (!f.alive) return;
-  const a = f.ai, L = aiLevel(f);
+  const a = f.ai;
+  if (!a.L) a.L = aiTuned(f);
   f.inp.jumpHeld = true;                     // CPUs always take full jumps
   if (a.behave === 'idle') { f.inp.mx = 0; f.inp.attackHeld = false; return; }
   a.t = (a.t || 0) - dt;
   if (a.t <= 0) {
-    a.t = L.react * rnd(.6, 1.4);
-    aiDecide(f, L);
+    a.L = aiTuned(f);                        // persona, adaptive difficulty and habit reads can change between decisions
+    a.t = a.L.react * rnd(.6, 1.4);
+    aiDecide(f, a.L);
   }
+  const L = a.L;
   aiMicro(f, L, dt);
   aiMovesStep(f, L, dt);                     // v3 moves: guard, grab/throw, mash, walls, flying mounts (66-ai-moves)
   if (MAP) aiSafety(f);
@@ -95,6 +100,8 @@ function aiDecide(f, L) {
   aiSkills(f, foe, c.d, L);
   hook(f.w.ai, 'think', f, foe, c.d);
   aiDecideMoves(f, L, c);                    // v3: ultimate, throwable, grab, guard, looting (66-ai-moves)
+  aiPersonaAct(f, L, c);                     // the rival's signature style (67)
+  aiHabitAct(f, L, c);                       // counters to a human's habits (68)
 }
 
 // What we know about the fight: horizontal gap d, direction, height difference of the feet, our reach.

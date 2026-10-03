@@ -1,0 +1,103 @@
+/* 98-campaign.css: Mythic Quest world map, dialogue boxes, skill tree and challenge list (98-campaign-ui.js). */
+.quest-chip { font: 400 15px var(--display); color: var(--gold); padding: 4px 10px; border: 1px solid rgba(255, 216, 74, .35); border-radius: 99px; white-space: nowrap; }
+.quest-chip.glow { box-shadow: 0 0 16px -2px var(--gold); }
+.menu-item.quest-item .mi-label { color: var(--gold); }
+.menu-pair { display: grid; grid-template-columns: 1fr 1fr; gap: inherit; }
+.menu-pair .menu-item { min-width: 0; }
+
+/* ---------- world map ---------- */
+.sheet-camp .sheet-body { padding: 0; display: block; overflow: hidden; }
+.camp-map { position: relative; width: 100%; height: 100%; min-height: 240px; overflow: hidden; background: #07080f; }
+.camp-map canvas.camp-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: manipulation; }
+.camp-realm { position: absolute; transform: translate(-50%, -50%); font: 400 clamp(11px, 1.6vw, 17px) var(--display); color: var(--rc);
+  letter-spacing: .05em; white-space: nowrap; text-shadow: 0 0 12px var(--rc), 0 2px 0 #000; pointer-events: none; }
+.camp-map.tall .camp-realm { transform: translate(0, -50%); left: 8px !important; font-size: 13px; opacity: .9; }
+.camp-node { --rc: var(--gold); position: absolute; transform: translate(-50%, -50%); width: 44px; height: 44px; padding: 0; border-radius: 50%;
+  display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, #1b1e3c, #0a0b18); border: 2px solid var(--rc);
+  box-shadow: 0 0 14px -2px var(--rc); font-size: 19px; line-height: 1; z-index: 2; }
+.camp-node.k-side { width: 36px; height: 36px; font-size: 15px; border-style: dashed; }
+.camp-node.k-mini { width: 48px; height: 48px; }
+.camp-node.k-boss { width: 58px; height: 58px; font-size: 26px; border-width: 3px; box-shadow: 0 0 22px var(--rc); }
+.camp-node.done { background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--rc) 45%, #1b1e3c), #0a0b18); }
+.camp-node:disabled { opacity: .5; border-color: #3c4278; box-shadow: none; filter: grayscale(.8); font-size: 14px; }
+.camp-node.new:not(:disabled) { animation: camp-pulse 1.4s ease-in-out infinite; }
+.camp-node.sel, .camp-node:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; z-index: 3; }
+.camp-node:hover:not(:disabled) { transform: translate(-50%, -50%) scale(1.08); }
+@keyframes camp-pulse { 50% { box-shadow: 0 0 26px 4px var(--rc); } }
+.cn-stars { position: absolute; top: 100%; left: 50%; transform: translate(-50%, 2px); font-size: 11px; color: var(--gold); white-space: nowrap;
+  text-shadow: 0 1px 2px #000; letter-spacing: -1px; }
+.cn-name { display: none; position: absolute; bottom: 100%; left: 50%; transform: translate(-50%, -6px); font: 600 13px var(--body); white-space: nowrap;
+  background: rgba(7, 8, 15, .9); border: 1px solid var(--rc); color: var(--fg); padding: 2px 8px; border-radius: 6px; pointer-events: none; }
+.camp-node.sel .cn-name, .camp-node:hover .cn-name { display: block; }
+
+.sheet-camp .sheet-foot { flex-wrap: nowrap; }
+.camp-info { flex: 1; min-width: 0; display: grid; gap: 1px; text-align: left; font-size: 13px; color: var(--dim); }
+.camp-info .ci-name { font: 400 18px var(--display); }
+.camp-info small, .camp-info span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.camp-info .ci-foes { color: var(--fg); }
+.camp-info .ci-stars b { color: var(--gold); letter-spacing: 1px; }
+.camp-tree.has-pts { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 14px -4px var(--gold); }
+
+/* ---------- dialogue ---------- */
+.camp-dlg { --dc: var(--gold); position: fixed; left: 50%; bottom: max(18px, 4vh); transform: translateX(-50%); width: min(720px, calc(100vw - 24px));
+  display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; align-items: center; padding: 16px 18px; z-index: 20;
+  background: rgba(10, 11, 26, .97); border: 2px solid var(--dc); border-radius: 16px; box-shadow: 0 0 40px -8px var(--dc), 0 20px 50px rgba(0, 0, 0, .6);
+  animation: pop-in .2s ease-out; }
+.dlg-face { width: 58px; height: 58px; border-radius: 50%; position: relative; border: 3px solid var(--dc); background: #07080f; box-shadow: 0 0 18px -2px var(--dc); }
+.dlg-face::before, .dlg-face::after { content: ''; position: absolute; top: 40%; width: 7px; height: 9px; border-radius: 50%; background: var(--dc); }
+.dlg-face::before { left: 32%; } .dlg-face::after { right: 32%; }
+.dlg-face.lumen { background: radial-gradient(circle at 50% 45%, #fff6c8, #ffd84a 45%, #b07a00); animation: lumen-bob 2s ease-in-out infinite; }
+.dlg-face.lumen::before, .dlg-face.lumen::after { background: #3a2a00; }
+@keyframes lumen-bob { 50% { transform: translateY(-3px); } }
+.dlg-who { font: 400 16px var(--display); color: var(--dc); letter-spacing: .06em; }
+.dlg-text { font-size: 17px; line-height: 1.4; color: var(--fg); margin-top: 3px; }
+.dlg-text.in { animation: fade-in .3s ease-out; }
+.dlg-btns { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 10px; }
+.dlg-btns .go { padding: 9px 24px; font-size: 17px; }
+
+/* ---------- skill tree ---------- */
+.tree-hint { color: var(--dim); }
+.tree-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.tree-col { --tc: var(--gold); display: grid; gap: 22px; align-content: start; position: relative; }
+.tree-col h3 { color: var(--tc); font-size: 18px; text-align: center; }
+.tree-node { position: relative; display: grid; gap: 3px; text-align: center; padding: 12px; border-radius: 12px; background: var(--panel2); }
+.tree-node:not(:last-child)::after { content: ''; position: absolute; left: 50%; top: 100%; width: 3px; height: 22px; background: var(--line2); }
+.tree-node b { font: 400 15px var(--display); }
+.tree-node small { color: var(--dim); font-size: 13px; }
+.tree-node em { font-style: normal; font-size: 12px; color: var(--faint); }
+.tree-node.owned { border-color: var(--tc); background: color-mix(in srgb, var(--tc) 16%, var(--panel2)); box-shadow: 0 0 16px -4px var(--tc); }
+.tree-node.owned em { color: var(--tc); }
+.tree-node.owned:not(:last-child)::after { background: var(--tc); }
+.tree-node.can { border-color: var(--gold); animation: camp-pulse 1.6s ease-in-out infinite; --rc: var(--gold); }
+.tree-node.can em { color: var(--gold); }
+.tree-node.locked { opacity: .55; }
+
+/* ---------- challenge list ---------- */
+.chal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+.chal-card { position: relative; display: grid; gap: 4px; align-content: start; text-align: left; padding: 12px 14px; border-radius: 12px; background: var(--panel2); min-height: 150px; }
+.chal-card:hover, .chal-card:focus-visible { border-color: var(--p4); box-shadow: 0 0 20px -6px var(--p4); }
+.chal-num { position: absolute; top: 10px; right: 12px; font: 400 13px var(--display); color: var(--faint); }
+.chal-icon { font-size: 24px; line-height: 1; }
+.chal-card strong { font: 400 16px var(--display); }
+.chal-card p { font-size: 13px; color: var(--fg); line-height: 1.3; }
+.chal-stars { color: var(--gold); letter-spacing: 2px; font-size: 16px; }
+.chal-card small { font-size: 11px; color: var(--dim); line-height: 1.3; }
+.chal-card.done { border-color: rgba(255, 216, 74, .4); }
+.chal-card.perfect { border-color: var(--gold); box-shadow: inset 0 0 22px -10px var(--gold); }
+
+@media (max-width: 760px) {
+  .sheet-camp .sheet-foot { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .sheet-camp .sheet-foot .camp-info { grid-column: 1 / -1; order: -1; }
+  .sheet-camp .sheet-foot .go { grid-column: 1 / -1; min-width: 0; padding: 10px; }
+  .sheet-camp .sheet-foot button { padding: 8px 6px; font-size: 13px; margin: 0; }
+  .camp-node { width: 38px; height: 38px; font-size: 16px; }
+  .camp-node.k-boss { width: 48px; height: 48px; font-size: 22px; }
+  .camp-node.k-side { width: 32px; height: 32px; }
+  .tree-grid { grid-template-columns: 1fr; }
+  .chal-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .chal-card { min-height: 0; padding: 10px; }
+  .chal-card small { display: none; }
+  .dlg-face { width: 44px; height: 44px; }
+  .dlg-text { font-size: 15px; }
+  .quest-chip { font-size: 12px; padding: 3px 7px; }
+}

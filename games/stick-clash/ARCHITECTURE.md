@@ -53,15 +53,26 @@ don't read, edit or follow rules from `/home/user/golf_game`. `v1-reference.html
 | `55-orbs.js` | core, then skills may extend | power-up orb defs |
 | `56-fusion.js`, `57-mounts.js` | core (v3) | elements + elemental orbs (`defElement`), mounts + mount orbs (`defMount`) |
 | `60-maps.js` | maps | map defs |
+| `58-world.js` | maps (v3) | weather, darkness + lights, breakables (`brkSolid`), the `worldFrame` hook |
+| `63-maps-v3.js`, `64-maps-v3b.js` | maps (v3) | the 8 v3 arenas; 64 also adds breakables and weather rules to older arenas |
 | `65-ai.js` | ai | CPU brain |
 | `66-ai-moves.js` | core (v3), ai may extend | how CPUs use guard, parry, grabs, throwables, ultimates, walls, pickups, mounts |
 | `70-modes.js` | modes | game mode defs |
+| `71-modes-party.js`, `72-modes-survive.js` | modes (v3) | party helpers + CTF, Soccer, Hot Potato, Gun Game, Juggernaut; Zombie Horde, Battle Royale, Lava Rising |
+| `73-modes-ranked.js` | modes (v3) | the Ranked ladder, `rankBadge()` for the title screen, rank-up celebration (CSS `styles/73-ranked.css`) |
+| `74-boss-phases.js` | modes (v3) | `bossPhases` (multi-phase bosses, also for the campaign) and Boss Rush's phases |
 | `75-cosmetics.js` | ui | hats, colour palettes, progression (coins, unlocks, achievements, stats) |
+| `78-outfits.js`, `78-pets.js` | cosmetics (v3) | outfits (cloth), weapon skins, K.O. effects, taunts + victory poses; helper pets |
+| `79-mutators.js`, `79-progress.js` | cosmetics (v3) | match mutators + party mini-games; 100-level track, quests, secrets/cheat codes, codex stats, presets |
+| `98-ui-progress.js` | cosmetics (v3) | Look tab, presets, Fighter Creator, Track & Quests, Codex, arena mutators, results XP (CSS `styles/98-progress.css`) |
 | `80-audio.js`, `81-music.js` | juice | sound effects (WebAudio synth, buses, panning) and the procedural synthwave music |
 | `87-juice.js` | juice | game feel: punch zoom, K.O. chroma/vignette, landing dust, speed streaks, heartbeat, hit colours, extra settings |
 | `85-render.js` | core, juice extends | camera, world drawing, fighters, HUD, banners |
 | `88-killcam.js` | juice | K.O. instant replay (ring-buffer snapshots, slow-motion playback, letterbox) |
+| `82-announcer.js`, `83-crowd.js` | juice (v3) | synth announcer callouts (speechSynthesis or formant synth); procedural crowd bed + reactions |
+| `84-postfx.js`, `86-photo.js`, `89-replays.js` | juice (v3) | bloom (WebGL, 2D fallback), dynamic lights, impacts, juice level; photo mode; highlight clips + WebM export (CSS `styles/84-fx.css`) |
 | `90-input.js` | core, juice extends | keyboard + rebinding, gamepads, touch |
+| `91-touch.js`, `92-access.js`, `93-pads.js`, `94-savecode.js` | input (v3) | touch stick/gestures/button arc; accessibility; pad remap + join lobby; save codes (CSS `styles/92-access.css`) |
 | `95-ui.js`, `96-ui-loadout.js`, `97-ui-pages.js` | ui | menu framework + title/modes/arenas; loadout with live previews; settings, controls, help, shop, trophies, pause, results (CSS in `src/styles/95-ui.css`) |
 | `99-main.js` | core | match/round flow, world step, main loop, boot, `window.SC` |
 
@@ -273,6 +284,37 @@ Music (`81-music.js`): an original synthwave loop with a calm `menu` and a drivi
 as semitones), switched on bar lines by game state. It starts after the first key or tap, follows `SETTINGS.musicOn`,
 muffles while paused / slow-mo / replaying, and adds hats when someone is low or at match point.
 
+### v3 audio and visual effects (`81`–`84`, `86`, `89`; all drawing/sound only)
+
+- **Music** (81): `MUSIC_ARENAS[mapKey]` = `[bpm, root, scale, verse degrees, chorus degrees, drums, bass, arp, lead wave,
+  pad wave, swing]` gives every arena its own track (`musicArenaTheme(key)` builds and caches `MUSIC_THEMES['map:' + key]`;
+  arenas without a row get a style rolled from their key). Grooves are 16-step strings in `MUSIC_DRUMS`. `musicIntensity()`
+  (low health, match point, final round, `bossPhase`, last 10 s) eases into `MUSIC_DYN.level`, which adds 16th hats (.25),
+  an octave bass + counter line (.45), snare rolls + crashes (.7); the final round modulates up 2 semitones.
+- **Announcer** (82): `announce(text, prio)` (silent in demo/sim, logged in `ANN.log` even without audio). Calls: round /
+  "Final round" / a mode's `roundLabel`, "Fight!" when the start lock ends, "K.O.!", "Perfect!", "Close call!", "Double
+  K.O.!", "Time!", "Ring out!", "Ultimate!", "Parry!" (a human involved), "Phase two", "You win!" / "You lose!" / "Game!".
+  `SETTINGS.announcer` `'voice'` (speechSynthesis, low pitch) | `'synth'` (formant synth via WebAudio) | `'off'`; `annVol`.
+- **Crowd** (83): `crowdReact(kind, vol, hype)` with kinds `ooh gasp boo clap roar` (sfx `crowd-*`), a murmur bed that
+  swells with `CROWD.hype`; `SETTINGS.crowd` (also gates the K.O. cheer in 80).
+- **Post-fx** (84): `SETTINGS.bloom` `off|low|high`: the frame is copied to a small canvas, uploaded to WebGL (threshold,
+  separable blur, output on `#bloom`, blended with CSS `mix-blend-mode: screen`). No hardware WebGL (or software
+  rendering) → a 2D glow (tiny self-multiplied copy screened back). A governor steps down (High→Low→half rate→off) after
+  ~3 s under 50 fps. `SETTINGS.lights`: additive glows for `fire`, `explode`, projectiles, burning fighters, glowing
+  weapons/elements/Lv3, ultimates and lava/acid. `postfxImpact(x, y, nx, ny, amt, color, id)` (on every direct hit ≥ 5;
+  recorded for the kill-cam) = direction sparks, flash, shockwave, squash-and-stretch (`postfxSquash` in `drawFighter`).
+  `SETTINGS.juice` `calm|normal|chaos` scales particles/shake (wraps `applySettings`), slow-mo, flashes (chaos adds
+  confetti and chroma kicks). `fxFlashMul()` honours `SETTINGS.reduceFlash`. Effects run on game time (freeze in pause).
+- **Photo mode** (86): pause → "Photo mode" (state `'photo'` + `G_STATE.override`): free camera (`photoCamera()` at the
+  top of `updateCamera`), filters (CSS on `#c`/`#bloom`, baked with `ctx.filter` on save), frames, HUD toggle, PNG via
+  `toBlob` + download + a preview dialog (`fxModal`) because embedded viewers may block downloads.
+- **Highlights** (89): every real K.O. is scored and its kill-cam history copied (`hlFlush`, also forced by `kcReset` /
+  `kcStart`); the best 5 per session stay in memory, the all-time top 5 summaries in `store 'highlights'`. The title
+  menu's Highlights screen replays a clip through `kcStart` and exports WebM: `hlRecordFrame()` (called from
+  `postfxFrame`) copies each finished frame into a 1280x720 canvas recorded by `captureStream` + `MediaRecorder`,
+  with the game audio when WebAudio runs. Test hooks: `SC.announcer`, `SC.postfx`, `SC.photo`, `SC.highlights`.
+  `node tools/smoke-fx.cjs` covers all of it (also run by smoke.cjs); `node tools/fx-perf.cjs` measures frame rates.
+
 ### Kill-cam (`88-killcam.js`)
 
 While a real (non-demo, non-sim) match plays, `kcRecord()` keeps ~4.5 s of snapshots (fighter points, numeric fields and
@@ -295,15 +337,35 @@ Defaults (rebindable in Controls, saved via `store`):
 - v3: P1 F block (hold), C grab/throw, R throwable, X super; P2 `,` block, L grab, `;` throwable, Enter super.
   Block + attack also grabs. Saved v2 binds keep their keys; a new action whose default key is taken starts unbound.
 - Gamepads: stick/d-pad move, A jump, X attack, B skill 1, Y skill 2, RB dash, LT block (hold), RT grab, LB throwable,
-  R3 (or Back) super, Start pause. `PAD_BUTTONS` / `PAD_ALT` are data (for a later remapping screen). Pads are tracked by browser index; with two humans pad 1
-  drives P1 and pad 2 P2. Plugging a pad in toasts which player it drives; unplugging one mid-fight pauses. Pads of the
-  fighter being hit rumble (where supported).
-- Touch-first devices (coarse pointer) get on-screen buttons during play; they hide once a hardware key is pressed.
-  Sliding a finger from ◀ to ▶ switches direction; the skill buttons show the skill icons and a cooldown sweep
-  (CSS in `src/styles/90-touch.css`). Esc/P pause, M mute. Switching tabs pauses.
+  R3 (or Back) super, Start pause. `PAD_BUTTONS` are the defaults; `PAD_MAPS[slot]` is each player's map, remapped on
+  the Gamepad buttons screen (93-pads, from Controls or Settings; swaps, store `padmap` = changes only, Reset per
+  player; Start and d-pad left/right are fixed). Pads are tracked by browser index; with two humans pad 1 drives P1 and
+  pad 2 P2. Plugging a pad in toasts which player it drives; unplugging one mid-fight pauses.
+- **Join lobby** (93-pads, "Local players…" on the arena screen of `crowd` modes): A joins a pad, B leaves, Start
+  begins; a key of either keyboard set joins that set. `cfg.joined` = `[{ pad } | { keys }]` in join order (only with
+  2+ players); every mode's `setup` is wrapped at boot so CPU seats become humans P1..Pn (team with the fewest humans
+  first) and `JOINED` maps player n to its own pad/keys only (`padSlot`, `bindsFor`). Up to 8.
+- **Rumble/haptics**: `feel(f, strength, ms, style)` on hits (both sides), K.O.s, parries, guard breaks and ultimates:
+  `padRumble` (dual-rumble × `SETTINGS.rumble`) for that player's pads, and for P1 `nativeHaptic(style)` →
+  `window.StickClashNative.haptic` (iOS app, expo-haptics styles) or `navigator.vibrate`, rate-limited (90 ms).
+- Touch-first devices (coarse pointer) get on-screen controls during play; they hide once a hardware key is pressed.
+  91-touch: a floating stick where the left thumb lands (analog `TOUCH_AXIS.mx`; push up = jump, pull down =
+  `SETTINGS.touchDown` block/grab/off), right-side gestures (`touchSwipe`: tap attack, swipe up jump, sideways dash,
+  down grab) and the action buttons on two arcs around Attack (incl. taunt), sized/faded by `touchSize`/`touchAlpha`,
+  relaid on resize (`touchLayout`). Multitouch: each finger is its own pointer. The skill buttons show the skill icons
+  and a cooldown sweep (CSS `90-touch.css`, `92-access.css`). Esc/P pause, M mute. Switching tabs pauses.
+- **Accessibility** (92-access, Settings → Accessibility): `cbPalette` (deutan/protan/tritan colours for fighters and
+  `PARTY_TEAMS`, plus shape markers + health-bar patterns via `accessCardMark`/`accessTagMark` in 85-render),
+  `reduceFlash` (flashes ×.35, shake ×.25, arenas don't strobe: drawing code checks `SETTINGS.reduceFlash`),
+  `oneButton` (`oneButtonDrive(f)` from `readHuman`: auto-move/jump, press attack, hold block, double-tap super/skill)
+  and `practiceSpeed` (`accessSpeedMul()` in `advance`: one human, never Ranked; also a slider in the pause menu).
+- **Save codes** (94-savecode, Settings → Transfer progress): `makeSaveCode()` / `readSaveCode(text)` /
+  `savePreview(data)`: every `stickclash*` localStorage key as `SC1z.<base64url deflate>.<fnv1a>` (`p` = plain when
+  CompressionStream is missing); import previews, confirms in-page, replaces the keys and reloads.
 
 API: `BINDS[slot][action]`, `setBind(slot, action, code)`, `resetBinds()`, `keyLabel(code)`, `keyHint(slot, action)`,
-`captureNextKey(cb)`, `togglePause()`, `readHuman(f)`, `pollPads()`.
+`captureNextKey(cb)`, `togglePause()`, `readHuman(f)`, `pollPads()`, `setPadBind(slot, action, button)`,
+`resetPadMap(slot)`, `feel(f, ...)`, `nativeHaptic(style)`. Tests: `node tools/smoke-access.cjs` (run by smoke.cjs).
 
 ### Menus, settings and progression (`75-cosmetics.js`, `95`–`97-ui`)
 
@@ -327,6 +389,40 @@ API: `BINDS[slot][action]`, `setBind(slot, action, code)`, `resetBinds()`, `keyL
   Only matches with a real (non-autopilot) human count; `mode.practice: true` (and `training`) earns nothing.
   A mode's `results()` may add `won` (boolean), `tournament: true` or `waves: n`; otherwise the score and
   `G_STATE.info.run` (`cleared` waves, tournament `won` count) decide the coin reward.
+
+### Customisation and progression (`78`–`79`, `98-ui-progress`)
+
+- **Look**: a roster entry may carry `look: { outfit, skins: { cat: key }, ko, pet, pose }` (the menu fills it from the
+  loadout through `loadoutOf`/`loadoutForMatch`; `SC.start({ loadouts: [{ look: {...} }] })` in tests). `lookOf(f)` reads it
+  (a decoy uses its owner's). Registries `OUTFITS`, `WSKINS`, `KOFX`, `POSES`, `PETS`, `TITLES` use `defLook(reg, key, def)`
+  (`hidden` = secret). Drawing only, except pets and taunts.
+- **Outfits**: `strands` (verlet ribbons hung from body points, `layer` back/front) plus optional `back`/`front(c, f, P, s, t)`
+  pieces. The renderer calls `outfitDraw(ctx, f, look, 'back'|'front', t)` around the body; cloth state is a WeakMap per
+  fighter object, so previews and kill-cam ghosts get their own.
+- **Weapon skins**: chosen per weapon category. `skinDrawWeapon(ctx, f, rig, view, look)` hands the weapon's own `draw`
+  a context proxy that maps every fill/stroke/shadow colour through the skin's palette (by brightness), then draws the
+  skin's `over(ctx, s, t)` sparkle. New weapons need nothing extra.
+- **K.O. effects**: the K.O.er's `look.ko` plays `koFxSpawn(key, x, y, color)` on top of the shatter (game-time particles,
+  recorded for the kill-cam as `KC_FX.koFx`).
+- **Taunt** (`inp.taunt`; P1 T, P2 `'`, pad d-pad up): `TAUNT.time` s pose; finished with no foe within `TAUNT.safe` px
+  and untouched = `+TAUNT.meter` super (events `taunt`, `tauntDone`). Winners hold `look.pose` through the K.O. delay
+  and behind the results.
+- **Pets**: `defPet(key, { cd, ready(f, pet) -> target|false, use(f, pet, target), draw(c, x, y, t) })`, state in
+  `f.mem.pet`, event `petUse(f, key)`. `petsAllowed()` is false in `ranked`, `ohko`, `mode.noPets` or `cfg.pets === false`.
+- **Mutators**: `cfg.mutators: [keys]` (arena screen). `defMutator(key, { match(cfg), round(), fighter(f), step(dt),
+  ko(V, K), hit(B, amt, o), secret })`. Off in ranked, campaign and challenge. Big Heads sets `f.headMul` (render only).
+- **Mini-games**: from round 2, every other round of versus/pvp/watch/team/ffa/roulette/tournament may open with a
+  10-15 s mini-game (`cfg.minigames` true/false, else `SETTINGS.minigames` auto = watch and party modes). Nobody can
+  be K.O.'d (damage x.01, health refilled, fallers return); `miniFinish` then calls `newRound()` and the winner gets a
+  small perk. `defMini(key, { time, score, start(m), step(m, dt), draw(c, m) /* world */, hud(c, m) })`; events
+  `miniStart(key)`, `miniEnd(key, winner)`.
+- **Progression** (store `prog`): `addXp(n)` grants every `TRACK[level]` reward reached (looks, shop hats, coins);
+  `lookOwned(kind, key)`, `lookGrant(kind, key)`. Match XP is settled once (`progSettle`, on `matchOver`/results) for
+  real players only. Quests (store `tasks`): 3 daily + 3 weekly from `TASKS`, seeded by the local date, one daily
+  reroll per day, `taskBump(key, n)`. Secrets: `SECRETS` (codes typed on the title screen via `cheatKey`, or feats),
+  `secretUnlock(key)`. Codex stats: `codexRow(kind, key)` = [uses, wins, K.O.s]. Presets (store `presets`):
+  `presetSave/presetApply/presetDelete`.
+- Tests: `node tools/smoke-progress.cjs` (also run by `tools/smoke.cjs`).
 
 ## v3 fighting depth (core layer: every mode, arena and CPU gets it)
 
@@ -451,6 +547,36 @@ sets `crowd: [min, max, default]` to get a "Fighters" stepper on the arena scree
 - New weapon categories need a `defUltimate` for the category (or they fall back to the blade's) and an entry in
   `LEVEL_ELEMENT`.
 
+### Party modes, ranked and multi-phase bosses (`71`–`74`)
+
+- Party helpers (71): `partyTeamRoster(cfg, n)` / `partyFfaRoster(cfg, n, extra)` (you + CPUs), `partyMap(cfg, prefer)`
+  (the menu's arena if it has a floor), `partySideSpot(team, slot)`, `partySafeSpot(f)`, `partyPlace(f, x, y)`,
+  `partyRespawn(old, x, y, over)` (rebuilds roster fighter `old.id` and swaps it into F), `partyTickRespawns(run, dt,
+  spawn)` (counts down `run.dead[id]`), `partyEnd(team, reason, title, sub, color)` (endRound + the mode's banner),
+  `partyHazard(o)`: a hazard owned by a mode (`{ kind, x, y, w, h, dps, tick, launch, status }`, mutate its x/y/w/h live).
+  It rides PROJ as a zone instead of joining `MAP.hazards`, because arena scripts may index their own hazards.
+  Mode HUD rows start at `PARTY_HUD_Y` (below the cards and the round label in every layout).
+- Every party mode ends on its own (captures, goals, a ladder, points, waves or a clock) and CPUs play the objective
+  through `aiGoal` (flag runs, ball chasing, fleeing the bomb, the storm, climbing above lava) plus a few per-step nudges
+  in `onStep` (CPUs swing at the ball, shamblers grab, bloaters burst). `tools/smoke.cjs` requires each to reach its
+  results headless (`PARTY_MODES`).
+- Ranked (73): saved as `store 'ranked'` = `{ pts, best, wins, losses, streak }`. `rankOf(pts)` → `{ tier, div, label
+  ('Gold II'), color, icon, into, floor, gm }`; 100 points per division, 3 divisions per tier, Grandmaster from
+  `RANK_GM` (1800). Win +25 (+5 per streak step, max +15), loss −18 (never below the tier floor). `rankOpponent(pts)`
+  scales the CPU's level (`RANK_TIERS[t].levels[div]`), health and class. Autopilot matches don't save.
+  `results()` adds `rankUp: true`, which makes the results card glow and toasts.
+- **`bossPhases(bosses, phases)`** (74): `bosses` is a fighter or an array (their combined health counts). `phases` =
+  `[{ at: .5, name, sub, color, fx: [[kind, opts], ...], enter(ctl), step(ctl, dt) }, ...]`. When the health fraction
+  falls to `at`, it shows a banner (name/sub), shakes, shoves nearby foes, gives the boss 1 s of `inv`, then runs the
+  fx: periodic ones (`rain`, `quake`) replace the previous phase's; arena ones (`adds`, `hazard`, `platforms`, `wind`,
+  `buff`) stay. Kinds and options are listed at the top of `74-boss-phases.js`; add more with
+  `BOSS_PHASE_FX.kind = (ctl, o) => stepFn | null`. Returns `ctl` (`{ bosses, phases, idx (phases entered), data }`),
+  also stored as `f.mem.phases` (`bossPhaseCtl(f)`). Adds are summons that vanish when their boss falls. It drives
+  itself through a zone in PROJ, so call it at `onRoundStart` (after the fighters exist); it ends with the round.
+  `bossPhaseMarks(ctx, x, y, w, f)` notches the thresholds on a `modeBigBar`. Event: `bossPhase(ctl, n)` (n = 2 at the
+  first threshold). Helpers: `bossSummonAdd(boss, o, k)`, `bossAddHazard(kind, x, w, o)`, `bossStrike(boss, o)`,
+  `bossQuake(f, o)`.
+
 ## Content defs
 
 ### Weapon
@@ -526,6 +652,29 @@ One-way platforms catch a fighter only when its feet were above them (you jump u
 whoever stands on them. A full jump rises ~210 px and a double jump ~385 px: keep ledges within those heights.
 Hazards with `launch` pop fighters up and out instead of letting them sit in the damage.
 
+v3 map fields (all optional; `58-world.js` reads them):
+- `weather: false | ['night', 'fog', ...]` which weathers suit the arena (default: all); `ownWind: true` skips weather gusts.
+- `dark` (0..1, set it in `onStep`) shades the arena: lights cut holes, fighters glow. `lights(t)` returns
+  `[{ x, y, r, a }]` lamps for that shade (night weather adds lanterns to arenas without `lights`).
+- `collide(p, friction)` extra collision shapes, called from `collidePoint` for every point (the asteroid's planets).
+- `frame(f, phase, enter)` called around each fighter's brain (`'think'`) and drive (`'drive'`): `enter` before, then
+  after. Use it to adjust CPU inputs after the brain (tunnel shelter, dart hops, planet hopping) or to re-orient a
+  fighter (the asteroid turns the world about the fighter's hip so "down" points at its planet, then turns it back).
+- Breakables: `brkSolid(kind, x, y, w, h, { id, hp, look: { fill, edge, debris } })` with kind `crate | glass | pillar`.
+  Melee hits, shots, blasts and fast bodies damage them; a solid with `restsOn: id` (or a list) collapses when that
+  breakable breaks (falls until it lands, or leaves a bottomless arena). Their collision box sinks 14 px into the
+  ground (`BRK_SINK`); also make blocks that sit on other blocks overlap them, or a fighter lying flat slides into the seam.
+
+### World: weather (`58-world.js`)
+
+`WEATHER` = clear, rain (friction ×.5, grip ×.65), snow (×.25, ×.4), fog (CPU gunners can't see past 380 px; the
+view fogs beyond the players), wind (warned gusts up to 1350 px/s² on fighters, shots drift), night (shade .74).
+One is rolled per match from `cfg.weather` (`'random'` | `'clear'` | a key; missing = clear, the menu demo = random)
+and re-rolled for a round whose arena can't have it. The arena screen has a Weather stepper (saved as `weather`,
+sent as `menuCfg().weather`); the round start shows a banner. `WX.key` is the live weather. Hooks in the core:
+`emit('mapStepPre')` / `emit('mapStep')` around the map's `onStep`, `worldFrame` around `think`/`drive` in
+`worldStep`, `MAP.collide` in `collidePoint` and `worldDrawTop(ctx, t)` after the map's `drawFg`.
+
 ### Mode
 
 ```js
@@ -578,6 +727,23 @@ that lies between the CPU and where it is going (`aiLeapHazard`: jump, double ju
 falls, and avoid enemy skill zones (`aiAvoidZones`).
 `node tools/ai-bench.cjs [secsPerPair] [modeCap] [matrix|modes|all]` prints the level-vs-level win matrix and runs
 every mode to a result; `SC.start({ mode: 'watch', diffs: ['easy', 'insane'] })` pits two levels.
+
+### CPU rivals, adaptive difficulty, habits (`67-ai-persona.js`, `68-ai-adapt.js`)
+
+- **Personas** (10 rivals: torque, mirage, vale, dazzle, tamsin, grizz, magpie, fenn, ivo, skitter): a roster entry with
+  `persona: key` plays that style. `aiPersonaEntry(entry, key | 'random' | 'none', { gear: 'force'|'fill'|false, color,
+  avoidColor, hat, caps, keepName, avoid })` sets name, title, look and favourite weapon/class/skills/throwables;
+  `aiPersona(key)` → def `{ name, title, color, hat, cls, weapons, cats, skills, throws, mul, add, act, lines }`,
+  `aiPersonaKeys()`, `aiPersonaDraw(n)` (distinct keys), `aiPersonaOf(f)`. Used by Versus (the loadout's Rival row,
+  `cfg.loadouts[1].persona`), Ranked, Tournament and FFA; `watch` only with `cfg.personas` (tests), so the bot ladder
+  and balance tools run without them. Knobs flow through `aiTuned(f)` → `f.ai.L` (what `aiLevel(f)` returns;
+  `aiBaseLevel(f)` is the raw level).
+- **Adaptive difficulty** (`SETTINGS.adaptive`, default on; one human only, never Ranked/practice): `AI_ADAPT.v` (-1..1)
+  blends a CPU's knobs toward the neighbour level by at most `AI_ADAPT.max` (.4) of the gap.
+- **Habits**: per match, a human's jump-ins, dash-ins, guarding and one-skill spam are counted (`AI_HAB`); after
+  `AI_HABIT.need` (3) CPUs counter them with a per-level chance and say "READ YOU!". Only humans are read.
+- **Bubbles**: `aiSay(f, text, force)`, `aiTalk(f, kind)` (kinds hi, ko, parry, combo, low, win, taunt), rate-limited,
+  off with `SETTINGS.taunts`. `node tools/ai-persona.cjs [secs] [personas|adapt|habits|all]` measures all of it.
 
 ### Orb, hat
 

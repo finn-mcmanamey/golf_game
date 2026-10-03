@@ -9,7 +9,7 @@
 function loadoutOf(cfg, i) {
   const lo = (cfg.loadouts || [])[i] || {};
   return { weapon: lo.weapon || 'random', skills: lo.skills || ['random', 'random'], hat: lo.hat, color: lo.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length],
-    cls: lo.cls || 'random', throws: lo.throws || ['random', 'random'] };   // v3: class and two throwables
+    cls: lo.cls || 'random', throws: lo.throws || ['random', 'random'], look: lo.look };   // v3: class and two throwables; look (78)
 }
 
 // ---------- shared helpers ----------
@@ -88,7 +88,8 @@ defMode('versus', {
   name: '1P vs CPU', desc: 'Duel the computer. First to 5 rounds wins.', order: 10,
   players: [1, 1], cpu: true, pickers: 2, labels: ['You', 'CPU'],
   setup(cfg) {
-    return { roster: [humanEntry(cfg, 0, 0, 0, 'YOU'), modeEntry({ ...loadoutOf(cfg, 1), team: 1, name: 'CPU' })] };
+    const rival = (cfg.loadouts && cfg.loadouts[1] || {}).persona || 'random';   // a named CPU rival (67)
+    return { roster: [humanEntry(cfg, 0, 0, 0, 'YOU'), aiPersonaEntry(modeEntry({ ...loadoutOf(cfg, 1), team: 1, name: 'CPU' }), rival, { color: false })] };
   },
   results() {
     const res = duelResults(), diff = modeDiff(), wins = store.get('wins', {});
@@ -119,7 +120,8 @@ defMode('watch', {
   // cfg.fighters: 2-8 bots, each on its own team
   setup(cfg) {
     const lv = i => (cfg.diffs && AI_LEVELS[cfg.diffs[i]] ? cfg.diffs[i] : null), n = clamp(cfg.fighters || 2, 2, MAX_FIGHTERS);
-    return { roster: Array.from({ length: n }, (_, i) => modeEntry({ ...loadoutOf(cfg, i), team: i, name: lv(i) ? levelName(lv(i)) + ' CPU' : 'CPU ' + (i + 1), aiLevel: lv(i) })) };
+    return { roster: Array.from({ length: n }, (_, i) => aiPersonaEntry(modeEntry({ ...loadoutOf(cfg, i), team: i, name: lv(i) ? levelName(lv(i)) + ' CPU' : 'CPU ' + (i + 1), aiLevel: lv(i) }),
+      cfg.personas && cfg.personas[i], { gear: false, color: false, hat: false })) };   // cfg.personas: tests only (67)
   },
 });
 
@@ -130,17 +132,18 @@ const TOURNEY_FIGHTS = 8, TOURNEY_WINS = 2, TOURNEY_INTRO = 2.3, TOURNEY_CONTINU
 const TOURNEY_STEPS = [-1, -1, 0, 0, 0, 1, 1, 0];
 
 function tourneyLadder(diff, playerColor) {
-  const names = shuffle(MODE_NAMES.slice()), themes = shuffle(MODE_THEMES.slice());
+  const names = shuffle(MODE_NAMES.slice()), themes = shuffle(MODE_THEMES.slice()), rivals = aiPersonaDraw(TOURNEY_FIGHTS);
   return TOURNEY_STEPS.map((step, i) => {
     const boss = i === TOURNEY_FIGHTS - 1, theme = themes[i % themes.length];
     const lo = boss ? { weapon: modeWeapon(['greatsword', 'hammer', 'halberd'], ['heavy', 'polearm']), skills: themeLoadout(MODE_THEMES[1]).skills } : themeLoadout(theme);
-    return { name: boss ? 'Titan Kord' : names[i], title: boss ? 'The Champion' : theme.title, level: aiShift(diff, step), boss,
+    const op = { name: boss ? 'Titan Kord' : names[i], title: boss ? 'The Champion' : theme.title, level: aiShift(diff, step), boss,
       color: boss ? '#ffd84a' : modeColor(playerColor), hat: boss ? (HATS.crown ? 'crown' : modeHat()) : modeHat(), ...lo };
+    return boss ? op : aiPersonaEntry(op, rivals[i], { gear: 'force', caps: false, avoidColor: playerColor });   // named rivals (67)
   });
 }
 function tourneyEntry(op) {
   return modeEntry({ team: 1, name: op.name.toUpperCase(), weapon: op.weapon, skills: op.skills, color: op.color, hat: op.hat,
-    aiLevel: op.level, scale: op.boss ? 1.6 : 1, hpMul: 1 });     // the giant's size already gives it 160 hp
+    aiLevel: op.level, scale: op.boss ? 1.6 : 1, hpMul: 1, ...(op.persona ? { persona: op.persona, cls: op.cls, throws: op.throws } : {}) });     // the giant's size already gives it 160 hp
 }
 
 defMode('tournament', {
@@ -301,7 +304,7 @@ function bossEntries(i, diff) {
 }
 
 defMode('bossrush', {
-  name: 'Boss Rush', desc: 'Five giant bosses, each with its own trick. Extra health, refilled for every boss; one loss ends the run.',
+  name: 'Boss Rush', desc: 'Five giant bosses, each with its own trick and new attacks at half and quarter health. Extra health, refilled for every boss; one loss ends the run.',
   order: 55, players: [1, 1], cpu: true, pickers: 1, labels: ['You'], roundLimit: 120,
   setup(cfg) {
     const hero = Object.assign(humanEntry(cfg, 0, 0, 0, 'YOU'), { hpMul: BOSS_HERO_HP });   // the lone hero gets a bigger health pool
@@ -313,6 +316,7 @@ defMode('bossrush', {
     G_STATE.winScore = 0;
     run.fx = { timer: 5, warn: 0, enraged: false };
     for (const f of F) if (f.team === 1) { f.kbMul = .6; f.isBoss = true; }
+    bossRushPhases(run.boss);                            // v3: new attacks and arena changes at 50% and 25% health (74-boss-phases)
     banner(b.name.toUpperCase(), 'FIGHT!', 2, b.color);   // the boss's name, as on its card and bar (title: in the bar)
   },
   onStep(dt) {
@@ -335,6 +339,7 @@ defMode('bossrush', {
       const x = bosses.length > 1 ? W / 2 - room / 2 + i * (room / 2 + 20) : (W - w) / 2;
       modeBigBar(ctx, x, H - 46, w, f.hp / f.maxHp, f.alive ? f.color : '#444a66',
         f.name + (modeRun().fx && modeRun().fx.enraged ? '  · ENRAGED' : bosses.length > 1 ? '' : '  · ' + b.title.toUpperCase()));
+      bossPhaseMarks(ctx, x, H - 46, w, f);
     });
     if (modeRun().fx && modeRun().fx.warn > 0) modeText(ctx, '! ' + b.special.toUpperCase() + ' !', W / 2, 140, 28, b.color);
   },
@@ -444,7 +449,9 @@ defMode('ffa', {
   order: 65, players: [1, 1], cpu: true, pickers: 1, labels: ['You'], winScore: 3, crowd: [3, MAX_FIGHTERS, 4],
   setup(cfg) {
     const me = humanEntry(cfg, 0, 0, 0, 'YOU'), names = shuffle(MODE_NAMES.slice()), n = clamp(cfg.fighters || 4, 3, MAX_FIGHTERS);
-    const cpus = Array.from({ length: n - 1 }, (_, k) => k + 1).map(i => modeEntry({ team: i, ...themeLoadout(pick(MODE_THEMES)), color: DEFAULT_COLORS[i], hat: modeHat(), name: names[i].toUpperCase() }));
+    const rivals = aiPersonaDraw(n - 1);   // named rivals with their own gear (67); colours stay one per slot
+    const cpus = Array.from({ length: n - 1 }, (_, k) => k + 1).map(i => aiPersonaEntry(modeEntry({ team: i, ...themeLoadout(pick(MODE_THEMES)), color: DEFAULT_COLORS[i], hat: modeHat(), name: names[i].toUpperCase() }),
+      rivals[i - 1], { gear: 'force', color: false }));
     return { roster: [me, ...cpus], winScore: 3 };
   },
   results() {

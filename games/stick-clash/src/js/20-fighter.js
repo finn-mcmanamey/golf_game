@@ -25,7 +25,7 @@ function makeFighter(o) {
     dashCd: 0, dashT: 0, stagger: 0, flash: 0, swingT: 0, phase: 0, aim: face > 0 ? 0 : Math.PI, gvx: 0, grounded: false,
     combo: 0, comboT: 0, hitCd: {}, lastHitBy: null, lastHitT: 0, inv: 0,
     inp: { mx: 0, my: 0, jump: false, jumpHeld: false, attack: false, attackHeld: false, skill1: false, skill2: false, dash: 0,
-      blockHeld: false, block: false, grab: false, throw: false, super: false, mash: false },   // v3 actions (22-moves)
+      blockHeld: false, block: false, grab: false, throw: false, super: false, mash: false, taunt: false },   // v3 actions (22-moves)
     ai: {}, stats: { dmgDealt: 0, dmgTaken: 0, hits: 0, kos: 0, skills: 0, jumps: 0, shots: 0, dashes: 0 },
     trail: [], upT: 0, aliveT: 0,
   };

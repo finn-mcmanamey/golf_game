@@ -7,7 +7,6 @@
 #touch button[data-act^="skill"]::after { content: ''; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
   background: conic-gradient(rgba(5, 6, 12, .55) calc(var(--cd, 0) * 360deg), transparent 0); }
 #touch button[hidden] { display: none; }
-#touch .tpad-l button { width: 76px; height: 76px; font-size: 22px; }
 #touch button.on { transform: scale(.93); background: rgba(255, 216, 74, .3); }
 
 /* Portrait phones: the pause button sits in the empty band above the arena instead of between the thumb pads. */

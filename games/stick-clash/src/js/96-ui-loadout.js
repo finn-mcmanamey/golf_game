@@ -44,6 +44,7 @@ function previewFighter(weapon, color, hat) {
   let f = PREVIEW_FIGHTERS.get(weapon);
   if (!f) {
     f = makeFighter({ id: 0, x: 0, y: 0, face: 1, weapon, ctrl: 'cpu', name: 'preview' });
+    f.preview = true;                 // cloth (78) skips the arena floor
     PREVIEW_FIGHTERS.set(weapon, f);
   }
   f.color = color; f.hat = hat || 'none';
@@ -104,7 +105,13 @@ function drawLoadoutPreview(g, t, w, h, lo) {
   floor.addColorStop(0, rgba(lo.color, .35)); floor.addColorStop(1, rgba(lo.color, 0));
   g.fillStyle = floor; g.fillRect(0, h - 60, w, 60);
   g.translate(w / 2 - 20 * s, h - 26); g.scale(s, s);
-  drawPreviewBody(g, f); drawPreviewHat(g, f); drawPreviewWeapons(g, f);
+  const look = typeof lookForPreview === 'function' ? lookForPreview(lo) : null;   // outfit, skin, pet (98-ui-progress)
+  if (look) outfitDraw(g, f, look, 'back', t);
+  drawPreviewBody(g, f);
+  if (look) outfitDraw(g, f, look, 'front', t);
+  drawPreviewHat(g, f);
+  if (look) { for (const rig of rigsOf(f)) skinDrawWeapon(g, f, rig, weaponView(f, rig), look); lookPreviewPet(g, f, look, t); }
+  else drawPreviewWeapons(g, f);
 }
 
 // A static weapon icon: the weapon laid diagonally and fitted to the tile by its drawn pixels (blades that stick out
@@ -215,15 +222,16 @@ SCREENS.loadout = () => {
     return el('button', { role: 'tab', 'aria-selected': String(k === i), 'data-key': 'picker-' + k, style: { '--pc': l.color },
       onclick: () => { LO.picker = k; LO.confirm = null; uiSfx('click'); refreshScreen(); } }, el('i'), labels[k] || `Fighter ${k + 1}`);
   })) : null;
-  const sections = [['weapon', 'Weapon'], ['skills', 'Skills'], ['class', 'Class'], ['gear', 'Throwables'], ['style', 'Style']];
+  const sections = [['weapon', 'Weapon'], ['skills', 'Skills'], ['class', 'Class'], ['gear', 'Throwables'], ['style', 'Style'], ['look', 'Look']];
   const subTabs = el('div', { class: 'seg sub-tabs', role: 'tablist' }, sections.map(([k, t]) =>
     el('button', { role: 'tab', 'aria-pressed': String(LO.tab === k), 'data-key': 'tab-' + k, onclick: () => { LO.tab = k; uiSfx('click'); refreshScreen(); } }, t)));
-  const tabs3 = { skills: skillsTab, style: styleTab, class: classTab, gear: gearTab };
+  const tabs3 = { skills: skillsTab, style: styleTab, class: classTab, gear: gearTab, look: typeof lookTab === 'function' ? lookTab : styleTab };
   const content = (tabs3[LO.tab] || weaponTab)(i, lo);
   const last = i >= n - 1;
-  const next = el('button', { class: 'go', onclick: () => { uiSfx('click'); if (last) openScreen('maps', 'loadout'); else { LO.picker++; refreshScreen(); } } },
-    last ? 'Arena ▸' : `Next: ${labels[i + 1] || 'Fighter ' + (i + 2)} ▸`);
-  return sheet('Loadout', [tabs, el('div', { class: 'lo-grid', style: { '--pc': lo.color } },
+  // A mode may send its last loadout step elsewhere (mode.loadoutNext / loadoutLabel: the campaign map, the challenge list).
+  const next = el('button', { class: 'go', onclick: () => { uiSfx('click'); if (last) { if (mode.loadoutNext) mode.loadoutNext(); else openScreen('maps', 'loadout'); } else { LO.picker++; refreshScreen(); } } },
+    last ? mode.loadoutLabel || 'Arena ▸' : `Next: ${labels[i + 1] || 'Fighter ' + (i + 2)} ▸`);
+  return sheet('Loadout', [tabs, typeof presetBar === 'function' ? presetBar(i, lo) : null, el('div', { class: 'lo-grid', style: { '--pc': lo.color } },
     previewPane(i, lo, label), el('div', { class: 'lo-pick' }, subTabs, content))],
   [uiButton('◂ Back', goBack, 'foot-back'), last ? null : uiButton('Skip to arena', () => openScreen('maps', 'loadout'), 'skip'), next], { cls: 'sheet-loadout' });
 };

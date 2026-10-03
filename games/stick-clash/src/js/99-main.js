@@ -172,10 +172,13 @@ function worldStep(dt) {
     if (G_STATE.lock === 0 && flowing) sfx('fight');
   } else if (!G_STATE.ending && flowing) G_STATE.roundT += dt;
   updateMap(dt);
+  emit('mapStepPre', dt);                  // 58-world: weather resets wind/grip before the arena's own step
   hook(MAP, 'onStep', dt, MAP.t);
+  emit('mapStep', dt);                     // 58-world: weather, breakables
   if (flowing) hook(G_STATE.mode, 'onStep', dt);   // not behind the results screen (re-spins, boss tricks)
-  for (const f of F) if (f.alive && (f.ctrl !== 'human' || f.autopilot)) think(f, dt);
-  for (const f of F) { drive(f, dt); clearPresses(f); tickFighter(f, dt); }
+  // worldFrame (58-world) lets an arena re-orient a fighter's frame around its brain and drive (radial gravity).
+  for (const f of F) if (f.alive && (f.ctrl !== 'human' || f.autopilot)) { worldFrame(f, 'think', true); think(f, dt); worldFrame(f, 'think', false); }
+  for (const f of F) { worldFrame(f, 'drive', true); drive(f, dt); clearPresses(f); tickFighter(f, dt); worldFrame(f, 'drive', false); }
   for (const f of F) { integrate(f); solve(f); }
   if (G_STATE.lock <= 0) { clashAll(); strikeAll(); }
   stepProjectiles(dt); stepHazards(dt); stepOrbs(dt); checkRingOuts();
@@ -193,7 +196,7 @@ function advance(dt) {
   if (FX.hitstop > 0) { FX.hitstop -= dt; return; }
   let rate = 1;
   if (FX.slow > 0) { FX.slow -= dt; rate = FX.slowRate; }
-  const speed = !G_STATE.demo && G_STATE.cfg && G_STATE.cfg.speed || 1;   // the menu's game speed setting
+  const speed = (!G_STATE.demo && G_STATE.cfg && G_STATE.cfg.speed || 1) * accessSpeedMul();   // menu speed x practice speed (92)
   stepAcc += dt * rate * speed;
   let n = 0;
   // Stop as soon as an override takes over mid-frame: a kill-cam that starts on matchOver swaps F for replay ghosts,

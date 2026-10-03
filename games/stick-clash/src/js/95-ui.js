@@ -118,12 +118,13 @@ SCREENS.menu = () => {
       el('nav', { class: 'menu-list', 'aria-label': 'Main menu' },
         item('Quick Fight', quickSummary(), startFromMenu, 'go'),
         item('Play', 'Pick a mode, loadout and arena', () => openScreen('modes', 'menu')),
+        typeof questMenuItems === 'function' ? questMenuItems(item) : null,   // Mythic Quest + Challenges (98-campaign-ui)
         item('Shop', `${ownedHats().length - 1}/${listOf(HATS).length - 1} hats · colour packs`, () => openScreen('shop', 'menu')),
         item('Trophies & Stats', `${done}/${Object.keys(ACHIEVEMENTS).length} trophies`, () => openScreen('stats', 'menu')),
         item('Settings', 'Rounds, speed, effects, sound', () => openScreen('settings', 'menu')),
         item('Controls', 'Keys, rebinding, gamepads', () => openScreen('controls', 'menu')),
         item('How to Play', 'Moves, skills, orbs, tips', () => openScreen('howto', 'menu'))),
-      el('div', { class: 'title-foot' }, coinBadge(), el('span', { class: 'hint', text: IS_TOUCH ? `v${VERSION}` : `↑↓ choose · Enter select · Esc back · v${VERSION}` }))));
+      el('div', { class: 'title-foot' }, coinBadge(), typeof rankBadge === 'function' ? rankBadge() : null, el('span', { class: 'hint', text: IS_TOUCH ? `v${VERSION}` : `↑↓ choose · Enter select · Esc back · v${VERSION}` }))));
 };
 
 // ---------- mode select ----------
@@ -195,6 +196,7 @@ SCREENS.maps = () => {
     modeUsesRounds(mode) ? stepper('Rounds to win', SETTINGS.rounds, 1, 9, v => { SETTINGS.rounds = v; saveSettings(); })
       : el('p', { class: 'hint', text: `${mode.name} sets its own rounds.` }),
     mode.cpu ? diffPicker() : null,
+    wxPicker(),                                   // weather (58-world)
     mode.crowd ? stepper('Fighters', crowdSize(mode), mode.crowd[0], mode.crowd[1], v => { (MENU.crowd = MENU.crowd || {})[mode.key] = v; saveMenu(); }) : null,
     uiButton('All settings…', () => openScreen('settings', 'maps'), 'link'));
   // The quick settings live in the footer beside Fight!, so they're visible without scrolling past the arenas.
@@ -254,13 +256,17 @@ function menuCfg() {
     loadouts: Array.from({ length: n }, (_, i) => loadoutForMatch(i)),
     winScore: modeUsesRounds(mode) ? SETTINGS.rounds : undefined, hpMul: SETTINGS.hpMul, speed: SETTINGS.speed, fighters: crowdSize(mode),
     orbs: SETTINGS.items !== 'off', orbRate: ITEM_RATES[SETTINGS.items] || 1, killcam: !!SETTINGS.killcam,
+    weather: wxMenuPick(),                        // 58-world: 'random' | 'clear' | a WEATHER key
+    mutators: typeof mutatorsPicked === 'function' ? mutatorsPicked() : [],   // 79-mutators (picked on the arena screen)
+    joined: joinCfg(mode),                        // 93-pads: local players from the join lobby (crowd modes)
   };
 }
 function loadoutForMatch(i) {
   const lo = menuLoadout(i);
   const hat = lo.hat === 'random' ? randomKey(HATS, h => h.key !== 'none') : lo.hat;
   return { weapon: lo.weapon, hat, color: lo.color, skills: lo.skills.map(k => k === 'none' ? null : k), cls: lo.cls,
-    throws: lo.throws.map(k => k === 'none' ? null : k) };
+    throws: lo.throws.map(k => k === 'none' ? null : k), persona: lo.persona,   // persona: the CPU rival (67)
+    look: typeof lookForMatch === 'function' ? lookForMatch(lo, isCpuPicker(i)) : undefined };   // outfit, skins, pet... (98-ui-progress)
 }
 // The saved loadout for picker i, filled with defaults (humans keep owned hats/colours only).
 function menuLoadout(i) {

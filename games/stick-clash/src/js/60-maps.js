@@ -122,7 +122,7 @@ function mapStepTraps(m, id, dt, o) {
 // Generic warning marker: a tinted column that flashes faster as the strike nears, and a target on the ground.
 function mapDrawWarn(ctx, hz, t) {
   if (mapParked(hz) || hz.st !== 'warn') return;
-  const k = 1 - hz.tt / hz.max, on = Math.sin(t * (12 + k * 34)) > -.2, col = hz.warnColor || '#ffd84a';
+  const k = 1 - hz.tt / hz.max, on = SETTINGS.reduceFlash || Math.sin(t * (12 + k * 34)) > -.2, col = hz.warnColor || '#ffd84a';
   const bx = hz.x + hz.w / 2, by = hz.y + hz.h;
   ctx.fillStyle = rgba(col, .05 + .12 * k); ctx.fillRect(hz.x, hz.y, hz.w, hz.h);
   if (on) {
@@ -155,7 +155,7 @@ function mapStepWind(m, dt, o) {
 function mapDrawWind(ctx, m, t, color) {
   const g = m.gust;
   if (!g) return;
-  if (g.st === 'warn' && Math.sin(t * 18) > -.3) {
+  if (g.st === 'warn' && (SETTINGS.reduceFlash || Math.sin(t * 18) > -.3)) {
     ctx.save(); ctx.fillStyle = rgba(color, .75); ctx.font = `30px ${FONT_DISPLAY}`; ctx.textAlign = 'center';
     ctx.fillText(g.dir > 0 ? 'GUST  ›››' : '‹‹‹  GUST', W / 2, 150); ctx.restore();
   }

@@ -36,12 +36,13 @@ on('ko', victim => {
   if (G_STATE.sim || victim.summon) return;
   const deciding = aliveTeams().length <= 1;
   if (!G_STATE.demo) {                    // the attract demo behind the menus stays calm (and cheap)
-    JUICE.chroma = deciding ? 1 : .55;
-    JUICE.koFlash = deciding ? 1 : .6;
+    const fl = fxFlashMul();              // juice level and reduced flashing (84)
+    JUICE.chroma = (deciding ? 1 : .55) * (SETTINGS.reduceFlash ? 0 : fl);
+    JUICE.koFlash = (deciding ? 1 : .6) * fl;
   }
   JUICE.koColor = victim.color;
   CAM.punch = Math.max(CAM.punch || 0, (deciding ? .11 : .06) * FX.shakeMul);
-  if (deciding && !G_STATE.demo) { hitstop(.11); slowmo(1.7, .22); }   // let the final blow land, then savour it
+  if (deciding && !G_STATE.demo) { hitstop(.11); slowmo(1.7 * fxJuice().slow, .22); }   // let the final blow land, then savour it
 });
 
 on('clash', () => hitstop(.045));
@@ -155,10 +156,16 @@ function juiceSettingsExtras(node) {
       g.append(
         toggleField('Replay every K.O.', SETTINGS.killcamAll, set('killcamAll'), 'Off: only the match-deciding K.O. is replayed.'),
         segField('Hit effects', [['sparks', 'Neon sparks'], ['red', 'Red']], SETTINGS.hitFx, set('hitFx')),
-        toggleField('Low-health heartbeat', SETTINGS.heartbeat, set('heartbeat')));
+        toggleField('Low-health heartbeat', SETTINGS.heartbeat, set('heartbeat')),
+        segField('Juice', [['calm', 'Calm'], ['normal', 'Normal'], ['chaos', 'Chaos']], SETTINGS.juice, set('juice')),
+        segField('Bloom glow', [['off', 'Off'], ['low', 'Low'], ['high', 'High']], SETTINGS.bloom, set('bloom')),
+        toggleField('Dynamic lights', SETTINGS.lights !== false, set('lights'), 'Muzzle flashes, fire, blasts and sabers light up the arena.'));
     } else if (title === 'Sound') {
-      const music = toggleField('Music', SETTINGS.musicOn, set('musicOn'), 'Synthwave soundtrack.');
+      const music = toggleField('Music', SETTINGS.musicOn, set('musicOn'), 'A track for every arena; it builds as the fight heats up.');
       g.children.length > 2 ? g.insertBefore(music, g.children[2]) : g.append(music);
+      g.append(segField('Announcer', [['off', 'Off'], ['synth', 'Synth'], ['voice', 'Voice']], SETTINGS.announcer, set('announcer')),
+        sliderField('Announcer volume', SETTINGS.annVol, set('annVol')),
+        toggleField('Crowd', SETTINGS.crowd !== false, set('crowd'), 'Cheers, gasps and boos.'));
     }
   }
   return node;

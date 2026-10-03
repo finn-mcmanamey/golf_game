@@ -1,27 +1,33 @@
 // 90-input.js: keyboard (rebindable, saved via store), gamepads and touch buttons, turned into each human fighter's
 // f.inp. Held things (move, jump held, attack held) are read every frame; presses (jump, attack, skills, dash) are
 // one-shot flags. When only one human is playing, slot 0 answers to both key sets and every gamepad.
+// v3: per-player gamepad maps (remapped in 93-pads), up to 8 players from the join lobby (JOINED), the touch stick's
+// analog axis (91-touch), one-button mode (92-access) and rumble + native haptics scaled by SETTINGS.rumble.
 
-const BIND_ACTIONS = ['left', 'right', 'jump', 'attack', 'skill1', 'skill2', 'dash', 'block', 'grab', 'throw', 'super'];
+const BIND_ACTIONS = ['left', 'right', 'jump', 'attack', 'skill1', 'skill2', 'dash', 'block', 'grab', 'throw', 'super', 'taunt'];
 const ACTION_LABELS = { left: 'Move left', right: 'Move right', jump: 'Jump', attack: 'Attack', skill1: 'Skill 1', skill2: 'Skill 2', dash: 'Dash',
-  block: 'Block (hold)', grab: 'Grab / throw', throw: 'Throwable', super: 'Super' };
+  block: 'Block (hold)', grab: 'Grab / throw', throw: 'Throwable', super: 'Super', taunt: 'Taunt' };
 // v3 actions sit next to each hand: P1 F block, C grab, R throwable, X super; P2 , block, L grab, ; throwable, Enter super.
 const DEFAULT_BINDS = [
   { left: 'KeyA', right: 'KeyD', jump: 'KeyW', attack: 'KeyS', skill1: 'KeyQ', skill2: 'KeyE', dash: 'ShiftLeft',
-    block: 'KeyF', grab: 'KeyC', throw: 'KeyR', super: 'KeyX' },
+    block: 'KeyF', grab: 'KeyC', throw: 'KeyR', super: 'KeyX', taunt: 'KeyT' },
   { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', attack: 'ArrowDown', skill1: 'Period', skill2: 'Slash', dash: 'ShiftRight',
-    block: 'Comma', grab: 'KeyL', throw: 'Semicolon', super: 'Enter' },
+    block: 'Comma', grab: 'KeyL', throw: 'Semicolon', super: 'Enter', taunt: 'Quote' },
 ];
 // Standard gamepad layout: A jump, B skill 1, X attack, Y skill 2, LB throwable, RB dash, LT block (hold), RT grab,
-// R3 (right stick click) super, Start pause, d-pad move. Kept as data so a later remapping screen can edit it.
-const PAD_BUTTONS = { jump: 0, skill1: 1, attack: 2, skill2: 3, throw: 4, dash: 5, block: 6, grab: 7, super: 11, pause: 9, left: 14, right: 15 };
+// R3 (right stick click) super, Start pause, d-pad move. These are the defaults; PAD_MAPS holds each player's own map.
+const PAD_BUTTONS = { jump: 0, skill1: 1, attack: 2, skill2: 3, throw: 4, dash: 5, block: 6, grab: 7, super: 11, pause: 9, left: 14, right: 15, taunt: 12 };   // taunt: d-pad up
 const DOUBLE_TAP_MS = 260;
 
 let BINDS = loadBinds();
 const KEYS = new Set();            // key codes currently held
 const TOUCH = new Set();           // actions held on the on-screen buttons (slot 0)
+const TOUCH_AXIS = { mx: 0 };      // the touch stick's analog x (91-touch), slot 0
 let PADS = [];                     // per connected pad: { slot, held: {action: bool}, axis }
-const TAPS = [{}, {}];             // last left/right press per slot, for double-tap dash
+const TAPS = Array.from({ length: MAX_FIGHTERS }, () => ({}));   // last left/right press per slot, for double-tap dash
+// Players who joined in the party lobby (93-pads), in join order: [{ pad: gamepad index } | { keys: 0 | 1 }].
+// While set, player n is driven only by its own entry. null = the classic rules (pad n -> P(n+1), both key sets in 1P).
+let JOINED = null;
 let KEY_CAPTURE = null;            // set by the rebinding UI: the next key goes to this callback
 
 // Saved binds from before v3 lack the new actions: their defaults are added unless that key is already taken.
@@ -66,7 +72,11 @@ function keyLabel(code, short) {
 
 const humanCount = () => G_STATE.roster.filter(r => r.ctrl === 'human').length;
 // Binding sets a slot listens to: in one-human modes, slot 0 accepts both.
-const bindsFor = slot => humanCount() <= 1 && slot === 0 ? BINDS : [BINDS[slot]].filter(Boolean);
+function bindsFor(slot) {
+  if (JOINED) { const j = JOINED[slot]; return j && j.keys != null ? [BINDS[j.keys]] : []; }
+  return humanCount() <= 1 && slot === 0 ? BINDS : [BINDS[slot]].filter(Boolean);
+}
+const keySlots = () => JOINED ? JOINED.map((_, i) => i) : [0, 1];
 const humansIn = slot => F.filter(f => f.ctrl === 'human' && !f.autopilot && f.slot === slot);
 // Short label of the key for an action (shown on HUD skill icons).
 function keyHint(slot, action) { const b = BINDS[slot]; return b ? keyLabel(b[action], true) : ''; }
@@ -103,11 +113,11 @@ function onKeyDown(e) {
   if (e.code === 'KeyM' && !typing) { toggleMute(); return; }
   KEYS.add(e.code);
   if (G_STATE.state !== 'play') return;
-  for (const slot of [0, 1]) for (const b of bindsFor(slot)) for (const a of BIND_ACTIONS) if (b[a] === e.code) pressAction(slot, a);
+  for (const slot of keySlots()) for (const b of bindsFor(slot)) for (const a of BIND_ACTIONS) if (b[a] === e.code) pressAction(slot, a);
 }
 addEventListener('keydown', onKeyDown);
 addEventListener('keyup', e => KEYS.delete(e.code));
-addEventListener('blur', () => { KEYS.clear(); TOUCH.clear(); });
+addEventListener('blur', () => { KEYS.clear(); TOUCH.clear(); TOUCH_AXIS.mx = 0; });
 // Switching tabs mid-fight pauses instead of letting the CPU win while you're away.
 document.addEventListener('visibilitychange', () => { if (document.hidden && G_STATE.state === 'play' && humanCount() > 0) setState('paused'); });
 
@@ -121,10 +131,12 @@ function heldAction(slot, act) {
 function readHuman(f) {
   let mx = (heldAction(f.slot, 'right') ? 1 : 0) - (heldAction(f.slot, 'left') ? 1 : 0);
   for (const p of PADS) if (p.slot === f.slot && Math.abs(p.axis) > .3 && !mx) mx = p.axis;
+  if (f.slot === 0 && !mx) mx = TOUCH_AXIS.mx;
   f.inp.mx = clamp(mx, -1, 1);
   f.inp.jumpHeld = heldAction(f.slot, 'jump');
   f.inp.attackHeld = heldAction(f.slot, 'attack');
   f.inp.blockHeld = heldAction(f.slot, 'block');
+  if (oneButtonOn(f.slot)) oneButtonDrive(f);   // 92-access: auto-move, the one button attacks / blocks / skills
 }
 
 // ---------- gamepads ----------
@@ -138,8 +150,24 @@ let PAD_POLL_STATE = null;         // game state at the last poll
 function readPadList() {
   try { return navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : []; } catch (e) { return []; }
 }
-function padButtonDown(gp, action) {
-  return [PAD_BUTTONS[action], ...(PAD_ALT[action] || [])].some(i => { const b = gp.buttons[i]; return !!b && (b.pressed || b.value > .5); });
+// Each player's pad map: the defaults plus their saved changes from the remapping screen (store 'padmap').
+let PAD_MAPS = loadPadMaps();
+function loadPadMaps() {
+  const saved = store.get('padmap', null);
+  return Array.from({ length: MAX_FIGHTERS }, (_, i) => Object.assign({}, PAD_BUTTONS, saved && saved[i]));
+}
+const padMapFor = slot => PAD_MAPS[slot] || PAD_BUTTONS;
+const padPressed = (gp, i) => { const b = gp.buttons[i]; return !!b && (b.pressed || b.value > .5); };
+// An alternative button (Back for super) only counts while the player hasn't given it another job.
+function padButtonDown(gp, action, slot = 0) {
+  const map = padMapFor(slot), used = Object.values(map);
+  const alt = (PAD_ALT[action] || []).filter(i => !used.includes(i));
+  return [map[action], ...alt].some(i => padPressed(gp, i));
+}
+// Which player a pad drives: its place in the join lobby (-1 = didn't join), else the classic rules.
+function padSlot(gp, n, solo) {
+  if (JOINED) return JOINED.findIndex(j => j.pad === gp.index);
+  return solo ? 0 : Math.min(n, Math.max(1, humanCount() - 1));
 }
 
 function pollPads() {
@@ -150,12 +178,12 @@ function pollPads() {
   PAD_POLL_STATE = G_STATE.state;
   PADS = list.map((gp, n) => {
     const old = PAD_HELD.get(gp.index) || {}, held = {};
-    const slot = solo ? 0 : Math.min(n, 1);
+    const slot = padSlot(gp, n, solo);
     for (const a in PAD_BUTTONS) {
-      held[a] = padButtonDown(gp, a);
+      held[a] = padButtonDown(gp, a, Math.max(slot, 0));
       if (held[a] && !old[a] && !changed) {
         if (a === 'pause') togglePause();
-        else pressAction(slot, a);
+        else if (slot >= 0) pressAction(slot, a);
         emit('pad', a, slot);      // lets menus react to gamepad buttons
       }
     }
@@ -170,7 +198,8 @@ const padLabel = gp => (gp && gp.id ? gp.id.replace(/\s*\(.*\)/, '').slice(0, 40
 // Hot-plugging: say which player a new pad drives; losing a pad mid-fight pauses so nobody is left helpless.
 addEventListener('gamepadconnected', e => {
   const n = readPadList().findIndex(gp => gp.index === e.gamepad.index);
-  const who = humanCount() >= 2 ? 'Player ' + (Math.min(Math.max(n, 0), 1) + 1) : 'Player 1';
+  const slot = padSlot(e.gamepad, Math.max(n, 0), humanCount() <= 1);
+  const who = slot < 0 ? 'nobody yet (join in the lobby)' : 'Player ' + (slot + 1);
   if (typeof toast === 'function') toast('Gamepad connected', `${padLabel(e.gamepad)} → ${who}`, '🎮', '#5ef2ff');
 });
 addEventListener('gamepaddisconnected', e => {
@@ -179,74 +208,85 @@ addEventListener('gamepaddisconnected', e => {
   if (G_STATE.state === 'play' && humanCount() > 0) setState('paused');
 });
 
-// Rumble the pads of a human fighter (strength 0..1). Silently does nothing where vibration isn't supported.
+// Rumble the pads of a human fighter (strength 0..1, scaled by SETTINGS.rumble). Silently does nothing where
+// vibration isn't supported.
 function padRumble(f, strength, ms) {
-  if (G_STATE.sim || f.ctrl !== 'human' || f.autopilot || !PADS.length) return;
-  const all = readPadList();
+  const k = SETTINGS.rumble ?? .8;
+  if (G_STATE.sim || f.ctrl !== 'human' || f.autopilot || !PADS.length || k <= 0) return;
+  const all = readPadList(), s = clamp(strength * k, 0, 1);
   for (const p of PADS) {
     if (p.slot !== f.slot) continue;
     const gp = all.find(g => g.index === p.id), act = gp && gp.vibrationActuator;
     if (!act || !act.playEffect) continue;
     try {
-      const r = act.playEffect('dual-rumble', { duration: ms, strongMagnitude: clamp(strength, 0, 1), weakMagnitude: clamp(strength * .7, 0, 1) });
+      const r = act.playEffect('dual-rumble', { duration: ms, strongMagnitude: s, weakMagnitude: clamp(s * .7, 0, 1) });
       if (r && r.catch) r.catch(() => {});
     } catch (e) { /* unsupported */ }
   }
 }
+
+// Phone haptics: the iOS app's bridge (StickClashNative.haptic, expo-haptics styles light/medium/heavy/soft/rigid/
+// success/warning/error/selection), else navigator.vibrate. Rate-limited so a combo doesn't become one long buzz;
+// results (success/error) always get through.
+const HAPTIC = { at: 0, gap: 90 };
+const HAPTIC_MS = { light: 10, selection: 8, soft: 12, medium: 20, rigid: 18, heavy: 35, success: 40, warning: 30, error: 60 };
+function nativeHaptic(style) {
+  if (SETTINGS.haptics === false || (SETTINGS.rumble ?? .8) <= 0) return;
+  const now = performance.now();
+  if (style !== 'success' && style !== 'error' && now - HAPTIC.at < HAPTIC.gap) return;
+  HAPTIC.at = now;
+  const native = window.StickClashNative;
+  try {
+    if (native && typeof native.haptic === 'function') native.haptic(style);
+    else if (IS_TOUCH && navigator.vibrate) navigator.vibrate(HAPTIC_MS[style] || 20);
+  } catch (e) { /* best effort */ }
+}
+// One place for "this player felt something": pad rumble for that player, phone haptics for P1 (the device owner).
+function feel(f, strength, ms, style) {
+  if (!f || G_STATE.sim || G_STATE.demo || f.ctrl !== 'human' || f.autopilot) return;
+  padRumble(f, strength, ms);
+  if (f.slot === 0 && style) nativeHaptic(style);
+}
 on('damage', (B, amt, o) => {
   if (!o || o.small) return;
-  padRumble(B, clamp(amt / 25, .2, 1), 70 + amt * 5);
-  if (o.src && o.src !== B) padRumble(o.src, clamp(amt / 50, .08, .4), 50);   // a lighter buzz for landing the hit
+  feel(B, clamp(amt / 25, .2, 1), 70 + amt * 5, amt >= 18 ? 'heavy' : 'medium');
+  if (o.src && o.src !== B) feel(o.src, clamp(amt / 50, .08, .4), 50, 'light');   // a lighter buzz for landing the hit
 });
-on('ko', victim => padRumble(victim, 1, 380));
+on('ko', (victim, killer) => {
+  feel(victim, 1, 380, 'error');
+  if (killer && killer !== victim) feel(killer, .6, 200, 'success');
+});
+on('parry', (B, A) => { feel(B, .55, 120, 'rigid'); feel(A, .35, 90, 'warning'); });
+on('guardBreak', f => feel(f, .7, 220, 'warning'));
+on('ultimate', f => feel(f, 1, 520, 'heavy'));
 
 // ---------- touch ----------
 // Shown only on touch-first devices (coarse pointer), during play, and hidden again once a keyboard is used.
+// Movement is the floating stick and the right side takes swipes (91-touch); these are the action buttons.
 const TOUCH_EL = document.getElementById('touch');
 const IS_TOUCH = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 let TOUCH_KEYBOARD = false;          // a hardware key was pressed on a touch device: hide the buttons
-const TOUCH_MOVES = ['left', 'right'];
 
 function touchButton(act) { return TOUCH_EL && TOUCH_EL.querySelector(`button[data-act="${act}"]`); }
 
-// The move button nearest a finger's x (so sliding from ◀ to ▶ switches direction without lifting).
-function touchMoveAt(clientX) {
-  let best = null, bestD = Infinity;
-  for (const a of TOUCH_MOVES) {
-    const b = touchButton(a), r = b && b.getBoundingClientRect();
-    if (!r) continue;
-    const d = Math.abs(clientX - (r.left + r.width / 2));
-    if (d < bestD) { bestD = d; best = a; }
-  }
-  return best;
-}
+// Holds a touch action while it is pressed (presses once on the way down). Shared with the stick and swipes.
+function touchHold(act) { if (!TOUCH.has(act)) { TOUCH.add(act); pressAction(0, act); } }
+function touchRelease(act) { TOUCH.delete(act); }
 
 function bindTouchButton(btn) {
-  const act = btn.dataset.act, isMove = TOUCH_MOVES.includes(act);
-  let cur = null;                   // the action this finger holds right now
-  const hold = a => {
-    if (cur === a) return;
-    release();
-    cur = a; TOUCH.add(a);
-    const b = touchButton(a); if (b) b.classList.add('on');
-    pressAction(0, a);
-  };
-  const release = () => {
-    if (!cur) return;
-    TOUCH.delete(cur);
-    const b = touchButton(cur); if (b) b.classList.remove('on');
-    cur = null;
-  };
+  const act = btn.dataset.act;
+  let held = false;                  // one finger per button: the button is held until that finger lifts
+  const release = () => { if (!held) return; held = false; touchRelease(act); btn.classList.remove('on'); };
   btn.addEventListener('pointerdown', e => {
     e.preventDefault();
     initAudio();
     if (e.pointerType === 'touch') { TOUCH_KEYBOARD = false; updateTouchUI(); }
     if (act === 'pause') { togglePause(); return; }
-    if (isMove && btn.setPointerCapture) { try { btn.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ } }
-    hold(act);
+    held = true; btn.classList.add('on');
+    touchHold(act);
+    nativeHaptic('selection');
   });
-  if (isMove) btn.addEventListener('pointermove', e => { if (cur) { const a = touchMoveAt(e.clientX); if (a) hold(a); } });
-  for (const ev of ['pointerup', 'pointercancel', ...(isMove ? [] : ['pointerleave'])]) btn.addEventListener(ev, release);
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) btn.addEventListener(ev, release);
 }
 
 function bindTouch() {
@@ -258,7 +298,8 @@ bindTouch();
 function updateTouchUI() {
   if (!TOUCH_EL) return;
   TOUCH_EL.hidden = !(IS_TOUCH && !TOUCH_KEYBOARD && G_STATE.state === 'play' && humanCount() > 0);
-  if (TOUCH_EL.hidden) { TOUCH.clear(); for (const b of TOUCH_EL.querySelectorAll('.on')) b.classList.remove('on'); }
+  if (TOUCH_EL.hidden) { TOUCH.clear(); TOUCH_AXIS.mx = 0; for (const b of TOUCH_EL.querySelectorAll('.on')) b.classList.remove('on'); }
+  touchLayout();                     // 91-touch: size, opacity and the thumb arc for the current screen
 }
 on('state', updateTouchUI);
 

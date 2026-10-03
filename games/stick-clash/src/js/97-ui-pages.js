@@ -54,7 +54,7 @@ SCREENS.controls = () => {
   const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
   const padRows = [['Stick / D-pad', 'Move'], ['A', 'Jump (again in the air: double jump; at a wall: wall jump)'], ['X', 'Attack'], ['B', 'Skill 1'],
     ['Y', 'Skill 2'], ['RB', 'Dash'], ['LT (hold)', 'Block · tap it just before a hit to parry'], ['RT', 'Grab, press again to throw'],
-    ['LB', 'Throwable'], ['R3 · Back', 'Super (when the meter is full)'], ['Start', 'Pause'], ['In menus', 'D-pad moves, A selects, B goes back']];
+    ['LB', 'Throwable'], ['R3 · Back', 'Super (when the meter is full)'], ['D-pad ↑', 'Taunt (from a safe distance: a little super)'], ['Start', 'Pause'], ['In menus', 'D-pad moves, A selects, B goes back']];
   const padCard = el('section', { class: 'set-group' }, el('h3', { text: 'Gamepads' }),
     el('p', { class: 'hint', text: pads.length ? `Connected: ${pads.map(p => p.id.replace(/\s*\(.*\)/, '')).join(', ')}` : 'No gamepad found. Plug one in and press a button.' }),
     el('dl', { class: 'pad-map' }, padRows.map(([k, v]) => [el('dt', {}, el('kbd', { text: k })), el('dd', { text: v })])),

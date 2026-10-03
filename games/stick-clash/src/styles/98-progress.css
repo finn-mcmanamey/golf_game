@@ -1,0 +1,65 @@
+/* 98-progress.css: Look tab, presets + Fighter Creator, Track & Quests, Codex, mutators, XP box (98-ui-progress.js). */
+.menu-trio { grid-template-columns: repeat(3, 1fr); }
+.menu-trio .menu-item { padding-left: 12px; padding-right: 8px; }
+.menu-trio .mi-label { font-size: 17px; }
+.menu-pair .menu-item small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lvl-badge { display: inline-flex; align-items: baseline; gap: 6px; padding: 5px 12px; border-radius: 99px; border: 1px solid rgba(94, 242, 255, .5);
+  background: rgba(10, 30, 40, .7); color: #5ef2ff; font-size: 12px; }
+.lvl-badge b { font: 400 15px var(--display); }
+
+.look-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+.look-tile .big-icon { font-size: 26px; min-height: 40px; }
+.look-tile.locked .big-icon { filter: grayscale(1) opacity(.5); }
+
+.preset-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.preset-bar .lbl { font: 600 12px var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin-right: 4px; }
+.preset-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 99px; font-size: 13px; }
+.preset-chip i, .cr-card > i { width: 10px; height: 10px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 8px var(--pc); }
+.preset-chip.sel { border-color: var(--pc); }
+.cr-name { font: 600 16px var(--body); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(0, 0, 0, .3); color: inherit; }
+.cr-pane .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.cr-list { display: grid; gap: 6px; }
+.cr-card { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px;
+  border: 1px solid var(--line); background: rgba(14, 16, 32, .6); }
+.cr-card.sel { border-color: var(--pc); }
+.cr-card small { display: block; color: var(--dim); font-size: 12px; }
+.cr-card button { padding: 6px 12px; }
+.wrap-seg .seg { flex-wrap: wrap; }
+
+.lvl-bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid rgba(94, 242, 255, .35); background: rgba(10, 24, 36, .6); }
+.lvl-num { font: 400 24px var(--display); color: #5ef2ff; }
+.lvl-bar span { font-variant-numeric: tabular-nums; color: var(--dim); font-size: 13px; }
+.lvl-bar em { font-style: normal; color: var(--gold); font-size: 13px; }
+.lvl-track { height: 8px; border-radius: 99px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.lvl-track i { display: block; height: 100%; background: linear-gradient(90deg, #5ef2ff, #9dff5a); box-shadow: 0 0 10px #5ef2ff; }
+.track-grid { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); }
+.track-tile { opacity: .55; font-size: 11px; text-align: center; }
+.track-tile small { color: var(--faint); font-size: 11px; }
+.track-tile .big-icon { font-size: 22px; min-height: 30px; }
+.track-tile.item { border-color: rgba(185, 140, 255, .45); }
+.track-tile.got { opacity: 1; border-color: rgba(94, 242, 255, .6); background: rgba(94, 242, 255, .07); }
+.track-tile.next { opacity: 1; border-color: var(--gold); box-shadow: 0 0 14px -4px var(--gold); }
+.quest-wrap { display: grid; gap: 10px; }
+.q-side { display: grid; gap: 6px; justify-items: end; }
+.q-reroll { padding: 4px 9px; font-size: 12px; }
+.codex-tabs { margin-bottom: 2px; }
+.codex-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.codex-card { align-items: start; }
+.codex-card .cx-lore { display: block; margin-top: 4px; font-style: italic; color: var(--dim); font-size: 12px; }
+.cx-stats { display: flex; gap: 12px; margin-top: 6px; font-size: 11px; color: var(--faint); }
+.cx-stats b { color: var(--gold); }
+.mut-panel { display: grid; gap: 8px; }
+.mut-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.mut-chip { display: inline-flex; gap: 6px; align-items: center; padding: 6px 12px; border-radius: 99px; }
+.mut-chip b { font-size: 16px; }
+.mut-chip strong { font-size: 13px; }
+.mut-chip[aria-pressed="true"] { border-color: #ff5ad1; background: rgba(255, 90, 209, .12); box-shadow: 0 0 14px -6px #ff5ad1; }
+.xp-box { border-color: rgba(94, 242, 255, .45); }
+.xp-box .reward-total b { color: #5ef2ff; }
+.xp-lvl { margin-left: auto; font: 400 16px var(--display); color: #5ef2ff; }
+@media (max-width: 640px) {
+  .menu-trio .mi-label { font-size: 15px; }
+  .lvl-bar { grid-template-columns: auto minmax(0, 1fr); }
+  .codex-grid { grid-template-columns: 1fr; }
+}

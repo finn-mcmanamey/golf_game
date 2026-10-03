@@ -1,0 +1,41 @@
+/* 92-access.css: touch stick + gesture zones + thumb arc (91-touch), join lobby and pad remap (93-pads), transfer
+   screen (94-savecode) and the accessibility settings links. Button sizes and arc positions are set inline by
+   touchLayout(); --to is the player's touch opacity and --sr the stick radius. */
+#touch .tzone { position: absolute; top: 14%; bottom: 0; pointer-events: auto; touch-action: none; }
+#touch .tzone-l { left: 0; width: 44%; }
+#touch .tzone-r { right: 0; width: 56%; }
+@media (orientation: portrait) { #touch .tzone-l { width: 40%; } #touch .tzone-r { width: 60%; } }
+#touch .tstick { position: absolute; left: 0; top: 0; width: calc(var(--sr, 56px) * 2); height: calc(var(--sr, 56px) * 2); border-radius: 50%;
+  border: 2px solid rgba(170, 180, 255, .35); background: rgba(20, 22, 44, .22); pointer-events: none; opacity: calc(var(--to, .8) * .45);
+  transform: translate(max(28px, env(safe-area-inset-left)), calc(100vh - var(--sr, 56px) * 2 - 40px)); }
+#touch .tstick.live { opacity: var(--to, .8); }
+#touch .tstick i { position: absolute; left: 50%; top: 50%; width: 46%; height: 46%; margin: -23% 0 0 -23%; border-radius: 50%;
+  background: rgba(94, 242, 255, .5); border: 2px solid rgba(94, 242, 255, .85); box-shadow: 0 0 14px rgba(94, 242, 255, .5); }
+#touch .tarc { position: absolute; right: env(safe-area-inset-right); bottom: env(safe-area-inset-bottom); width: 0; height: 0; }
+#touch .tarc button { position: absolute; opacity: var(--to, .8); }
+#touch.one .tzone-l, #touch.one .tarc button:not([data-act="attack"]) { display: none; }
+#touch.one .tzone-r { left: 0; width: 100%; top: 0; }
+#touch.one .tarc button[data-act="attack"] { pointer-events: none; }
+
+.join-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 12px; outline: none; }
+.join-card { --jc: var(--p1); display: grid; gap: 6px; justify-items: start; padding: 14px; border-radius: 12px; min-height: 104px;
+  border: 2px solid var(--jc); background: rgba(20, 22, 44, .7); box-shadow: 0 0 14px color-mix(in srgb, var(--jc) 35%, transparent); }
+.join-card b { font: 400 26px var(--display); color: var(--jc); }
+.join-card span { font-size: 13px; color: var(--fg); }
+.join-card.empty { --jc: rgba(160, 170, 255, .25); border-style: dashed; box-shadow: none; }
+.join-card.empty span { color: var(--dim); animation: join-pulse 1.6s ease-in-out infinite; }
+@keyframes join-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .join-card.empty span { animation: none; } }
+.padbinds { grid-template-columns: auto 1fr; }
+
+.access-links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.xfer-code { width: 100%; box-sizing: border-box; font: 12px/1.4 ui-monospace, monospace; color: var(--fg); background: rgba(5, 6, 14, .7);
+  border: 1px solid rgba(160, 170, 255, .3); border-radius: 8px; padding: 8px; resize: vertical; word-break: break-all; }
+.xfer-msg { min-height: 1.3em; color: var(--gold); margin: 0 0 8px; }
+.xfer-preview { grid-column: 1 / -1; border-color: var(--gold); }
+.xfer-facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 8px 0; }
+.xfer-facts dt { color: var(--dim); }
+.xfer-rows { list-style: none; padding: 0; margin: 0; display: grid; gap: 3px; font-size: 14px; }
+.xfer-rows b { display: inline-block; min-width: 72px; font-weight: 600; text-transform: uppercase; font-size: 11px; }
+.xfer-new b { color: #7dffcf; } .xfer-changed b { color: var(--gold); } .xfer-removed b { color: #ff6a7a; }
+button.danger { border-color: #ff4a6a; color: #ff8a9a; }

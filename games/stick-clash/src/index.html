@@ -11,24 +11,21 @@
 <!-- The arena is one full-bleed canvas. Every menu, pause and results panel is built by 95-ui.js inside #ui. -->
 <canvas id="c" aria-label="Stick Clash arena"></canvas>
 <div id="ui"></div>
-<!-- On-screen controls for touch devices; 90-input.js shows them only during play on a coarse pointer. -->
+<!-- Touch controls (90-input shows them in play on a coarse pointer; 91-touch: stick, swipes, button arc). -->
 <div id="touch" hidden>
-  <div class="tpad tpad-l">
-    <button data-act="left" aria-label="Move left">&#9664;</button>
-    <button data-act="right" aria-label="Move right">&#9654;</button>
-  </div>
-  <div class="tpad tpad-r">
-    <div class="tsmall">
-      <button data-act="super" class="small" aria-label="Super">&#9733;</button>
-      <button data-act="throw" class="small" aria-label="Throwable">&#9679;</button>
-      <button data-act="grab" class="small" aria-label="Grab or throw">&#9995;</button>
-    </div>
-    <button data-act="skill1" aria-label="Skill 1">S1</button>
-    <button data-act="skill2" aria-label="Skill 2">S2</button>
-    <button data-act="dash" aria-label="Dash">&raquo;</button>
-    <button data-act="block" aria-label="Block (hold)">&#9670;</button>
+  <div class="tzone tzone-l"><div class="tstick"><i></i></div></div>
+  <div class="tzone tzone-r"></div>
+  <div class="tarc">
     <button data-act="attack" class="big" aria-label="Attack">&#9876;</button>
     <button data-act="jump" class="big" aria-label="Jump">&#9650;</button>
+    <button data-act="skill1" aria-label="Skill 1">S1</button>
+    <button data-act="skill2" aria-label="Skill 2">S2</button>
+    <button data-act="block" aria-label="Block (hold)">&#9670;</button>
+    <button data-act="dash" aria-label="Dash">&raquo;</button>
+    <button data-act="super" class="small" aria-label="Super">&#9733;</button>
+    <button data-act="throw" class="small" aria-label="Throwable">&#9679;</button>
+    <button data-act="grab" class="small" aria-label="Grab or throw">&#9995;</button>
+    <button data-act="taunt" class="small" aria-label="Taunt">&#9996;</button>
   </div>
   <button data-act="pause" class="tpause" aria-label="Pause">II</button>
 </div>

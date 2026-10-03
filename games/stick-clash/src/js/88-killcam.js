@@ -67,7 +67,9 @@ function kcEvent(kind, args) {
 FX_RECORD = kcEvent;
 SFX_RECORD = (name, vol) => kcEvent('sfx', [name, vol]);
 
-function kcReset() { KC.frames.length = 0; KC.events.length = 0; KC.lastKO = null; KC.pending = null; }
+function kcReset() {
+  hlFlush(true);              // highlight clips copy their K.O. history first (89)
+  KC.frames.length = 0; KC.events.length = 0; KC.lastKO = null; KC.pending = null; }
 
 on('ko', (victim, killer, o) => {
   if (G_STATE.sim || G_STATE.demo || victim.summon) return;
@@ -91,6 +93,7 @@ on('matchStart', () => { kcAbort(); kcReset(); });
 
 // ---------- playback ----------
 function kcStart(resume) {
+  hlFlush(true);
   const ko = KC.pending, frames = KC.frames;
   KC.pending = null;
   if (!ko || frames.length < 2) return;
@@ -158,7 +161,7 @@ function kcUpdate(dt) {
   if (P.clock >= P.t1 && (P.endT += dt) > .45) kcStop();
 }
 
-const KC_FX = { burst, float, ring, beam, flashScreen, shake, sfx };
+const KC_FX = { burst, float, ring, beam, flashScreen, shake, sfx, impact: postfxImpact };
 function kcFireEvents(clock) {
   const P = KC.play, list = KC.events;
   while (P.ev < list.length && list[P.ev].t <= clock) {
@@ -247,7 +250,7 @@ function kcDrawOverlay(c2) {
   c2.fillStyle = 'rgba(255,255,255,.12)'; c2.fillRect(0, bar - 3, W, 3);
   c2.fillStyle = '#ff4a6a'; c2.fillRect(0, bar - 3, W * prog, 3);
   if (P.endT > 0) { c2.fillStyle = `rgba(5,6,12,${clamp(P.endT / .45, 0, 1) * .9})`; c2.fillRect(0, 0, W, H); }
-  if (P.real < .25) { c2.fillStyle = `rgba(255,255,255,${(1 - P.real / .25) * .35})`; c2.fillRect(0, 0, W, H); }
+  if (P.real < .25) { c2.fillStyle = `rgba(255,255,255,${(1 - P.real / .25) * .35 * fxFlashMul()})`; c2.fillRect(0, 0, W, H); }
 }
 
 function kcDrawTag(c2, y) {

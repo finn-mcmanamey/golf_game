@@ -68,6 +68,7 @@ function collidePoint(p, friction, feetY = null) {
   if (p.y < CEILING) p.y = CEILING;
   if (m.floor != null && p.y > m.floor) land(p, m.floor, friction, null);
   for (const s of m.solids) collideSolid(p, s, friction, feetY);
+  if (m.collide) m.collide(p, friction);   // extra map shapes (58-world/63-maps: round planetoids)
 }
 
 function collideSolid(p, s, friction, feetY) {

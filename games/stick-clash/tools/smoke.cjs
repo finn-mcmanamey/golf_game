@@ -498,6 +498,54 @@ async function testV3Core(page) {
 
 // Real-time screens of the v3 features (read them after a run): an 8-fighter brawl, a mounted fighter, an ultimate's
 // cut-in, the shatter replayed in the kill-cam, and the loadout's class and throwable tabs.
+// v3 party modes (71-73), the ranked ladder and multi-phase bosses (74): each party mode must reach its results
+// headless (CPUs play the objective), bossPhases must fire its phases and clean up its adds.
+const PARTY_MODES = ['ctf', 'soccer', 'potato', 'gungame', 'juggernaut', 'zombies', 'royale', 'lava', 'ranked'];
+async function testPartyModes(page) {
+  fs.mkdirSync(SHOTS, { recursive: true });
+  for (const k of PARTY_MODES) {
+    const r = await page.evaluate(k => {
+      if (!SC.reg.MODES[k]) return { missing: true };
+      const e0 = SC.errors.length;
+      SC.start({ mode: k, autopilot: true, map: 'random' });
+      let t = 0;
+      while (SC.G.state !== 'over' && t < 300) { SC.sim(5); t += 5; }
+      const out = { over: SC.G.state === 'over', t, title: SC.G.result && SC.G.result.title, errors: SC.errors.slice(e0).map(e => e.msg) };
+      SC.start({ mode: k, autopilot: true, map: 'random' }); SC.sim(8); BANNER = null;
+      for (let i = 0; i < 10; i++) SC.render(1 / 60);
+      return out;
+    }, k);
+    if (r.missing) { check(false, `party mode ${k}: not registered`); continue; }
+    await page.screenshot({ path: path.join(SHOTS, `mode-${k}.png`) });
+    const ok = check(r.over && !!r.title, `party mode ${k}: no result after ${r.t}s`) & check(!r.errors.length, `party mode ${k}: errors ${r.errors.join(' | ')}`);
+    rows.push({ kind: 'party', key: k, ok: !!ok, note: r.over ? `${r.title} (${r.t}s)` : 'unfinished' });
+  }
+  const b = await page.evaluate(() => {
+    const e0 = SC.errors.length, out = {};
+    SC.start({ mode: 'bossrush', autopilot: true, map: 'neon' }); SC.G.lock = 0; SC.sim(.2);
+    const boss = SC.F.find(f => f.isBoss), ctl = bossPhaseCtl(boss);
+    boss.hp = boss.maxHp * .45; SC.sim(.3);
+    out.p2 = ctl && ctl.idx === 1 && BANNER && BANNER.a === ctl.phases[0].name;
+    boss.hp = boss.maxHp * .2; SC.sim(.3);
+    out.p3 = ctl && ctl.idx === 2 && PROJ.filter(p => p.kind === 'mode-hazard').length >= 2;
+    SC.start({ mode: 'watch', map: 'neon', weapons: ['blade', 'blade'] }); SC.G.lock = 0;
+    const c2 = bossPhases(SC.F[1], [{ at: .5, name: 'TEST PHASE', fx: [['adds', { n: 2 }], ['rain', { every: .2, first: 0 }], ['platforms', {}]] }]);
+    SC.F[1].hp = SC.F[1].maxHp * .4; SC.sim(.5);
+    out.adds = SC.F.filter(f => f.summon && f.owner === SC.F[1]).length === 2 && PROJ.some(p => p.zone && p.danger > 0);
+    knockout(SC.F[1], SC.F[0]); SC.sim(.2);
+    out.cleanup = c2.done && !SC.F.some(f => f.summon && f.alive);
+    out.rank = rankOf(0).label === 'Bronze III' && rankOf(299).label === 'Bronze I' && rankOf(300).label === 'Silver III' && rankOf(RANK_GM + 50).gm
+      && rankSettle(true, true).delta > 0;
+    out.errors = SC.errors.slice(e0).map(e => e.msg);
+    return out;
+  });
+  for (const k of ['p2', 'p3', 'adds', 'cleanup', 'rank']) {
+    check(b[k], `boss phases / ranked: ${k} failed`);
+    rows.push({ kind: 'v3-modes', key: k, ok: !!b[k] });
+  }
+  check(!b.errors.length, 'boss phases: errors ' + b.errors.join(' | '));
+}
+
 async function testV3Screens(browser) {
   const { page, errors } = await newPage(browser);
   const step = async (name, fn) => { try { const ok = await fn(); check(ok, `ui ${name}: failed`); rows.push({ kind: 'ui', key: name, ok: !!ok }); } catch (e) { check(false, `ui ${name}: ${e.message}`); rows.push({ kind: 'ui', key: name, ok: false }); } };
@@ -588,12 +636,13 @@ async function testTouch(browser) {
   await page.waitForTimeout(1500);
   const visible = await page.isVisible('#touch');
   const x0 = await page.evaluate(() => SC.F[0].P[2].x);
-  const box = await page.locator('#touch [data-act="right"]').boundingBox();
-  if (box) {
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.down(); await page.waitForTimeout(400); await page.mouse.up();
-  }
-  const moved = (await page.evaluate(() => SC.F[0].P[2].x)) - x0;
+  // The floating stick (91-touch): a thumb lands on the left side and drags toward the foe.
+  const cdp = await ctx.newCDPSession(page), dir = x0 < 640 ? 1 : -1;
+  const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts });
+  await touch('touchStart', [{ x: 170, y: 300, id: 1 }]);
+  for (let k = 1; k <= 6; k++) await touch('touchMove', [{ x: 170 + dir * k * 10, y: 300, id: 1 }]);
+  await page.waitForTimeout(400); await touch('touchEnd', []);
+  const moved = Math.abs((await page.evaluate(() => SC.F[0].P[2].x)) - x0);
   const bb = await page.locator('#touch [data-act="block"]').boundingBox();
   let guard = false;
   if (bb) {
@@ -602,10 +651,10 @@ async function testTouch(browser) {
     guard = await page.evaluate(() => SC.F[0].blocking);
     await page.mouse.up();
   }
-  const v3Buttons = await page.evaluate(() => ['super', 'throw', 'grab', 'block'].every(a => { const b = document.querySelector(`#touch [data-act="${a}"]`); return b && b.offsetParent !== null; }));
+  const v3Buttons = await page.evaluate(() => ['super', 'throw', 'grab', 'block', 'taunt'].every(a => { const b = document.querySelector(`#touch [data-act="${a}"]`); return b && b.offsetParent !== null; }));
   await page.screenshot({ path: path.join(SHOTS, 'touch-play.png') });
-  const ok = check(visible, 'touch: buttons hidden on a touch device') & check(moved > 40, 'touch: right button did not move P1')
-    & check(guard, 'touch: block button did not raise the guard') & check(v3Buttons, 'touch: super/throw/grab/block buttons missing')
+  const ok = check(visible, 'touch: buttons hidden on a touch device') & check(moved > 40, 'touch: the stick did not move P1')
+    & check(guard, 'touch: block button did not raise the guard') & check(v3Buttons, 'touch: super/throw/grab/block/taunt buttons missing')
     & check(!errors.length, 'touch: errors ' + errors.join(' | '));
   rows.push({ kind: 'ui', key: 'touch controls', ok: !!ok });
   await ctx.close();
@@ -702,9 +751,14 @@ async function testUI(browser) {
       window.__x0 = SC.F[0].P[2].x; __pad.axes[0] = 1;
     });
     await page.waitForTimeout(400);
+    // The dash above may have left P1 against a wall on the right (e.g. Haunted Mansion): then walk left instead.
+    if (await page.evaluate(() => Math.abs(SC.F[0].P[2].x - __x0) < 60)) {
+      await page.evaluate(() => { window.__x0 = SC.F[0].P[2].x; __pad.axes[0] = -1; });
+      await page.waitForTimeout(400);
+    }
     await page.evaluate(() => { __pad.axes[0] = 0; __pad.buttons[0].pressed = true; });
     await page.waitForTimeout(120);
-    const r = await page.evaluate(() => ({ moved: SC.F[0].P[2].x - __x0, jumps: SC.F[0].stats.jumps }));
+    const r = await page.evaluate(() => ({ moved: Math.abs(SC.F[0].P[2].x - __x0), jumps: SC.F[0].stats.jumps }));
     await page.evaluate(() => { __pad.buttons[0].pressed = false; __pad.buttons[6].value = 1; });   // LT: hold to block
     await page.waitForTimeout(120);
     const guard = await page.evaluate(() => SC.F[0].blocking);
@@ -735,11 +789,16 @@ function summary(r) {
     await testCore(page);
     await testV3Registry(page);
     await testV3Core(page);
+    await testPartyModes(page);
+    await require('./smoke-quest.cjs').run(page, browser, { check, rows, SHOTS, newPage });   // campaign nodes + challenges + their screens
+    await require('./smoke-progress.cjs').run(page, browser, { check, rows, SHOTS, newPage });   // outfits, pets, mutators, track, quests, codex
     if (errors.length) failures.push('console: ' + [...new Set(errors)].join(' | '));
     await page.close();
     await testUI(browser);
     await testV3Screens(browser);
     await testTouch(browser);
+    await require('./smoke-fx.cjs').run(browser, { check, rows, SHOTS });
+    await require('./smoke-access.cjs').run(browser, { check, rows, SHOTS });   // touch stick, pads, accessibility, save codes   // announcer, crowd, music, bloom, photo mode, highlights
   } catch (e) {
     failures.push('smoke crashed: ' + (e.stack || e.message));
   } finally {
