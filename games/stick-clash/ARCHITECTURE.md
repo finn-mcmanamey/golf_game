@@ -4,8 +4,8 @@ Stick Clash is an **original** browser game: wobbly physics stickmen fighting wi
 stickman-duel genre, but every name, visual and sound must be our own. Never use the name "Supreme Duelist" or copy any
 of its assets, names, UI or level layouts. Generic archetypes (sword, axe, bow, gun…) are fine with our own names and art.
 
-The project lives in this folder (a scratchpad, not a git repo). It has nothing to do with the `golf_game` repository:
-don't read, edit or follow rules from `/home/user/golf_game`. `v1-reference.html` is the old single-file v1.
+The project lives in `games/stick-clash/` and is separate from the golf game: it has its own build and never
+touches the golf game's `src/` or `build.mjs`. `v1-reference.html` is the old single-file v1.
 
 ## Build and test
 
