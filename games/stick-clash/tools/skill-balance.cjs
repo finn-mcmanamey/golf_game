@@ -20,7 +20,8 @@ const [isecs = 2400, fsecs = 7200, diff = 'normal'] = process.argv.slice(2);
     let win = 0, n = 0, used = 0, t = 0;
     for (let i = 0; i < 8; i++) {
       const wpn = randomKey(WEAPONS), swap = i % 2, sk = [[k, 'none'], ['none', 'none']];
-      SC.start({ mode: 'watch', diff, map: maps[(i * 3 + k.length) % maps.length], weapons: [wpn, wpn], skills: swap ? [sk[1], sk[0]] : sk, winScore: 999 });
+      SC.start({ mode: 'watch', diff, map: maps[(i * 3 + k.length) % maps.length], weapons: [wpn, wpn], skills: swap ? [sk[1], sk[0]] : sk, winScore: 999,
+        classes: ['none', 'none'], throws: [['none', 'none'], ['none', 'none']] });   // v3: skills only
       SC.G.state = 'play'; SC.sim(secs / 8);
       for (const l of SC.G.log) { if (l.winner < 0) continue; const ci = swap ? 1 : 0; n++; t += l.time; if (l.winner === ci) win++; used += l.fighters[ci].skillsUsed || 0; }
     }

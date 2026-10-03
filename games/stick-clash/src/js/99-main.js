@@ -27,10 +27,12 @@ function teamName(team) {
 function teamColor(team) { const m = teamMembers(team); return m.length ? m[0].color : '#ffffff'; }
 
 function buildRoster(info) {
-  const roster = (info && Array.isArray(info.roster) ? info.roster : []).map((r, i) => Object.assign({
-    ctrl: 'cpu', slot: 0, team: i, weapon: 'random', skills: ['random', 'random'], color: DEFAULT_COLORS[i % 4],
+  const roster = (info && Array.isArray(info.roster) ? info.roster : []).slice(0, MAX_FIGHTERS).map((r, i) => Object.assign({
+    ctrl: 'cpu', slot: 0, team: i, weapon: 'random', skills: ['random', 'random'], color: DEFAULT_COLORS[i % DEFAULT_COLORS.length],
     hat: 'none', scale: 1, hpMul: 1, name: 'CPU ' + (i + 1),
-  }, r));
+    cls: (r.scale || 1) > 1.05 ? 'none' : 'random', throws: ['random', 'random'],   // v3: bosses stay classless
+  }, r, { wxp: {}, superKeep: 0 }));                                                   // weapon levels + meter: per match
+  if ((info.roster || []).length > MAX_FIGHTERS) report(new Error(`roster capped at ${MAX_FIGHTERS} fighters`), G_STATE.mode.key + '.setup');
   if (roster.length >= 2) return roster;
   report(new Error('mode setup must return at least 2 roster entries'), G_STATE.mode.key + '.setup');
   return [0, 1].map(i => ({ ctrl: 'cpu', slot: 0, team: i, weapon: 'random', skills: ['random', 'random'], color: DEFAULT_COLORS[i], hat: 'none', scale: 1, hpMul: 1, name: 'CPU ' + (i + 1) }));
@@ -59,6 +61,8 @@ function startMatch(cfg) {
 function rollRandomOnce(r) {
   if (r.weapon === 'random') r.weapon = resolveWeapon('random');
   if (Array.isArray(r.skills) && r.skills.includes('random')) r.skills = resolveSkills(r.skills);
+  if (r.cls === 'random') r.cls = resolveClass('random');
+  if (Array.isArray(r.throws) && r.throws.includes('random')) r.throws = resolveThrows(r.throws);
 }
 function resolveWeapon(key) { return key && key !== 'random' && WEAPONS[key] ? key : randomKey(WEAPONS); }
 function resolveSkills(keys) {
@@ -78,17 +82,31 @@ function newRound() {
   MAP = instantiateMap(resolveMap());
   applyMapPhysics(MAP);
   PROJ = []; resetOrbs(); clearFx();
-  const spawns = MAP.spawns;
   F = G_STATE.roster.map((r, i) => {
-    const sp = spawns[(r.spawn ?? i) % spawns.length];
+    const sp = spawnPoint(r.spawn ?? i);
+    if (!r.wxp) r.wxp = {};
     return makeFighter(Object.assign({}, r, { id: i, x: sp[0], y: sp[1], face: sp[0] < W / 2 ? 1 : -1,
-      weapon: resolveWeapon(r.weapon), skills: resolveSkills(r.skills), autopilot: !!G_STATE.cfg.autopilot && r.ctrl === 'human' }));
+      weapon: resolveWeapon(r.weapon), skills: resolveSkills(r.skills), autopilot: !!G_STATE.cfg.autopilot && r.ctrl === 'human',
+      cls: resolveClass(r.cls || 'none'), throws: resolveThrows(r.throws) }));
   });
   Object.assign(G_STATE, { lock: TUNE.startLock, koT: 0, ending: false, roundT: 0, winner: null, endReason: '' });
   banner('ROUND ' + G_STATE.round, 'FIGHT!', 1.6);
   sfx('round');
   hook(G_STATE.mode, 'onRoundStart');
   emit('roundStart', G_STATE.round);
+}
+
+// Spawn i of the current map. Maps define 4; fighters past that stand beside an existing spawn, on the same ground
+// and out of hazards (falling back to sharing the spot when there is no room, e.g. a narrow bottomless ledge).
+function spawnPoint(i) {
+  const sp = MAP.spawns, n = sp.length;
+  if (i < n) return sp[i];
+  const base = sp[i % n], lap = Math.ceil((i + 1) / n) - 1;
+  for (const off of [lap * 70, -lap * 70, lap * 130, -lap * 130]) {
+    const x = clamp(base[0] + off, 60, W - 60), g = groundBelow(x, base[1] - 40);
+    if (g != null && Math.abs(g - base[1]) < 30 && !MAP.hazards.some(hz => inRect(x, g - 10, hz, 20))) return [x, g];
+  }
+  return base;
 }
 
 // The team with the most health left (as a fraction) wins a round that runs out of time.
@@ -112,6 +130,7 @@ function checkRoundEnd() {
 
 function endRound(winner, reason) {
   Object.assign(G_STATE, { ending: true, winner, endReason: reason, koT: TUNE.koDelay });
+  for (const f of F) if (!f.summon && G_STATE.roster[f.id]) G_STATE.roster[f.id].superKeep = f.super;   // the meter carries over
   if (winner >= 0) G_STATE.score[winner]++;
   G_STATE.log.push({ round: G_STATE.round, winner, reason, time: G_STATE.roundT, map: MAP.key,
     fighters: F.filter(f => !f.summon).map(f => ({ wkey: f.wkey, skills: f.skills.slice(), dmg: f.stats.dmgDealt, hits: f.stats.hits, kos: f.stats.kos,
@@ -217,25 +236,31 @@ function boot() {
 
 // ---------- test / debug API ----------
 // SC.start(cfg) also accepts shorthands: weapons: ['blade', 'spear'], skills: [['blink', 'slam'], ...], hats: [...]
+// v3 shorthands: classes: ['ninja', 'tank'], throws: [['grenade', 'mine'], ...], fighters: 8 (watch / ffa).
 function testCfg(cfg = {}) {
   const c = Object.assign({ mode: 'watch' }, cfg);
-  const n = Math.max(2, (c.weapons || []).length, (c.skills || []).length, (c.loadouts || []).length);
+  const n = Math.max(2, (c.weapons || []).length, (c.skills || []).length, (c.loadouts || []).length, (c.classes || []).length,
+    (c.throws || []).length, c.fighters || 0);
   c.loadouts = Array.from({ length: n }, (_, i) => Object.assign({}, (cfg.loadouts || [])[i],
     c.weapons && c.weapons[i] ? { weapon: c.weapons[i] } : null,
     c.skills && c.skills[i] ? { skills: c.skills[i] } : null,
-    c.hats && c.hats[i] ? { hat: c.hats[i] } : null));
+    c.hats && c.hats[i] ? { hat: c.hats[i] } : null,
+    c.classes && c.classes[i] ? { cls: c.classes[i] } : null,
+    c.throws && c.throws[i] ? { throws: c.throws[i] } : null));
   return c;
 }
 
 function fighterSummary(f) {
   return { id: f.id, name: f.name, team: f.team, ctrl: f.ctrl, hp: f.hp, maxHp: f.maxHp, alive: f.alive,
     x: f.P[2].x, y: f.P[2].y, upright: f.aliveT ? f.upT / f.aliveT : 1, wkey: f.wkey, skills: f.skills.slice(),
-    status: Object.keys(f.status), stats: Object.assign({}, f.stats), nan: f.P.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y)) };
+    status: Object.keys(f.status), stats: Object.assign({}, f.stats), nan: f.P.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y)),
+    cls: f.clsKey, stamina: f.stamina, super: f.super, lvl: f.lvl, element: f.element, mount: f.mount && f.mount.key,
+    throws: f.throws.slice(), throwN: f.throwN.slice(), blocking: f.blocking, held: !!f.heldBy };
 }
 
 window.SC = {
   version: VERSION,
-  reg: { WEAPONS, SKILLS, MAPS, MODES, ORBS, HATS, STATUS },
+  reg: { WEAPONS, SKILLS, MAPS, MODES, ORBS, HATS, STATUS, CLASSES, THROWABLES, MOUNTS, ULTIMATES, ELEMENTS },
   errors: ERRORS, TUNE,
   get F() { return F; },
   get G() { return G_STATE; },
@@ -258,9 +283,11 @@ window.SC = {
       fighters: F.map(fighterSummary), projectiles: PROJ.length, orbs: ORB_LIST.length, errors: ERRORS.map(e => e.msg) };
   },
   render(dt = 1 / 60) { render(dt); },
-  // Presses an action for fighter i: 'jump' | 'attack' | 'skill1' | 'skill2' | 'dash' (one step), or sets mx with move(i, dir).
+  // Presses an action for fighter i (one step): 'jump' | 'attack' | 'skill1' | 'skill2' | 'dash' | 'grab' | 'throw' |
+  // 'super' | 'mash'; or sets mx with move(i, dir); hold(i, 'block' | 'jump' | 'attack', on) holds a button.
   press(i, action) { const f = F[i]; if (f) { if (action === 'dash') f.inp.dash = f.face; else f.inp[action] = true; } },
   move(i, mx) { const f = F[i]; if (f) f.inp.mx = mx; },
+  hold(i, action, on = true) { const f = F[i]; if (f) f.inp[action === 'block' ? 'blockHeld' : action + 'Held'] = !!on; },
   setState,
 };
 

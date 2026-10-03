@@ -8,7 +8,8 @@
 // The menu's loadout for picker i (weapon/skills may be 'random'; resolved fresh every round).
 function loadoutOf(cfg, i) {
   const lo = (cfg.loadouts || [])[i] || {};
-  return { weapon: lo.weapon || 'random', skills: lo.skills || ['random', 'random'], hat: lo.hat, color: lo.color || DEFAULT_COLORS[i] };
+  return { weapon: lo.weapon || 'random', skills: lo.skills || ['random', 'random'], hat: lo.hat, color: lo.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length],
+    cls: lo.cls || 'random', throws: lo.throws || ['random', 'random'] };   // v3: class and two throwables
 }
 
 // ---------- shared helpers ----------
@@ -51,9 +52,11 @@ function modeColor(avoid) {
 function modeHat() { return chance(.6) ? randomKey(HATS) || 'none' : 'none'; }
 
 // A complete roster entry (rosters swapped mid-match skip buildRoster's defaults, so fill everything).
+// v3: CPUs get a random class (bosses, scale > 1, stay classless) and random throwables unless o says otherwise.
 function modeEntry(o) {
   return Object.assign({ ctrl: 'cpu', slot: 0, team: 1, weapon: 'random', skills: ['random', 'random'], color: '#ff8a2e',
-    hat: 'none', scale: 1, hpMul: 1, name: 'CPU', aiLevel: null }, o);
+    hat: 'none', scale: 1, hpMul: 1, name: 'CPU', aiLevel: null, cls: (o.scale || 1) > 1.05 ? 'none' : resolveClass('random'),
+    throws: resolveThrows(['random', 'random']), wxp: {} }, o);
 }
 const humanEntry = (cfg, i, slot, team, name) => modeEntry({ ...loadoutOf(cfg, i), ctrl: 'human', slot, team, name });
 const modeRun = () => (G_STATE.info && G_STATE.info.run) || {};
@@ -109,12 +112,14 @@ defMode('pvp', {
 });
 
 defMode('watch', {
-  name: 'CPU vs CPU', desc: 'Sit back and watch two bots brawl.', order: 30,
+  name: 'CPU vs CPU', desc: 'Sit back and watch the bots brawl: a duel, or up to 8 in a free-for-all.', order: 30,
   players: [0, 0], cpu: true, pickers: 2, labels: ['CPU 1', 'CPU 2'], rerollRandom: true,   // fresh match-ups every round
+  crowd: [2, MAX_FIGHTERS, 2],                                                                // the menu's "Fighters" stepper: min, max, default
   // cfg.diffs: optional per-side levels (used by tools/ai-bench.cjs to pit levels against each other)
+  // cfg.fighters: 2-8 bots, each on its own team
   setup(cfg) {
-    const lv = i => (cfg.diffs && AI_LEVELS[cfg.diffs[i]] ? cfg.diffs[i] : null);
-    return { roster: [0, 1].map(i => modeEntry({ ...loadoutOf(cfg, i), team: i, name: lv(i) ? levelName(lv(i)) + ' CPU' : 'CPU ' + (i + 1), aiLevel: lv(i) })) };
+    const lv = i => (cfg.diffs && AI_LEVELS[cfg.diffs[i]] ? cfg.diffs[i] : null), n = clamp(cfg.fighters || 2, 2, MAX_FIGHTERS);
+    return { roster: Array.from({ length: n }, (_, i) => modeEntry({ ...loadoutOf(cfg, i), team: i, name: lv(i) ? levelName(lv(i)) + ' CPU' : 'CPU ' + (i + 1), aiLevel: lv(i) })) };
   },
 });
 
@@ -435,11 +440,11 @@ defMode('coop', {
 });
 
 defMode('ffa', {
-  name: 'Free-for-All', desc: 'Four fighters, everyone for themselves. Last one standing takes the round. First to 3.',
-  order: 65, players: [1, 1], cpu: true, pickers: 1, labels: ['You'], winScore: 3,
+  name: 'Free-for-All', desc: 'Up to 8 fighters (4 by default), everyone for themselves. Last one standing takes the round. First to 3.',
+  order: 65, players: [1, 1], cpu: true, pickers: 1, labels: ['You'], winScore: 3, crowd: [3, MAX_FIGHTERS, 4],
   setup(cfg) {
-    const me = humanEntry(cfg, 0, 0, 0, 'YOU'), names = shuffle(MODE_NAMES.slice());
-    const cpus = [1, 2, 3].map(i => modeEntry({ team: i, ...themeLoadout(pick(MODE_THEMES)), color: DEFAULT_COLORS[i], hat: modeHat(), name: names[i].toUpperCase() }));
+    const me = humanEntry(cfg, 0, 0, 0, 'YOU'), names = shuffle(MODE_NAMES.slice()), n = clamp(cfg.fighters || 4, 3, MAX_FIGHTERS);
+    const cpus = Array.from({ length: n - 1 }, (_, k) => k + 1).map(i => modeEntry({ team: i, ...themeLoadout(pick(MODE_THEMES)), color: DEFAULT_COLORS[i], hat: modeHat(), name: names[i].toUpperCase() }));
     return { roster: [me, ...cpus], winScore: 3 };
   },
   results() {

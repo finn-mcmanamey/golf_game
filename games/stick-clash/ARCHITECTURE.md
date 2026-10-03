@@ -1,11 +1,11 @@
-# Stick Clash v2: architecture contract
+# Stick Clash v3: architecture contract
 
 Stick Clash is an **original** browser game: wobbly physics stickmen fighting with floppy weapons. It is inspired by the
 stickman-duel genre, but every name, visual and sound must be our own. Never use the name "Supreme Duelist" or copy any
 of its assets, names, UI or level layouts. Generic archetypes (sword, axe, bow, gun…) are fine with our own names and art.
 
-The project lives in `games/stick-clash/` and is separate from the golf game: it has its own build and never
-touches the golf game's `src/` or `build.mjs`. `v1-reference.html` is the old single-file v1.
+The project lives in this folder (a scratchpad, not a git repo). It has nothing to do with the `golf_game` repository:
+don't read, edit or follow rules from `/home/user/golf_game`. `v1-reference.html` is the old single-file v1.
 
 ## Build and test
 
@@ -18,6 +18,9 @@ touches the golf game's `src/` or `build.mjs`. `v1-reference.html` is the old si
 - `node build.mjs` writes `dist/stick-clash.html`. It syntax-checks every slice on its own and the joined script
   (failing with `slice:line`), refuses `</script` inside code, and **fails on duplicate top-level names across slices**
   (a second `function draw()` would silently replace the first). Prefix helpers with your feature, e.g. `axeSpin()`.
+- **Size budget:** the build prints every slice's size and **fails above 1.5 MB** (`SIZE_BUDGET` in build.mjs). v3 core
+  is ~750 KB, which leaves ~790 KB for all v3 content. Music, voices and art stay procedural: no samples, images or
+  model files. Check the printed table after your change and mention your slice's size in your report.
 - `node tools/smoke.cjs` (≈20 s, `--quick` for shorter sims) must pass before you report done. See "Testing" below.
   Tuning tools (all headless, run `node build.mjs` first; latest results in `tmp/balance.md`):
   `node tools/balance.cjs [secsPerPair=120] [diff] [workers] [onlyKeys]` (weapon round robin, ~4.5 min),
@@ -36,14 +39,22 @@ touches the golf game's `src/` or `build.mjs`. `v1-reference.html` is the old si
 | `00-core.js` | core | constants, `TUNE`, maths, `store`, error log + `hook`, event bus, registries + `def*`, world state, draw helpers |
 | `10-physics.js` | core | points, links, integrate, solve, map collision (floor, walls, solids, one-way, moving), `PHYS`, map runtime |
 | `20-fighter.js` | core | `makeFighter`, body + weapon rigs, `drive` (move, jump, dash, attack, skills, ranged aim), teams, statuses |
+| `22-moves.js` | core (v3) | per-fighter v3 state, guard/parry/guard break, grab/throw/escape, wall slide/jump, dispatch to the other v3 slices |
+| `24-classes.js` | core (v3) | the six classes (`defClass`) and `applyClass` |
 | `30-combat.js` | core | `strike`, `damage`, KO, clashes, projectiles, explosions, hazards, ring-outs, orb runtime |
+| `32-arms.js` | core (v3) | bare fists, disarm, weapon pickups and supply crates (they ride `PROJ`) |
+| `33-power.js` | core (v3) | super meter, weapon levels, the 8 ultimates (`defUltimate`), the cut-in |
+| `34-throwables.js` | core (v3) | throwables (`defThrowable`), aimed lobs |
 | `35-effects.js` | core | particles, floating text, rings, beams, shake, hit-stop, slow-mo, flash |
+| `36-shatter.js` | core (v3) | neon limb shatter on every K.O. (drawing only, replayed by the kill-cam) |
 | `40-weapons-melee.js` | weapons-melee | melee weapon defs |
 | `45-weapons-ranged.js` | weapons-ranged | ranged and magic weapon defs |
 | `50-skills.js`, `51-skills-elements.js`, `52-skills-control.js` | skills | skill defs, skill helpers and their statuses |
 | `55-orbs.js` | core, then skills may extend | power-up orb defs |
+| `56-fusion.js`, `57-mounts.js` | core (v3) | elements + elemental orbs (`defElement`), mounts + mount orbs (`defMount`) |
 | `60-maps.js` | maps | map defs |
 | `65-ai.js` | ai | CPU brain |
+| `66-ai-moves.js` | core (v3), ai may extend | how CPUs use guard, parry, grabs, throwables, ultimates, walls, pickups, mounts |
 | `70-modes.js` | modes | game mode defs |
 | `75-cosmetics.js` | ui | hats, colour palettes, progression (coins, unlocks, achievements, stats) |
 | `80-audio.js`, `81-music.js` | juice | sound effects (WebAudio synth, buses, panning) and the procedural synthwave music |
@@ -63,7 +74,7 @@ an in-between number (e.g. `52-skills-extra.js`) if you own the area.
 ### Constants, tuning, helpers (`00-core.js`)
 
 ```js
-W = 1280, H = 720, DT = 1/120, TAU, VERSION, DEFAULT_COLORS (4 neon colours), FONT_DISPLAY, FONT_BODY
+W = 1280, H = 720, DT = 1/120, TAU, VERSION, DEFAULT_COLORS (8 neon colours, one per slot), MAX_FIGHTERS (8), FONT_DISPLAY, FONT_BODY
 TUNE            // feel constants: speed, accelGround, accelAir, jumpVel, riseGrav, fallGrav, cutGrav, coyote, buffer,
                 // dashVel/dashCd/dashTime, minHit, hitCd, dmgDiv, maxHit, headMul, kbMul, kbMax, staggerPerDmg,
                 // hitstopMin, roundLimit, koDelay, startLock. Change only with SC.sim measurements.
@@ -86,13 +97,19 @@ glow(ctx, color, blur, () => { ...draw... })    // neon glow (shadowBlur) around
 `ko(victim, killer, opts)` (opts.kind `'ringout'` for falls), `clash(A, B, x, y)`, `block(target, src)`, `attack(f)`,
 `fire(f, proj)`, `jump(f)`, `dash(f)`, `skill(f, key)`, `status(f, name, secs)`, `orb(f, orb)`,
 `explode(x, y, radius, owner)`, `mute(muted)`, `pad(action, slot)` (gamepad button edges), `escape(event)`.
+v3: `parry(B, A)`, `guardBreak(f)`, `grab(A, B)`, `throw(A, B)`, `grabEscape(B, A)` (B broke out of A's grab),
+`wallJump(f)`, `disarm(B, A, wkey)`,
+`pickup(f, item)`, `levelUp(f, lvl)`, `ultimate(f, cat)`, `throwable(f, key, proj)`, `mount(f, key)`,
+`dismount(f, key, why)`, `element(f, key)`, `shatter(f)`.
 
 ### Registries and `def*`
 
 ```js
 WEAPONS, SKILLS, MAPS, MODES, ORBS, HATS, STATUS     // plain objects keyed by id
+CLASSES, THROWABLES, MOUNTS, ULTIMATES, ELEMENTS     // v3 (see "v3 fighting depth" below)
 defWeapon(key, def)  defSkill(key, def)  defMap(key, def)  defMode(key, def)
 defOrb(key, def)     defHat(key, def)    defStatus(key, def)
+defClass(key, def)   defThrowable(key, def)  defMount(key, def)  defUltimate(cat, def)  defElement(key, def)
 listOf(reg)          // visible (not hidden) defs sorted by `order`
 randomKey(reg, filter?)
 ```
@@ -104,7 +121,7 @@ Every def may set `hidden: true` (kept out of menus and random picks, e.g. off-h
 ### World state
 
 ```js
-F          // fighters this round (2–4), index = roster index = f.id; summoned decoys (f.summon) are appended after
+F          // fighters this round (2–8), index = roster index = f.id; summoned decoys (f.summon) are appended after
            // them with ids from 100, so skip f.summon when mapping fighters to roster slots
 PROJ       // live projectiles          ORB_LIST // orbs lying in the arena
 MAP        // runtime copy of the current map def (live solids/hazards with x, y, dx, dy per step; MAP.t)
@@ -128,13 +145,24 @@ G_STATE    // { state: 'menu'|'play'|'paused'|'over'|'killcam', cfg, mode (def),
   inp: { mx, my, jump, jumpHeld, attack, attackHeld, skill1, skill2, dash },   // jump/attack/skill/dash: one step
   mem: {},                                 // per-round scratch for your weapon/skill: f.mem.myThing (mem.extraJumps adds jumps)
   dmgTakenMul, kbMul,                      // optional multipliers a mode may set (e.g. a tanky boss)
-  ai: {}, stats: { dmgDealt, dmgTaken, hits, kos, skills, jumps, shots, dashes } }
+  ai: {}, stats: { dmgDealt, dmgTaken, hits, kos, skills, jumps, shots, dashes,
+                   blocks, parries, grabs, throws, wallJumps, ults, thrown, disarms, pickups },   // v3 counters
+  // v3 (22-moves initFightingDepth; read them, change them only through the APIs below):
+  cls, clsKey,                             // class def + key ('none' = classless)
+  stamina, maxStamina, blocking, guardBroken,  // guard
+  heldBy, holding,                         // grabs (fighter refs)
+  wallT, wallDir, wallSliding,             // walls
+  super (0..100), ult ({ key, t, dur } while an ultimate runs),
+  lvl (1..3), lvlDmg, reachMul, wxp,       // weapon level of the weapon held; wxp = { wkey: damage dealt } per match
+  throws: [key|null, key|null], throwN: [n, n],   // throwables and how many are left this round
+  element (key|null), mount ({ key, t, hp, ... } | null), shatterT (game time of the K.O. shatter, 0 = intact),
+  inp also has blockHeld (held), grab, throw, super, mash (one step) }
 ```
 
 Body points: 0 head, 1 neck, 2 hip, 3/4 back elbow/hand, 5/6 weapon elbow/hand, 7/8 and 9/10 knee/foot.
 `scale` > 1 makes a boss: body, reach and hp grow (`maxHp = 100 × hpMul × scale`), knockback shrinks.
 
-Helpers: `makeFighter(opts)`, `equipWeapon(f, key)` (swap weapons mid-round), `rigsOf(f)`, `moveFighter(f, dx, dy)`
+Helpers: `makeFighter(opts)` (v3 opts: `cls`, `throws`, `wxp`, `superKeep`), `equipWeapon(f, key)` (swap weapons mid-round), `rigsOf(f)`, `moveFighter(f, dx, dy)`
 (teleport, keeps velocity), `feetY(f)`, `chest(f)` → {x,y}, `enemiesOf(f)`, `alliesOf(f)`, `nearestEnemy(f, visibleOnly)`,
 `aliveTeams()`, `heal(f, amount, showFloat)`, `canAct(f)`, `spinAttack(f, power)` (the default melee swing),
 `fireRanged(f, overrides)` (fires the ranged weapon with ammo/reload/recoil), `useSkill(f, slot)`,
@@ -264,8 +292,10 @@ Defaults (rebindable in Controls, saved via `store`):
   Left Shift or double-tap A/D to dash.
 - P2: arrows move/jump, ↓ attack, `.` skill 1, `/` skill 2, Right Shift or double-tap to dash.
 - With one human, P1 also accepts the P2 keys and every gamepad.
-- Gamepads: stick/d-pad move, A jump, X attack, B skill 1, Y skill 2, RB dash, Start pause.
-- Gamepads also accept RT = attack, LT = dash, LB = skill 1. Pads are tracked by browser index; with two humans pad 1
+- v3: P1 F block (hold), C grab/throw, R throwable, X super; P2 `,` block, L grab, `;` throwable, Enter super.
+  Block + attack also grabs. Saved v2 binds keep their keys; a new action whose default key is taken starts unbound.
+- Gamepads: stick/d-pad move, A jump, X attack, B skill 1, Y skill 2, RB dash, LT block (hold), RT grab, LB throwable,
+  R3 (or Back) super, Start pause. `PAD_BUTTONS` / `PAD_ALT` are data (for a later remapping screen). Pads are tracked by browser index; with two humans pad 1
   drives P1 and pad 2 P2. Plugging a pad in toasts which player it drives; unplugging one mid-fight pauses. Pads of the
   fighter being hit rumble (where supported).
 - Touch-first devices (coarse pointer) get on-screen buttons during play; they hide once a hardware key is pressed.
@@ -297,6 +327,129 @@ API: `BINDS[slot][action]`, `setBind(slot, action, code)`, `resetBinds()`, `keyL
   Only matches with a real (non-autopilot) human count; `mode.practice: true` (and `training`) earns nothing.
   A mode's `results()` may add `won` (boolean), `tournament: true` or `waves: n`; otherwise the score and
   `G_STATE.info.run` (`cleared` waves, tournament `won` count) decide the coin reward.
+
+## v3 fighting depth (core layer: every mode, arena and CPU gets it)
+
+All of this is on for every fighter in every mode unless noted. A content agent normally only *uses* it; to opt out,
+see "Hooks for modes" below.
+
+### Moves (`22-moves.js`)
+
+- **Guard:** `inp.blockHeld` raises it (`f.blocking`) while the fighter can act, isn't mounted, holding someone or in an
+  ultimate, and has stamina. `damage()` calls `guardHit(B, A, o, x, y, amount)` for direct hits: from the front
+  (`guardFront`: push direction, or the projectile's velocity) a guard lets `BLOCK.chip[kind]` through (melee .2, proj
+  .2, skill .5, explode .6) and knockback × .35, and costs stamina. A hit within `BLOCK.parryWin` (.15 s) of a *fresh*
+  guard (not re-raised within .3 s) is a **parry**: 0 damage, +30 stamina, +10 super, the melee attacker is stunned
+  .65 s, a projectile is reflected (`o.proj`). Blasts (`o.blast`) can't be parried. Stamina at 0 = **guard break**
+  (1.1 s stun). `o.unblockable` skips the guard (grab throws use it).
+- **Grab:** `inp.grab`, or `inp.attack` while blocking. `tryGrab(A)` takes the nearest grabbable foe within
+  `GRAB.reach` (not mounted, ragdolled, in an ultimate, a summon or much bigger). The holder carries the foe
+  (`carryHeld`) and throws on attack/grab (or after `GRAB.hold` s): 9 damage (kind skill, unblockable), the foe flies
+  and gets the `ragdoll` status (limp, can't act). The held fighter breaks free after `GRAB.mash` presses
+  (`inp.mash` or any action key; left/right taps count too).
+- **Walls:** airborne against the arena edge (`MAP.walls`) or the side of a solid (`oneWay: false`, `h >= 50`):
+  `f.wallT` (coyote) and `f.wallDir`; pressing into it caps the fall at `WALL.slide`; jump then calls `wallJump(f)`
+  instead of the air jump.
+- `drawFighterUnder(f)` / `drawFighterOver(f)` are the render hooks (guard arc, element glow, Lv3 trail, mounts,
+  ultimates).
+
+### Classes (`24-classes.js`)
+
+```js
+defClass('ninja', { name, icon, color, desc, passive, order,
+  hp: 1.05, speed: 1.14, mass: .9 /* knockback taken = mass^-0.8 */, stamina: .9, dmg: 1 /* all damage */,
+  melee: 1 /* melee only */, cd: 1 /* skill cooldowns */, ammo: 1, reload: 1 /* reload speed */, dash: 1 /* distance */,
+  dashCd: 1, airJumps: 0, disarm: 1, superGain: 1, throwBonus: 0, onDash(f) {} })
+```
+Roster entries take `cls` ('random' is rolled once per match). Bosses (scale > 1.05) default to `'none'`. Tune with
+`node tools/class-balance.cjs [segments] [secs] [diff] [workers]` (mirror random loadouts, sides swapped, every pair);
+`CLASSES='{"tank":{"hp":1.1}}'` tries numbers without editing. Measured at Normal: every class 44–54 %, every pair
+38–62 % (target 35–65 %).
+
+### Disarm, pickups, supply crates (`32-arms.js`)
+
+A melee hit (or a shot of 14+) deals `damage` → chance `clamp((dmg - 12) / 40, 0, .45)` × Brute bonus × head 1.3 to
+`disarm(B, A, o)`: the weapon becomes a pickup and B gets the hidden `fists` weapon. Pickups are `PROJ` zones
+(`kind: 'pickup'`, `pickup: 'weapon' | 'crate'`, `wkey`), so they are stepped, drawn, kill-cam recorded and cleared
+each round. Bare-handed fighters take them by touch; anyone can press grab beside one to swap (`armsGrabKey`). After
+`ARMS.crateAfter` (5 s) bare-handed, `dropCrate(f)` parachutes a random weapon down beside them. A K.O.'d fighter's
+weapon drops too. Helpers: `spawnPickup(kind, wkey, x, y, vx, vy, o)`, `pickupsLive()`, `isBare(f)`, `dropCrate(f, wkey?)`.
+Mode opt-out: `noDisarm: true`.
+
+### Super meter, weapon levels, ultimates (`33-power.js`)
+
+- Meter: `gainSuper(f, n)`; damage dealt × .55, taken × .4 (indirect × .2), parry +10. It carries over between rounds
+  (`roster[i].superKeep`). About one ultimate per fighter every two rounds at Normal.
+- Levels: damage dealt with a weapon (melee, proj, explode; not skills or mounts) adds to `f.wxp[wkey]` for the
+  whole match (reset each match). `LEVELS.xp` [0, 55, 140] → Lv2 (+15 % melee reach, +10 % damage), Lv3 (+25 %, +20 %,
+  plus `LEVEL_ELEMENT[cat]` as a weak element on every hit and a sparkle trail).
+- Ultimates: `defUltimate(cat, { name, color, time, ai: { range }, use(f, u), step(f, dt, u), end(f, u), draw(ctx, f, u) })`.
+  `useUltimate(f)` (super key) picks `ULTIMATES[f.w.cat]` (blade for shields). Ultimate damage is kind `'skill'`
+  (projectiles set `dmgKind: 'skill'`). The cut-in band is drawn by `powerDrawScreen` and recorded for the kill-cam.
+  Helpers: `ultHit(f, e, amount, o)`, `ultFoes(f, x, y, r)`, `ultHover(f)`.
+
+### Throwables (`34-throwables.js`)
+
+`defThrowable(key, { name, icon, color, desc, throw(f, aim) -> proj, ai: { min, max, when(f, foe, d) } })`; `aim` =
+`{ x, y, vx, vy, foe }` from `throwAim(f)` (an arc onto the nearest visible foe). Roster `throws: [k, k]` (each once per
+round; 'random' allowed), `throwNext(f)` on the throw key. Build projectiles with `thrBase(f, aim, o)`: kind
+`'throwable'`, `dmgKind`/`blastKind: 'skill'` (never weapon-scaled).
+
+### Elements and combo weapons (`56-fusion.js`)
+
+`defElement(key, { name, adj, icon, color, status, hit(A, B, dealt, o) })` (`o.weak` = Lv3 dose). `fuseElement(f, key)`
+(the elemental orbs call it) sets `f.element` for the round; every direct weapon hit then calls the element's `hit`.
+`weaponLabel(f)` gives "Flaming Chainsaw" (HUD, kill-cam caption). Damage with `o.elemental` or `o.fromMount` never
+triggers elements (no chains).
+
+### Mounts (`57-mounts.js`)
+
+`defMount(key, { name, icon, color, desc, time, hp, speedMul, takenMul, kbMul, auto, fly, onMount(f, m),
+drive(f, dt, m, grounded), attack(f, m), draw(ctx, f, m, layer 'under'|'over'), onEnd(f, m), ai: { range, style, fly } })`.
+`mount(f, key)` / `dismount(f, why)`; each mount def automatically gets an orb `mount-<key>` (weight .2). One hit of
+`MOUNT_BIG` (18) or the mount's `hp` worn down knocks the rider off. Mounted fighters can't guard, grab, be grabbed,
+be disarmed or use ultimates. `mountMul(f, 'speed'|'taken'|'kb')`, `mountHit(f, e, amount, o)`.
+
+### Limb shatter (`36-shatter.js`)
+
+Every K.O. sets `f.shatterT` and bursts the body into neon pieces (drawing only, moved by game time, so pauses freeze
+them and replays slow them). The renderer skips a K.O.'d fighter with `shatterT > 0`. The burst is recorded as a
+kill-cam event (`KC_FX.shatter`), and the kill-cam snapshot keeps `blocking`, `element`, `mount` and `ult` per frame.
+
+### CPUs (`66-ai-moves.js`)
+
+Per-level knobs merged into `AI_LEVELS`: `guard`, `block`, `parry`, `grab`, `mash`, `hold`, `throw`, `super`, `wall`,
+`loot`. `aiReach(f)` / `aiStyle(f)` include weapon levels and the mount's own attack. Measured per round (2 CPUs):
+
+| level | parries | grabs | throwables | ultimates | wall jumps | disarms | guard blocks |
+|---|---|---|---|---|---|---|---|
+| Easy | .3 | .1 | .1 | .7 | .2 | .5 | 2.3 |
+| Normal | 1.1 | .3 | .5 | 1.1 | .9 | .4 | 2.4 |
+| Hard | 1.5 | .4 | 2.1 | 1.3 | 4.7 | .3 | 3.5 |
+| Insane | 1.6 | 1.1 | 3.0 | 1.3 | 2.6 | .2 | 5.5 |
+
+(6 matches × 90 s of CPU vs CPU per level on random arenas, random loadouts; rounds last 10–15 s.)
+
+### Eight fighters
+
+`MAX_FIGHTERS` = 8 (rosters are capped). `spawnPoint(i)` uses the map's spawns, then stands extra fighters beside
+them on the same ground (out of hazards). The HUD switches to compact cards (4 per row) for 5–8 fighters; strikes and
+clashes skip pairs that are clearly out of reach (`outOfReach`), so 8 CPUs cost ~0.3 ms per physics step. A mode
+sets `crowd: [min, max, default]` to get a "Fighters" stepper on the arena screen; it arrives as `cfg.fighters`
+(`watch` and `ffa` use it).
+
+### Hooks for modes (what later agents need)
+
+- A roster entry may set `cls` ('random' | key | 'none') and `throws: [k, k]` (or `['none', 'none']`); `modeEntry`
+  gives CPUs a random class and random throwables, and bosses (scale > 1.05) none.
+- `mode.noDisarm: true` turns disarms off. A mode can strip other parts per fighter in `onRoundStart`
+  (`f.throwN = [0, 0]`, `f.super = 0`, `f.maxStamina`...).
+- Scoring a mode on K.O.s still uses `onKO`; the body shatters on its own. Respawning modes build a new fighter with
+  `makeFighter(Object.assign({}, roster[id], {...}))` like King of the Hill does (it keeps class, throwables and levels).
+- New arenas: tall solid blocks (`oneWay: false`, `h >= 50`) are wall-jumpable; pickups and crates land on any
+  floor or platform; flying mounts stay below y 170 (`MOUNT_TOP`).
+- New weapon categories need a `defUltimate` for the category (or they fall back to the blade's) and an entry in
+  `LEVEL_ELEMENT`.
 
 ## Content defs
 
@@ -533,6 +686,9 @@ anything that affects feel or balance, and update `tmp/balance.md`.
 - Weapons: every visible weapon wins 40–60 % (hard limits 35–65 %) of its round-robin rounds at Normal, where the
   shipped `power` values were tuned. Hard shifts a few slow-projectile guns down and instant ones up (≈34–68 %):
   Hard CPUs dodge 58 % of shots, so tune at Normal and check Hard stays inside 30–70 %.
+- Classes: every class 40–60 % overall and every pair 35–65 % in `tools/class-balance.cjs` at Normal.
+- v3 pacing (2 CPUs, per round): about one ultimate per fighter every two rounds, a disarm every 2–3 rounds, a parry
+  or two from Normal up, and every throwable used within a few rounds. Measure with the `on(...)` events.
 - Skills: every skill should help its carrier against a skill-less mirror (impact ≈52–68 %) and land 40–60 % in
   random-loadout fights; the CPU should use each one about once or twice a round.
 - Difficulty: each level beats the one below it in ~65–80 % of rounds (Easy→Normal→Hard→Insane).
@@ -546,16 +702,19 @@ Not required (no replays from codes). Use `Math.random` freely. The kill-cam sho
 ## Testing: `window.SC`
 
 ```js
-SC.reg            // { WEAPONS, SKILLS, MAPS, MODES, ORBS, HATS, STATUS }
+SC.reg            // { WEAPONS, SKILLS, MAPS, MODES, ORBS, HATS, STATUS, CLASSES, THROWABLES, MOUNTS, ULTIMATES, ELEMENTS }
 SC.start(cfg)     // start a match without the menu (default mode 'watch'). Shorthands: weapons: ['blade', 'spear'],
-                  // skills: [['blink', 'slam'], ['none', 'none']], hats: ['crown', 'none']; autopilot: true lets the
-                  // CPU brain drive human fighters. Returns SC.state().
+                  // skills: [['blink', 'slam'], ['none', 'none']], hats: ['crown', 'none'], classes: ['ninja', 'none'],
+                  // throws: [['grenade', 'mine'], ['none', 'none']], fighters: 8 (watch / ffa); autopilot: true lets
+                  // the CPU brain drive human fighters. Returns SC.state().
 SC.sim(seconds)   // run fixed steps synchronously: no drawing, sound, effects, hit-stop or slow-mo
 SC.state()        // { state, mode, map, round, score, roundT, ending, winner, t, log, result,
-                  //   fighters: [{ id, name, team, ctrl, hp, maxHp, alive, x, y, upright, wkey, skills, status, stats, nan }],
+                  //   fighters: [{ id, name, team, ctrl, hp, maxHp, alive, x, y, upright, wkey, skills, status, stats, nan,
+                  //   cls, stamina, super, lvl, element, mount, throws, throwN, blocking, held }],
                   //   projectiles, orbs, errors }
 SC.render(dt)     // draw one frame now
-SC.press(i, 'jump'|'attack'|'skill1'|'skill2'|'dash')   SC.move(i, mx)   // drive fighter i (inputs persist in sim)
+SC.press(i, 'jump'|'attack'|'skill1'|'skill2'|'dash'|'grab'|'throw'|'super'|'mash')   SC.move(i, mx)   // drive fighter i
+SC.hold(i, 'block'|'jump'|'attack', on)                    // hold a button (inputs persist in sim)
 SC.errors, SC.TUNE, SC.F, SC.G (= G_STATE), SC.setState(state)
 ```
 Tip: to stop the real-time loop interfering while you script a test, set `SC.G.state = 'paused'` after `SC.start`
@@ -568,6 +727,14 @@ Tip: to stop the real-time loop interfering while you script a test, set `SC.G.s
 - every **orb** is grabbed, every **hat** and **status** is applied and drawn;
 - core systems: ring-out, moving-platform carry, hazards, teams, boss scale, explode/homing/bounce/pierce projectiles,
   off-hand + shield deflect, freeze/shatter, giant, firing/reload, auto-fire, double jump, dash;
-- the real UI: menu → Fight → keyboard (both key sets in 1P) → pause/resume → results → menu → controls panel,
-  double-tap dash, a mocked gamepad, and touch buttons on a phone-sized touch screen.
+- v3: every **class** (a CPU fight; its numbers apply), **throwable** (thrown at a foe: it must hurt or affect it),
+  **mount** (ridden at a foe, timer and big-hit dismount), **ultimate** (super key with a weapon of the category) and
+  **element** (fused hit applies it); guard chip/parry/projectile parry/guard break, grab + throw, mash escape,
+  block + attack grab, wall slide + jump, disarm + pickup, chance disarms, supply crate, weapon levels to Lv3, super
+  meter, class passives, 8-fighter spawns on every arena + step cost, an 8-fighter FFA;
+- v3 screens: an 8-fighter brawl, mounted fighters, an ultimate cut-in, the shatter in the kill-cam replay, the
+  loadout's Class and Throwables tabs and How to Play (`tmp/smoke/v3-*.png`);
+- the real UI: menu → Fight → keyboard (both key sets in 1P, block/grab/throw/super keys) → pause/resume → results →
+  menu → controls panel, double-tap dash, a mocked gamepad (incl. LT block), and touch buttons (incl. block, super,
+  throwable, grab) on a phone-sized touch screen.
 It prints a table and exits non-zero on any failure. Screenshots: `tmp/smoke/`.

@@ -10,6 +10,7 @@ const SRC = path.join(ROOT, 'src');
 const JS_DIR = path.join(SRC, 'js');
 const STYLE_DIR = path.join(SRC, 'styles');
 const OUT = path.join(ROOT, 'dist', 'stick-clash.html');
+const SIZE_BUDGET = 1.5 * 1024 * 1024;   // bytes: the whole game must stay one small offline file
 
 function fail(msg) {
   console.error('\n BUILD FAILED\n ' + msg.split('\n').join('\n ') + '\n');
@@ -107,5 +108,19 @@ html = html.replace('<!--STYLE-->', () => '<style>\n' + readStyles() + '\n</styl
 html = html.replace('<!--SCRIPT-->', () => '<script>\n' + script + '</script>');
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, html);
-const kb = (Buffer.byteLength(html) / 1024).toFixed(1);
-console.log(`built dist/stick-clash.html  ${kb} KB  (${slices.length} slices, ${script.split('\n').length} script lines)`);
+reportSizes(html, slices);
+
+// The game must stay one offline file under SIZE_BUDGET: everything (music, voice, art) is procedural.
+// Prints every slice's size so content owners can see what they spend, and fails the build above the budget.
+function reportSizes(out, list) {
+  const total = Buffer.byteLength(out), kb = n => (n / 1024).toFixed(1);
+  const cells = list.map(s => `${s.name.replace(/\.js$/, '').padEnd(22)}${kb(Buffer.byteLength(s.code)).padStart(6)}`);
+  console.log('slice sizes (KB):');
+  for (let i = 0; i < cells.length; i += 3) console.log('  ' + cells.slice(i, i + 3).join('   '));
+  const css = Buffer.byteLength(readStyles());
+  console.log(`  css + fonts ${kb(css)} KB`);
+  const pct = (total / SIZE_BUDGET * 100).toFixed(0);
+  console.log(`built dist/stick-clash.html  ${kb(total)} KB of ${kb(SIZE_BUDGET)} KB budget (${pct}%)  ` +
+    `(${list.length} slices, ${script.split('\n').length} script lines)`);
+  if (total > SIZE_BUDGET) fail(`output is ${kb(total)} KB, over the ${kb(SIZE_BUDGET)} KB budget: trim or make content procedural`);
+}

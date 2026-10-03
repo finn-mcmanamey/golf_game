@@ -369,7 +369,7 @@ defWeapon('pistol', {
 
 // ---------- Thunder Six: a heavy revolver ----------
 defWeapon('revolver', {
-  power: 0.88,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 1.0,    // balance: × damage dealt with it (see tmp/balance.md; raised from .88 for v3 guards)
   name: 'Thunder Six', cat: 'ranged', desc: 'Six slow, heavy rounds that knock foes back. Long reload.', order: 11,
   len: 40, mass: .9, dmg: .25, width: 4, color: '#ffd84a', bodyRecoil: 160,
   ranged: { cooldown: .5, ammo: 6, reload: 2.3, speed: 2100, spread: .035, recoil: 320, sfx: 'gun-revolver',
@@ -413,7 +413,7 @@ defWeapon('shotgun', {
 
 // ---------- Buzzsaw: minigun that has to spin up ----------
 defWeapon('minigun', {
-  power: 0.82,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 0.9,    // balance: × damage dealt with it (see tmp/balance.md; raised from .82 for v3 guards)
   name: 'Buzzsaw', cat: 'ranged', desc: 'Hold attack to spin up, then a hail of bullets. Heavy: you walk slower.', order: 13,
   len: 58, mass: 1.6, dmg: .25, width: 6, color: '#ffe066', twoHanded: true, speed: .85, bodyRecoil: 30,
   ranged: { cooldown: .08, ammo: 40, reload: 3, auto: true, speed: 1700, spread: .1, recoil: 50, sfx: 'gun-minigun',
@@ -799,7 +799,7 @@ function flameDraw(ctx, p) {
   ctx.globalAlpha = 1;
 }
 defWeapon('flamethrower', {
-  power: 1.08,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 1.4,    // balance: × damage dealt with it (see tmp/balance.md; raised from 1.08 for v3 guards)
   name: "Dragon's Breath", cat: 'ranged', desc: 'A short cone of fire. Sets foes alight; runs dry fast.', order: 23,
   len: 52, mass: 1.3, dmg: .25, width: 6, color: '#ff8a2e', twoHanded: true,
   ranged: { cooldown: .04, ammo: 45, reload: 2.6, auto: true, speed: 640, spread: .16, recoil: 18, sfx: 'gun-silent',

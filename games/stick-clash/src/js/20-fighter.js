@@ -24,7 +24,8 @@ function makeFighter(o) {
     ammo: 0, reload: 0, atkCd: 0, atkBuf: 0, jumpBuf: 0, jumpCd: 0, coyote: 0, airJumps: 1, rising: false,
     dashCd: 0, dashT: 0, stagger: 0, flash: 0, swingT: 0, phase: 0, aim: face > 0 ? 0 : Math.PI, gvx: 0, grounded: false,
     combo: 0, comboT: 0, hitCd: {}, lastHitBy: null, lastHitT: 0, inv: 0,
-    inp: { mx: 0, my: 0, jump: false, jumpHeld: false, attack: false, attackHeld: false, skill1: false, skill2: false, dash: 0 },
+    inp: { mx: 0, my: 0, jump: false, jumpHeld: false, attack: false, attackHeld: false, skill1: false, skill2: false, dash: 0,
+      blockHeld: false, block: false, grab: false, throw: false, super: false, mash: false },   // v3 actions (22-moves)
     ai: {}, stats: { dmgDealt: 0, dmgTaken: 0, hits: 0, kos: 0, skills: 0, jumps: 0, shots: 0, dashes: 0 },
     trail: [], upT: 0, aliveT: 0,
   };
@@ -33,6 +34,7 @@ function makeFighter(o) {
   addLink(f, 2, 8, { min: true, r: dist(f.P[2], f.P[8]) * .93 });   // legs can't fold flat
   addLink(f, 2, 10, { min: true, r: dist(f.P[2], f.P[10]) * .93 });
   addLink(f, 8, 10, { min: true, r: 14 * scale });                  // feet don't merge
+  initFightingDepth(f, o);          // v3: class, stamina, super meter, throwables, weapon levels (22-moves)
   equipWeapon(f, o.weapon);
   return f;
 }
@@ -69,9 +71,12 @@ function equipWeapon(f, key) {
   const offDef = def.offhand && WEAPONS[def.offhand];
   if (def.offhand && !offDef) report(new Error(`offhand "${def.offhand}" is not a registered weapon`), def.key);
   f.off = offDef ? buildWeaponRig(f, offDef, 4, 3) : null;
-  f.ammo = def.ranged ? def.ranged.ammo : 0; f.reload = 0; f.atkCd = Math.max(f.atkCd, .15);
+  f.ammo = ammoCap(f); f.reload = 0; f.atkCd = Math.max(f.atkCd, .15);
   hook(def, 'onEquip', f);
 }
+
+// Magazine size: the weapon's ammo, more for classes with an ammo bonus (Gunner).
+const ammoCap = f => f.w && f.w.ranged ? Math.max(1, Math.round(f.w.ranged.ammo * (f.ammoMul || 1))) : 0;
 
 // Both weapon rigs of a fighter (main first). Each has { w, ws, tip, pts, hand, elbow }.
 // Read many times every step, so the list is cached on the fighter and rebuilt only when its rigs change.
@@ -179,11 +184,12 @@ function heal(f, amount, show = true) {
 // Multipliers from statuses and the weapon, used by drive and damage.
 function moveMul(f) {
   const s = f.status;
-  return (f.w.speed || 1) * (s.haste ? 1.45 : 1) * (s.slow ? .55 : 1) * (s.rage ? 1.12 : 1) * (s.freeze ? 0 : 1) * statusMul(f, 'moveMul');
+  return (f.w.speed || 1) * (s.haste ? 1.45 : 1) * (s.slow ? .55 : 1) * (s.rage ? 1.12 : 1) * (s.freeze ? 0 : 1) * statusMul(f, 'moveMul') *
+    (f.spdMul || 1) * (f.blocking ? BLOCK.moveMul : 1) * (f.holding ? .6 : 1) * mountMul(f, 'speed');   // v3: class, guard, carrying, mount
 }
 function cdMul(f) { const s = f.status; return (s.haste ? .65 : 1) * (s.slow ? 1.35 : 1) * (s.rage ? .85 : 1) * statusMul(f, 'cdMul'); }
-function dmgMul(f) { const s = f.status; return (s.rage ? 1.35 : 1) * (s.giant ? 1.1 : 1) * statusMul(f, 'dmgMul'); }
-function takenMul(f) { return (f.w.armor || 1) * (f.off ? f.off.w.armor || 1 : 1) * (f.status.freeze ? 1.25 : 1) * statusMul(f, 'takenMul'); }
+function dmgMul(f) { const s = f.status; return (s.rage ? 1.35 : 1) * (s.giant ? 1.1 : 1) * statusMul(f, 'dmgMul') * (f.dmgCls || 1); }
+function takenMul(f) { return (f.w.armor || 1) * (f.off ? f.off.w.armor || 1 : 1) * (f.status.freeze ? 1.25 : 1) * statusMul(f, 'takenMul') * mountMul(f, 'taken'); }
 // Content statuses may set moveMul, cdMul, dmgMul or takenMul on their def (a number, or (f, s) => number).
 function statusMul(f, field) {
   let m = 1;
@@ -193,7 +199,7 @@ function statusMul(f, field) {
   }
   return m;
 }
-const canAct = f => f.alive && G_STATE.lock <= 0 && !f.status.stun && !f.status.freeze;
+const canAct = f => f.alive && G_STATE.lock <= 0 && !f.status.stun && !f.status.freeze && !f.status.ragdoll && !f.heldBy;
 
 // ---------- driving (called every physics step) ----------
 function spring(p, tx, ty, k, c) { p.fx += (tx - p.x) * k - vx(p) * c; p.fy += (ty - p.y) * k - vy(p) * c; }
@@ -210,6 +216,7 @@ function updateFacing(f) {
 
 // The body hangs like a puppet between a lifted head and weighted feet, so it stays upright but wobbles.
 function driveBody(f, dt, grounded, locked) {
+  if (f.status.ragdoll || f.heldBy) return;      // limp: thrown or held fighters just fall (22-moves moves held ones)
   const P = f.P, [head, neck, hip] = P, G = PHYS.gravity, s = f.scale, face = f.face;
   const up = (grounded ? 1 : .55) * (f.status.stun ? .45 : 1) * (f.stagger > 0 ? .75 : 1);
   head.fy -= G * 3.4 * up; neck.fy -= G * 2.2 * up; hip.fy -= G * 1.2 * up; P[8].fy += G; P[10].fy += G;
@@ -221,6 +228,7 @@ function driveBody(f, dt, grounded, locked) {
   if (f.stagger > 0 || f.dashT > 0) k *= .12;      // let knockback and dashes carry the body
   if (f.status.freeze) k = grounded ? 5 : .5;      // a frozen statue slides to a stop
   if (grounded && f.grip != null) k *= f.grip;      // maps set f.grip < 1 on slippery ground (ice)
+  if (f.wallLock > 0) k *= .12;                     // just wall-jumped: let the kick-off carry us away from the wall
   const target = mx * speed + (grounded ? f.gvx : 0);
   for (const j of UPPER_BODY) P[j].fx += (target - vx(P[j])) * k;
   for (const j of KNEES) P[j].fx += (target - vx(P[j])) * k * TUNE.kneeDrive;
@@ -237,7 +245,7 @@ function driveBody(f, dt, grounded, locked) {
   // Snappier arcs: extra gravity when falling, and when rising with the jump key released (tap = short hop).
   // Only for an upright body: a knocked-down fighter getting back up must not be pulled down.
   if (grounded) f.rising = false;
-  else if (!f.status.freeze && head.y < hip.y - 20 * s) {
+  else if (!f.status.freeze && head.y < hip.y - 20 * s && !(f.mount && f.mount.carried)) {
     const hipVy = vy(hip);
     if (hipVy > 0) f.rising = false;
     const extra = hipVy > 0 ? TUNE.fallGrav : f.rising && !f.inp.jumpHeld ? TUNE.cutGrav : TUNE.riseGrav;
@@ -246,6 +254,7 @@ function driveBody(f, dt, grounded, locked) {
 }
 
 function driveArms(f) {
+  if (f.blocking && guardPose(f)) return;          // 22-moves: weapon raised as a guard
   const P = f.P, neck = P[1], s = f.scale, face = f.face, G = PHYS.gravity;
   const guard = f.off && f.off.w.block > 0;      // a shield is held out in front, the weapon hand a little behind it
   if (f.w.ranged) aimRanged(f);
@@ -286,8 +295,9 @@ function doJump(f, mul) {
 
 function doDash(f) {
   const dir = f.inp.dash === -1 || f.inp.dash === 1 ? f.inp.dash : (Math.sign(f.inp.mx) || f.face);
-  for (const p of f.P) { p.ox = p.x - dir * TUNE.dashVel * DT; kick(p, 0, -70); }
-  f.dashCd = TUNE.dashCd; f.dashT = TUNE.dashTime; f.stats.dashes++;
+  const far = f.dashMul || 1;                     // Trickster dashes further
+  for (const p of f.P) { p.ox = p.x - dir * TUNE.dashVel * Math.sqrt(far) * DT; kick(p, 0, -70); }
+  f.dashCd = TUNE.dashCd * (f.dashCdMul || 1); f.dashT = TUNE.dashTime * Math.sqrt(far); f.stats.dashes++;
   burst(f.P[2].x, f.P[2].y, f.color, 14, 260);
   sfx('dash');
   emit('dash', f);
@@ -311,7 +321,8 @@ function attack(f) {
   const def = f.w;
   f.atkBuf = 0;
   f.atkCd = def.cd * cdMul(f);
-  if (typeof def.attack === 'function') hook(def, 'attack', f);
+  if (f.mount && MOUNTS[f.mount.key] && MOUNTS[f.mount.key].attack) hook(MOUNTS[f.mount.key], 'attack', f, f.mount);   // mounts bring their own attack
+  else if (typeof def.attack === 'function') hook(def, 'attack', f);
   else if (def.ranged) { if (!fireRanged(f)) f.atkCd = .05; }   // empty/reloading: stay ready to fire the moment it's done
   else spinAttack(f);
   emit('attack', f);
@@ -345,7 +356,7 @@ function useSkill(f, slot) {
   f.skillBuf[slot] = 0;
   if (!def || f.skillCd[slot] > 0) return false;
   if (hook(def, 'use', f) === false) return false;
-  f.skillCd[slot] = def.cd * (f.status.haste ? .8 : 1);
+  f.skillCd[slot] = def.cd * (f.status.haste ? .8 : 1) * (f.skillCdMul || 1);   // Mage: shorter cooldowns
   f.stats.skills++;
   float(f.P[0].x, f.P[0].y - 46 * f.scale, def.name.toUpperCase(), def.color, 17);
   sfx(def.sfx || 'skill');
@@ -359,32 +370,36 @@ function handleActions(f, grounded, locked) {
   if (inp.attack) f.atkBuf = TUNE.buffer;
   if (inp.skill1) f.skillBuf[0] = TUNE.buffer;
   if (inp.skill2) f.skillBuf[1] = TUNE.buffer;
+  movesInput(f);                                   // v3: guard, mash-to-escape (even while locked)
   if (locked) return;
+  if (movesActions(f, grounded)) return;           // v3: grab, throw, throwable, ultimate took this step
   if (f.jumpBuf > 0 && f.jumpCd <= 0) {
     if (grounded || f.coyote > 0) doJump(f, 1);
+    else if (f.wallT > 0) wallJump(f);               // v3: kick off a wall instead of spending the air jump
     else if (f.airJumps > 0) { f.airJumps--; doJump(f, TUNE.airJumpMul); }
   }
-  const auto = f.w.ranged && f.w.ranged.auto && inp.attackHeld;
-  if ((f.atkBuf > 0 || auto) && f.atkCd <= 0) attack(f);
+  const auto = ((f.w.ranged && f.w.ranged.auto) || mountAuto(f)) && inp.attackHeld;
+  if ((f.atkBuf > 0 || auto) && f.atkCd <= 0 && !f.blocking && !f.ult) attack(f);
   if (inp.dash && f.dashCd <= 0) doDash(f);
   for (let k = 0; k < 2; k++) if (f.skillBuf[k] > 0 && f.skillCd[k] <= 0 && f.skills[k]) useSkill(f, k);
 }
 
 function drive(f, dt) {
   if (!f.alive) return;
-  const P = f.P, grounded = P[8].g || P[10].g, locked = !canAct(f);
+  const P = f.P, grounded = P[8].g || P[10].g || !!(f.mount && f.mount.hover), locked = !canAct(f);
   const gs = P[8].gs || P[10].gs;
   f.grounded = grounded;
   f.gvx = gs ? gs.dx / DT : 0;
-  if (grounded) { f.coyote = TUNE.coyote; f.airJumps = 1 + (f.mem.extraJumps || 0); } else f.coyote -= dt;
+  if (grounded) { f.coyote = TUNE.coyote; f.airJumps = 1 + (f.mem.extraJumps || 0) + (f.clsJumps || 0); } else f.coyote -= dt;
   updateFacing(f);
   driveBody(f, dt, grounded, locked);
   driveArms(f);
+  driveMoves(f, dt, grounded);                     // v3: walls, guard, grabs, mounts, ultimates
   handleActions(f, grounded, locked);
 }
 
 // One-shot inputs last a single physics step; buffers above remember them a little longer.
-function clearPresses(f) { const i = f.inp; i.jump = i.attack = i.skill1 = i.skill2 = false; i.dash = 0; }
+function clearPresses(f) { const i = f.inp; i.jump = i.attack = i.skill1 = i.skill2 = i.block = i.grab = i.throw = i.super = i.mash = false; i.dash = 0; }
 
 function tickFighter(f, dt) {
   for (const k of ['atkCd', 'atkBuf', 'jumpBuf', 'jumpCd', 'dashCd', 'dashT', 'stagger', 'flash', 'swingT', 'comboT', 'inv']) {
@@ -395,9 +410,10 @@ function tickFighter(f, dt) {
   if (!f.alive) return;
   f.aliveT += dt;
   if (f.P[0].y < f.P[2].y - 25 * f.scale) f.upT += dt;
-  if (f.reload > 0 && (f.reload -= dt) <= 0) { f.reload = 0; f.ammo = f.w.ranged ? f.w.ranged.ammo : 0; sfx('reload'); }
-  const big = !!f.status.giant;   // giant grows weapon links smoothly instead of popping
-  for (const l of f.L) if (l.rG) l.cur = lerp(l.cur, big ? l.rG : l.r, .08);
+  if (f.reload > 0 && (f.reload -= dt * (f.reloadRate || 1)) <= 0) { f.reload = 0; f.ammo = ammoCap(f); sfx('reload'); }
+  const big = !!f.status.giant, reach = f.reachMul || 1;   // giant (and weapon level reach) grow links smoothly
+  for (const l of f.L) if (l.rG) l.cur = lerp(l.cur, (big ? l.rG : l.r) * reach, .08);
+  tickMoves(f, dt);                                // v3: stamina, timers, super meter, mounts
   tickStatus(f, dt);
   hook(f.w, 'onStep', f, dt);
   if (f.off) hook(f.off.w, 'onStep', f, dt);

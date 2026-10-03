@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Stick Clash",
+    "slug": "stick-clash",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#10121a",
+    "ios": {
+      "bundleIdentifier": "com.example.stickclash",
+      "buildNumber": "1",
+      "supportsTablet": true,
+      "requireFullScreen": true,
+      "infoPlist": {
+        "UIStatusBarHidden": true,
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.example.stickclash",
+      "adaptiveIcon": {
+        "backgroundColor": "#10121a",
+        "foregroundImage": "./assets/splash-icon.png"
+      }
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "backgroundColor": "#10121a"
+        }
+      ],
+      [
+        "expo-screen-orientation",
+        { "initialOrientation": "LANDSCAPE" }
+      ]
+    ]
+  }
+}

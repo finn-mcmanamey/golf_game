@@ -60,6 +60,7 @@ function think(f, dt) {
     aiDecide(f, L);
   }
   aiMicro(f, L, dt);
+  aiMovesStep(f, L, dt);                     // v3 moves: guard, grab/throw, mash, walls, flying mounts (66-ai-moves)
   if (MAP) aiSafety(f);
 }
 
@@ -93,14 +94,15 @@ function aiDecide(f, L) {
   aiDodge(f, L, c);
   aiSkills(f, foe, c.d, L);
   hook(f.w.ai, 'think', f, foe, c.d);
+  aiDecideMoves(f, L, c);                    // v3: ultimate, throwable, grab, guard, looting (66-ai-moves)
 }
 
 // What we know about the fight: horizontal gap d, direction, height difference of the feet, our reach.
 function aiSense(f, foe) {
   const me = f.P[2], op = foe.P[2], dx = op.x - me.x;
-  const range = f.w.ai.range * f.scale * (f.status.giant ? 1.4 : 1);
-  return { d: Math.abs(dx), dx, dir: Math.sign(dx) || f.face, dy: feetY(foe) - feetY(f), range, style: f.w.ai.style || 'melee',
-    foeRange: foe.w.ai.range * foe.scale };
+  const range = aiReach(f);                  // v3: weapon level reach and mounts (66-ai-moves)
+  return { d: Math.abs(dx), dx, dir: Math.sign(dx) || f.face, dy: feetY(foe) - feetY(f), range, style: aiStyle(f),
+    foeRange: aiReach(foe) };
 }
 
 // Chooses whom to fight: nearest, but finish off weak foes, help a hurt ally, and don't all pile on one enemy.
@@ -207,7 +209,7 @@ function aiMelee(f, L, c) {
 function aiRanged(f, L, c) {
   const a = f.ai, inp = f.inp, foe = a.foe, me = f.P[2], op = foe.P[2];
   const near = c.range * (c.style === 'kite' ? .85 : .72), far = c.range * 1.05;
-  const rusher = foe.w.ai.style === 'melee', danger = rusher ? Math.max(c.foeRange + 60, 290) : near * .6;   // ~a dash-swing away
+  const rusher = aiStyle(foe) === 'melee', danger = rusher ? Math.max(c.foeRange + 60, 290) : near * .6;   // ~a dash-swing away
   a.fire = c.d < c.range * 1.6 && chance(Math.min(1, L.attack + .15));
   if (c.d < danger) {
     const pinned = aiCornered(f, -c.dir) || aiCornered(f, -c.dir, 220);
@@ -275,7 +277,7 @@ function aiRoam(f) {
 function incoming(f) {
   const c = chest(f);
   for (const p of PROJ) {
-    if (p.team === f.team || (p.owner && p.owner.team === f.team)) continue;
+    if (p.zone || p.team === f.team || (p.owner && p.owner.team === f.team)) continue;   // zones and pickups aren't shots
     const dx = c.x - p.x, dy = c.y - p.y;
     if (dx * dx + dy * dy < 260 * 260 && dx * p.vx + dy * p.vy > 0) return p;
   }
@@ -369,7 +371,7 @@ function aiMicro(f, L, dt) {
   aiUnstick(f, dt);
   aiMoveLearn(f);
   if (!foe || !foe.alive || G_STATE.lock > 0 || !canAct(f)) return;
-  if (f.w.ai.style !== 'melee') aiEvadeDash(f, L, foe);
+  if (aiStyle(f) !== 'melee') aiEvadeDash(f, L, foe);
   if (f.w.ranged || a.fire) aiShoot(f, L, foe);
   else if (a.queue && G_STATE.t >= a.queue) { inp.attack = true; a.queue = 0; }      // the swing that follows a dash/jump
   else if (a.armed && !a.queue && f.atkCd <= 0) aiTryMove(f, L, foe);
@@ -386,8 +388,8 @@ const AI_BRAWL_WIDE = 25;   // px beyond reach where a brawling CPU starts its s
 function aiTryMove(f, L, foe) {
   const a = f.ai, inp = f.inp, me = f.P[2], op = foe.P[2];
   const gap = Math.abs(op.x + (vx(op) - vx(me)) * .08 - me.x), dir = Math.sign(op.x - me.x) || f.face;
-  if (Math.abs(feetY(foe) - feetY(f)) > f.w.ai.range * f.scale * .9 + 20) return;
-  const range = f.w.ai.range * f.scale * (f.status.giant ? 1.4 : 1);
+  const range = aiReach(f);
+  if (Math.abs(feetY(foe) - feetY(f)) > range * .9 + 20) return;
   let k = null;
   if (a.brawl) k = gap < range + AI_BRAWL_WIDE ? 'g' : null;   // pressure: plain swings, started a bit early
   else if (L.pick <= 0) k = gap < range + L.wide ? 'g' : null;

@@ -16,7 +16,7 @@ const { chromium } = require('/opt/node-tools/node_modules/playwright');
     const hipVx = f => vx(f.P[2]);
     // A fresh fighter standing in the open centre of the arena, its opponent removed.
     const solo = () => {
-      SC.start({ mode: 'pvp', map: 'neon', weapons: ['blade', 'blade'] });
+      SC.start({ mode: 'pvp', map: 'neon', weapons: ['blade', 'blade'], classes: ['none', 'none'] });   // the plain fighter
       SC.G.state = 'paused'; SC.G.lock = 0;
       const [f, g] = SC.F;
       g.alive = false; moveFighter(g, 0, 2000); moveFighter(f, 640 - f.P[2].x, 0);

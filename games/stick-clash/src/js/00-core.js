@@ -2,9 +2,11 @@
 // Everything here is plain data and functions; no DOM access at load time.
 
 const W = 1280, H = 720, DT = 1 / 120;      // logical arena size and fixed physics step
-const VERSION = '2.0.0';
+const VERSION = '3.0.0';
 const TAU = Math.PI * 2;
-const DEFAULT_COLORS = ['#2ee6ff', '#ff8a2e', '#9dff5a', '#ff5ad1'];
+// One neon colour per fighter slot (up to MAX_FIGHTERS); the first four are the classic player colours.
+const DEFAULT_COLORS = ['#2ee6ff', '#ff8a2e', '#9dff5a', '#ff5ad1', '#ffd84a', '#b98cff', '#7dffcf', '#ff4a6a'];
+const MAX_FIGHTERS = 8;                     // roster cap for party modes (HUD, spawns and perf are sized for it)
 const FONT_DISPLAY = 'Bungee, Impact, "Arial Black", sans-serif';
 const FONT_BODY = '"Chakra Petch", system-ui, sans-serif';
 
@@ -129,6 +131,8 @@ const store = {
 // Events: matchStart(cfg) roundStart(round) roundEnd(winnerTeam, reason) matchOver(result) state(now, before)
 // damage(target, amount, opts) hit(attacker, target, hit) ko(victim, killer, opts) clash(A, B, x, y) block(target, src)
 // attack(f) fire(f, proj) jump(f) dash(f) skill(f, key) status(f, name, secs) orb(f, orb)
+// v3: parry(B, A) guardBreak(f) grab(A, B) throw(A, B) grabEscape(B, A) wallJump(f) disarm(B, A, wkey) pickup(f, item)
+// levelUp(f, lvl) ultimate(f, cat) throwable(f, key, proj) mount(f, key) dismount(f, key) element(f, key) shatter(f)
 const BUS = {};
 function on(ev, fn) { (BUS[ev] = BUS[ev] || []).push(fn); return () => off(ev, fn); }
 function off(ev, fn) { const l = BUS[ev]; if (l && l.includes(fn)) l.splice(l.indexOf(fn), 1); }
@@ -140,6 +144,7 @@ function emit(ev, ...args) {
 
 // ---------- registries ----------
 const WEAPONS = {}, SKILLS = {}, MAPS = {}, MODES = {}, ORBS = {}, HATS = {}, STATUS = {};
+const CLASSES = {}, THROWABLES = {}, MOUNTS = {}, ULTIMATES = {}, ELEMENTS = {};   // v3 fighting depth
 const WEAPON_CATS = ['blade', 'heavy', 'polearm', 'chain', 'fist', 'ranged', 'magic', 'exotic', 'shield'];
 
 function defError(kind, key, msg) { report(new Error(msg), `def${kind}('${key}')`); }
@@ -209,6 +214,36 @@ function defStatus(key, def) {
   return register(STATUS, 'Status', key, def, { name: key, icon: '•', color: '#ffffff', debuff: false, max: 30, immunity: 0 }, []);
 }
 
+// ---------- v3 fighting-depth registries (runtime in 22-moves, 24-classes, 33-power, 34-throwables, 56, 57) ----------
+// Class: body and passive. Every number is a multiplier on the base fighter (1 = unchanged).
+function defClass(key, def) {
+  return register(CLASSES, 'Class', key, def, { name: key, icon: '◆', color: '#ffffff', desc: '', passive: '', hp: 1, speed: 1,
+    mass: 1, stamina: 1, dmg: 1, cd: 1, ammo: 1, reload: 1, dash: 1, airJumps: 0, hidden: false }, []);
+}
+// Throwable: throw(f, aim) spawns its projectile from aim = { x, y, vx, vy, foe } and returns it.
+function defThrowable(key, def) {
+  const t = register(THROWABLES, 'Throwable', key, def, { name: key, icon: '●', color: '#ffffff', desc: '', hidden: false }, ['throw']);
+  if (t) t.ai = Object.assign({ min: 120, max: 520, when: null }, def.ai);
+  return t;
+}
+// Mount: a ridden power-up (hoverboard, mech...). drive(f, dt, m) moves it, attack(f, m) replaces the weapon swing.
+function defMount(key, def) {
+  const m = register(MOUNTS, 'Mount', key, def, { name: key, icon: '♞', color: '#ffffff', desc: '', time: 8, hp: 45, hidden: false }, ['draw']);
+  if (m) m.ai = Object.assign({ range: 140, style: 'melee', fly: false }, def.ai);
+  return m;
+}
+// Ultimate: one per weapon category, fired with a full super meter. use(f, u) (optional, false = can't now) starts
+// it, step(f, dt, u) runs it every step for `time` seconds, end(f, u) and draw(ctx, f, u) are optional.
+function defUltimate(cat, def) {
+  const u = register(ULTIMATES, 'Ultimate', cat, def, { name: cat, color: '#ffd84a', time: 1, hidden: false }, ['step']);
+  if (u) u.ai = Object.assign({ range: 260 }, def.ai);
+  return u;
+}
+// Element fused into a weapon by an elemental orb: hit(A, B, dealt, o) runs on each direct hit with it.
+function defElement(key, def) {
+  return register(ELEMENTS, 'Element', key, def, { name: key, adj: key, icon: '✦', color: '#ffffff', hidden: false }, ['hit']);
+}
+
 // Visible entries of a registry (not hidden), in a stable order for menus and random picks.
 function listOf(reg) {
   return Object.values(reg).filter(d => !d.hidden).sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
@@ -219,7 +254,7 @@ function randomKey(reg, filter) {
 }
 
 // ---------- world state ----------
-let F = [];             // fighters in the current round (2-4)
+let F = [];             // fighters in the current round (2-MAX_FIGHTERS)
 let PROJ = [];          // live projectiles
 let ORB_LIST = [];      // power-up orbs lying in the arena
 let MAP = null;         // the current map: a runtime copy of a MAPS def with live solids/hazards

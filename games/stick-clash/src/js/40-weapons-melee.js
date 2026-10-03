@@ -475,7 +475,7 @@ defWeapon('frying-pan', {
 });
 
 defWeapon('chainsaw', {
-  power: 1.12,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 1.38,   // balance: × damage dealt with it (see tmp/balance.md; raised from 1.12 for v3)
   name: 'Ripper Saw', cat: 'exotic', twoHanded: true, color: '#ffb347', order: 26,
   desc: 'Revving chainsaw. Attacks spin it up: while revving it grinds anything it touches for steady damage.',
   len: 70, mass: 1.6, dmg: .6, width: 7, speed: .95, kb: .7,

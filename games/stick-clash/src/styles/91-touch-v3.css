@@ -1,0 +1,16 @@
+/* 91-touch-v3.css: on-screen buttons for the v3 moves (core slice). Block sits beside dash; super, throwable and grab
+   are a row of small buttons above the main cluster. Super glows when the meter is full (90-input sets .ready). */
+#touch .tpad-r { max-width: 300px; }
+#touch .tsmall { display: flex; gap: 10px; justify-content: flex-end; width: 100%; }
+#touch .tsmall button { width: 46px; height: 46px; font-size: 16px; }
+#touch button[data-act="block"] { color: #7fd8ff; border-color: rgba(127, 216, 255, .5); }
+#touch button[data-act="super"] { color: rgba(255, 216, 74, .45); }
+#touch button[data-act="super"].ready { color: #07080f; background: rgba(255, 216, 74, .85); border-color: #ffd84a;
+  box-shadow: 0 0 16px rgba(255, 216, 74, .8); }
+#touch button[data-act="throw"] { color: var(--sc, var(--fg)); border-color: var(--sc, rgba(160, 170, 255, .35)); }
+#touch button[data-act="throw"][data-n="0"] { opacity: .35; }
+@media (max-height: 420px) {
+  #touch .tpad-r { max-width: 280px; gap: 8px; }
+  #touch .tpad-r > button:not(.big) { width: 54px; height: 54px; }
+  #touch .big { width: 70px; height: 70px; }
+}

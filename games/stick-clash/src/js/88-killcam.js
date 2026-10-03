@@ -36,7 +36,10 @@ function kcSnapFighter(f) {
   f.P.forEach((p, j) => { pts[j * 2] = p.x; pts[j * 2 + 1] = p.y; });
   const status = {};
   for (const k in f.status) status[k] = Object.assign({}, f.status[k]);
-  return { ref: f, pts, nums: kcNums(f), status, alive: f.alive, grounded: f.grounded };
+  // v3 drawing state that isn't a plain number: guard, fused element, mount and running ultimate (copied as they were).
+  const v3 = { blocking: !!f.blocking, element: f.element || null, mount: f.mount ? Object.assign({}, f.mount) : null,
+    ult: f.ult ? Object.assign({}, f.ult) : null };
+  return { ref: f, pts, nums: kcNums(f), status, alive: f.alive, grounded: f.grounded, v3 };
 }
 
 function kcSnapshot() {
@@ -184,6 +187,7 @@ function kcGhostFighter(sa, sb, k, gdt) {
   if (!g) P.ghosts.set(real, g = Object.assign(Object.create(real), { trail: [], P: [] }));
   Object.assign(g, sa.nums);
   g.status = sa.status; g.alive = sa.alive; g.grounded = sa.grounded;
+  if (sa.v3) Object.assign(g, sa.v3);
   const n = sa.pts.length / 2, useB = sb && sb.pts.length === sa.pts.length;
   if (g.P.length !== n) g.P = Array.from({ length: n }, () => ({ x: 0, y: 0, ox: 0, oy: 0, fresh: true }));
   for (let j = 0; j < n; j++) {
@@ -268,7 +272,7 @@ function kcDrawCaption(c2, y) {
     const you = k.name === 'YOU';   // "YOU knock out", "CPU knocks out"
     word(ko.ringout ? (you ? 'ring out' : 'rings out') : (you ? 'knock out' : 'knocks out'), '#ff4a6a', plain);
     word(v.name, v.color, name);
-    if (!ko.ringout && k.w && k.w.name) { word('with', '#9096c2', plain); word(k.w.name, '#ffffff', name); }
+    if (!ko.ringout && k.w && k.w.name) { word('with', '#9096c2', plain); word(weaponLabel(k), '#ffffff', name); }   // "Flaming Chainsaw"
   } else {
     word(v.name, v.color, name);
     word(ko.ringout ? 'falls out of the arena' : 'is knocked out', '#ff4a6a', plain);

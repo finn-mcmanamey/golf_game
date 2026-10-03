@@ -215,10 +215,11 @@ SCREENS.loadout = () => {
     return el('button', { role: 'tab', 'aria-selected': String(k === i), 'data-key': 'picker-' + k, style: { '--pc': l.color },
       onclick: () => { LO.picker = k; LO.confirm = null; uiSfx('click'); refreshScreen(); } }, el('i'), labels[k] || `Fighter ${k + 1}`);
   })) : null;
-  const sections = [['weapon', 'Weapon'], ['skills', 'Skills'], ['style', 'Style']];
+  const sections = [['weapon', 'Weapon'], ['skills', 'Skills'], ['class', 'Class'], ['gear', 'Throwables'], ['style', 'Style']];
   const subTabs = el('div', { class: 'seg sub-tabs', role: 'tablist' }, sections.map(([k, t]) =>
     el('button', { role: 'tab', 'aria-pressed': String(LO.tab === k), 'data-key': 'tab-' + k, onclick: () => { LO.tab = k; uiSfx('click'); refreshScreen(); } }, t)));
-  const content = LO.tab === 'skills' ? skillsTab(i, lo) : LO.tab === 'style' ? styleTab(i, lo) : weaponTab(i, lo);
+  const tabs3 = { skills: skillsTab, style: styleTab, class: classTab, gear: gearTab };
+  const content = (tabs3[LO.tab] || weaponTab)(i, lo);
   const last = i >= n - 1;
   const next = el('button', { class: 'go', onclick: () => { uiSfx('click'); if (last) openScreen('maps', 'loadout'); else { LO.picker++; refreshScreen(); } } },
     last ? 'Arena ▸' : `Next: ${labels[i + 1] || 'Fighter ' + (i + 2)} ▸`);
@@ -243,7 +244,61 @@ function previewPane(i, lo, label) {
     el('p', { class: 'lo-desc', text: w ? w.desc : 'Rolls a different weapon from the whole arsenal for each match.' }),
     statBars(w && w.key),
     w && weaponTraits(w).length ? el('p', { class: 'traits', text: weaponTraits(w).join(' · ') }) : null,
-    el('div', { class: 'skill-chips' }, skills));
+    el('div', { class: 'skill-chips' }, skills, loadoutChipsV3(lo)));
+}
+
+// Class and throwable chips under the preview.
+function loadoutChipsV3(lo) {
+  const c = CLASSES[lo.cls], chip = (d, fallback) => el('span', { class: 'skill-chip', style: d ? { '--sc': d.color } : null },
+    el('b', { text: d ? d.icon : '🎲' }), d ? d.name : fallback);
+  return [chip(c, 'Random class'), ...lo.throws.map(k => THROWABLES[k] ? chip(THROWABLES[k]) : k === 'random' ? chip(null, 'Random throwable') : null)];
+}
+
+// ---------- class tab ----------
+// Stat bars are scaled across the range the classes actually use, so the differences are easy to see.
+function classTab(i, lo) {
+  const pick = key => () => { lo.cls = key; saveMenu(); uiSfx('click'); refreshScreen(); };
+  const bar = (label, v) => el('div', { class: 'bar' }, el('span', { text: label }), el('b', { style: { '--v': (clamp(v, .06, 1) * 100).toFixed(0) + '%' } }));
+  const tiles = listOf(CLASSES).map(c => el('button', { class: 'skill-tile class-tile' + (lo.cls === c.key ? ' sel' : ''), 'data-key': 'cls-' + c.key,
+    style: { '--sc': c.color }, title: c.passive, onclick: pick(c.key) },
+  el('span', { class: 'sk-icon', text: c.icon }),
+  el('span', { class: 'sk-text' }, el('strong', { text: c.name }), el('small', { text: c.desc }), el('em', { class: 'cl-passive', text: c.passive })),
+  el('div', { class: 'bars cl-bars' }, bar('Health', (c.hp - .8) / .6), bar('Speed', (c.speed - .8) / .36), bar('Weight', (c.mass - .7) / .75),
+    bar('Guard', (c.stamina - .8) / .75))));
+  const random = el('button', { class: 'skill-tile class-tile' + (CLASSES[lo.cls] ? '' : ' sel'), 'data-key': 'cls-random', onclick: pick('random') },
+    el('span', { class: 'sk-icon', text: '🎲' }), el('span', { class: 'sk-text' }, el('strong', { text: 'Random' }), el('small', { text: 'A different class every match.' })));
+  return el('div', { class: 'tab-body' },
+    el('p', { class: 'hint', text: 'Your class sets your health, speed and weight, and adds a passive. Every class can win: pick a style.' }),
+    el('div', { class: 'skill-grid class-grid' }, random, tiles));
+}
+
+// ---------- throwables tab ----------
+function gearTab(i, lo) {
+  const th = lo.throws, set = (a, b) => { lo.throws = [a, b]; saveMenu(); uiSfx('click'); refreshScreen(); };
+  const human = !isCpuPicker(i), key = human && BINDS[Math.min(i, 1)] ? keyLabel(BINDS[Math.min(i, 1)].throw) : '';
+  const slots = el('div', { class: 'skill-slots' }, [0, 1].map(s => {
+    const d = THROWABLES[th[s]];
+    return el('div', { class: 'slot', style: d ? { '--sc': d.color } : null }, el('small', { text: `Throw ${s + 1}` + (key ? ` · key ${key}` : '') }),
+      el('strong', {}, el('b', { text: d ? d.icon : th[s] === 'random' ? '🎲' : '–' }), d ? d.name : th[s] === 'random' ? 'Random' : 'Empty'));
+  }),
+  el('div', { class: 'slot-actions' },
+    el('button', { 'data-key': 'th-random', onclick: () => set('random', 'random') }, '🎲 Random'),
+    el('button', { 'data-key': 'th-clear', onclick: () => set('none', 'none') }, 'Clear')));
+  const toggle = k => {
+    const at = th.indexOf(k), next = th.slice();
+    if (at >= 0) { next[at] = 'none'; return set(...next); }
+    const free = th.findIndex(x => !THROWABLES[x]);
+    if (free >= 0) { next[free] = k; return set(...next); }
+    set(th[1], k);
+  };
+  const grid = el('div', { class: 'skill-grid' }, listOf(THROWABLES).map(t => {
+    const slot = th.indexOf(t.key);
+    return el('button', { class: 'skill-tile' + (slot >= 0 ? ' sel' : ''), 'data-key': 'th-' + t.key, style: { '--sc': t.color }, title: t.desc, onclick: () => toggle(t.key) },
+      el('span', { class: 'sk-icon', text: t.icon }), el('span', { class: 'sk-text' }, el('strong', { text: t.name }), el('small', { text: t.desc })),
+      slot >= 0 ? el('span', { class: 'sk-badge', text: String(slot + 1) }) : null);
+  }));
+  return el('div', { class: 'tab-body' },
+    el('p', { class: 'hint', text: 'Pick two throwables. Each can be thrown once per round, lobbed at the nearest foe.' }), slots, grid);
 }
 
 // ---------- weapon tab ----------

@@ -1,13 +1,13 @@
 # Stick Clash
 
-Wobbly neon stickmen, floppy weapons, big knockbacks. Stick Clash is a physics duel game for one or two players
-(plus CPUs) that runs in any modern browser. There is nothing to install.
+Wobbly neon stickmen, floppy weapons, big knockbacks. Stick Clash is a physics fighting game for one or two players
+(plus up to 8 fighters with CPUs) that runs in any modern browser. There is nothing to install.
 
 **To play:** open `dist/stick-clash.html` in Chrome, Edge, Firefox or Safari. If it isn't there yet, run
 `node build.mjs` first. It works offline from your disk.
 
-Everything is unlocked from the start: 51 weapons, 24 skills, 15 arenas and 13 modes. Coins you earn buy hats and
-colour packs in the Shop. They are just for style.
+Everything is unlocked from the start: 51 weapons, 24 skills, 6 classes, 6 throwables, 8 ultimates, 15 arenas and
+13 modes. Coins you earn buy hats and colour packs in the Shop. They are just for style.
 
 ## Controls
 
@@ -15,10 +15,14 @@ colour packs in the Shop. They are just for style.
 |---|---|---|---|
 | Move | A / D | ← / → | Left stick or d-pad |
 | Jump (press again in the air to double jump; tap for a short hop) | W | ↑ | A |
-| Attack | S | ↓ | X (or RT) |
-| Skill 1 | Q | . | B (or LB) |
+| Attack | S | ↓ | X |
+| Skill 1 | Q | . | B |
 | Skill 2 | E | / | Y |
-| Dash (or double-tap left/right) | Left Shift | Right Shift | RB (or LT) |
+| Dash (or double-tap left/right) | Left Shift | Right Shift | RB |
+| Block (hold; a fresh press just before a hit parries) | F | , | LT |
+| Grab, then again to throw (or block + attack) | C | L | RT |
+| Throwable | R | ; | LB |
+| Super (when the meter is full) | X | Enter | R3 (right stick click) or Back |
 | Pause | Esc or P | Esc or P | Start |
 | Mute | M | M | |
 
@@ -28,7 +32,7 @@ colour packs in the Shop. They are just for style.
 - **Menus:** use the arrow keys or WASD, Enter to select and Esc to go back. A gamepad works the same way with the
   d-pad, A and B.
 - **Touch screens:** on-screen buttons appear during a match. Slide your thumb between ◀ and ▶ to turn, and the skill
-  buttons show each skill's cooldown.
+  buttons show each skill's cooldown. ◆ blocks while held; ★ (super), ● (throwable) and ✋ (grab) sit in a row above.
 
 ### How fighting works
 
@@ -41,8 +45,69 @@ colour packs in the Shop. They are just for style.
 - **Heavy hits** send fighters flying, and the final blow hits hardest. On arenas without walls or floor you can be
   knocked off the stage for a **ring-out**.
 - **Power-up orbs** float into most arenas. Touch one to grab it (see the list below).
+- **Walls:** in the air, hold toward a wall to slide down it slowly, and press jump to kick off it (arena edges and tall
+  blocks).
 - A fight is first to 5 rounds unless the mode says otherwise. Change rounds, health, game speed, orbs and CPU level
   under **Settings**.
+
+### Fighting depth
+
+- **Block and parry.** Hold block to raise your guard: hits from the front only chip you, but each drains the stamina
+  bar under your health (holding the guard drains it slowly too). Run out and your **guard breaks**: you are stunned for
+  a second. Raise the guard *just before* a hit lands (within about 0.15 s, with a fresh press) to **parry**: no damage,
+  stamina back, and the attacker is staggered. A parried shot flies back at the shooter. Blasts can be blocked but not
+  parried.
+- **Grab and throw.** Up close, grab (or press attack while blocking). Grabs go straight through a guard. Press again to
+  throw the foe the way you are holding; they tumble like a rag doll. Held? Mash any button to break free.
+- **Disarms.** A big hit can knock the weapon out of a hand. It lands on the ground: walk over it bare-handed to take it,
+  or press grab beside it to swap. The disarmed fighter fights with bare fists, and after 5 seconds a **supply crate**
+  with a random weapon parachutes in beside them. A K.O.'d fighter's weapon drops too.
+- **Super meter and ultimates.** Dealing and taking damage fills the gold bar. When it glows, press super to unleash the
+  ultimate of your weapon's type. The meter carries over between rounds.
+- **Weapon levels.** Your weapon levels up as it deals damage, for the rest of the match: **Lv2** reaches further and
+  hits harder, **Lv3** hits harder still and leaves an elemental trail whose hits burn, chill, shock or poison.
+- **Throwables.** Pick two in the loadout; each can be thrown once per round, lobbed at the nearest foe.
+- **Combo weapons.** Elemental orbs (fire, ice, shock, poison) fuse with your weapon for the round: a *Flaming
+  Chainsaw*, a *Shocking Katana*...
+- **Mounts.** Rare orbs give you a ride for a few seconds; one big hit knocks you off.
+- **Limb shatter.** Every K.O. pops the fighter apart into glowing neon pieces (no blood), replayed in the kill-cam.
+
+### Classes
+
+Pick one in the loadout (the **Class** tab). Every class wins 44-54% against the others in CPU tests.
+
+| Class | Body | Passive |
+|---|---|---|
+| **Ninja** | Fast, light (knocked further) | Extra mid-air jump (triple jump) |
+| **Brute** | Slow, heavy | Melee hits +12% and knock weapons loose more often |
+| **Mage** | Balanced | Skill cooldowns 38% shorter; super meter fills 15% faster |
+| **Gunner** | Balanced | +50% ammo, reloads 60% faster, one extra throwable |
+| **Tank** | Slow, heavy, hits a little softer | +15% health, +50% guard stamina, hard to knock away |
+| **Trickster** | A little faster | Dash goes 60% further, recharges faster and turns you invisible for a moment |
+
+### Ultimates (one per weapon type)
+
+| Weapon type | Ultimate |
+|---|---|
+| Blades | **Phantom Edge**: blink through everyone in front, then every foe passed is cut again |
+| Heavy | **Earthbreaker**: leap, slam, and a shockwave launches everyone on the ground |
+| Polearms | **Skyline Skewer**: three spectral thrusts down a long line, the last sends them flying |
+| Chains | **Cyclone**: a whirlwind that pulls foes in, shreds them and blasts them away |
+| Fists | **Meteor Flurry**: rush the nearest foe, a flurry of blows and a towering uppercut |
+| Ranged | **Bullet Storm**: a rain of shots falls on every foe |
+| Magic | **Arcane Nova**: float, gather power, then a huge nova |
+| Exotic | **Chaos Parade**: a parade of bouncing, homing oddities with random effects |
+
+### Throwables
+
+| Throwable | |
+|---|---|
+| **Grenade** | Bounces about, then blows up after 1.5 s (or on contact). |
+| **Sticky Bomb** | Sticks to the first fighter or wall it touches and explodes a moment later. |
+| **Proximity Mine** | Lands and arms itself. The first foe to step close sets it off. |
+| **Smoke Bomb** | A thick cloud: anyone inside is hidden from sight and aim. |
+| **Ice Bomb** | Shatters on impact and freezes everyone nearby for 1.2 s. |
+| **Cluster Bomb** | Pops after a second and scatters five bomblets. |
 
 ## Modes
 
@@ -50,13 +115,13 @@ colour packs in the Shop. They are just for style.
 |---|---|
 | **1P vs CPU** | Duel the computer. First to 5 rounds wins. |
 | **2 Players** | Two players, one keyboard (or gamepads). First to 5. |
-| **CPU vs CPU** | Sit back and watch two bots brawl. |
+| **CPU vs CPU** | Sit back and watch the bots brawl: a duel, or up to 8 in a free-for-all (Fighters on the arena screen). |
 | **Tournament** | Beat 8 challengers of rising skill, then a giant champion. Best of 3 each; one loss ends the run. |
 | **Survival** | Endless waves that keep getting tougher, with a boss every 5th. Your health carries over. How far can you go? |
 | **Boss Rush** | Five giant bosses, each with its own trick. Extra health, refilled for every boss; one loss ends the run. |
 | **Team 2v2** | You and a CPU partner against two rival CPUs. Your ally backs you up. First team to 3 rounds. |
 | **Co-op 2v2** | Player 1 and Player 2 team up against two CPUs. First team to 3 rounds. |
-| **Free-for-All** | Four fighters, everyone for themselves. Last one standing takes the round. First to 3. |
+| **Free-for-All** | Up to 8 fighters (4 by default), everyone for themselves. Last one standing takes the round. First to 3. |
 | **One-Hit KO** | Every solid hit kills. Patience, spacing and timing win. You vs CPU, first to 5. |
 | **Weapon Roulette** | Random weapons every round, re-spun every 15 s mid-fight. Adapt fast! First to 5. |
 | **King of the Hill** | Stand in the glowing zone to score. It moves, and KOs respawn. First to 15 takes the round. |
@@ -205,6 +270,11 @@ Each fighter carries two skills (Skill 1 and Skill 2) with their own cooldowns, 
 | **Skill Reset** | Both skills are ready again instantly. |
 | **Sky Boots** | An extra mid-air jump (triple jump) for 10 seconds. |
 | **Thorn Mail** | For 8 seconds, melee attackers take half the damage they deal you. |
+| **Fire / Ice / Shock / Poison Orb** | Fuses that element into your weapon for the round (burn, chill and freeze, arcing stun, poison). |
+| **Hoverboard** (rare) | 8 s: glide at high speed and ram foes. |
+| **Mech Suit** (rare) | 9 s: half damage, almost no knockback; attack throws a crushing mech punch. |
+| **Jetpack** (rare) | 8 s: hold jump to fly; the exhaust burns anyone underneath. |
+| **Dragon** (rare) | 8 s: fly with jump and hold attack to breathe fire. |
 
 ## Arenas
 
@@ -239,13 +309,16 @@ Arena traps always flash a warning before they strike, and they stay quiet for t
 
 - Don't mash. Wind up, then swing *into* your foe while moving.
 - Dash and jump to dodge, and use the double jump to get back onto a ledge.
-- Against guns, close the distance fast or bat the shots back with a quick swing.
+- Against guns, close the distance fast or bat the shots back with a quick swing (or a parry).
+- Someone turtling behind a guard? Grab them. Someone grabbing? Hit them first.
+- Bare-handed? Run for a weapon on the floor, or wait for the supply crate.
 - Watch the arena: hazards glow or flash before they strike.
 - The deciding blow of a match is replayed in slow motion (press any key to skip).
 
 ## For developers
 
 The code is plain HTML, CSS and JavaScript with no libraries. `src/js/*.js` are slices of one script, joined in
-filename order by `node build.mjs` into the single file `dist/stick-clash.html`. `node tools/smoke.cjs` tests every
-weapon, skill, map and mode. Read **ARCHITECTURE.md** before changing anything. The latest balance measurements are in
+filename order by `node build.mjs` into the single file `dist/stick-clash.html` (the build fails above 1.5 MB and
+prints every slice's size). `node tools/smoke.cjs` tests every weapon, skill, map, mode, class, throwable, mount,
+ultimate and element. `node tools/class-balance.cjs` measures class win rates. Read **ARCHITECTURE.md** before changing anything. The latest balance measurements are in
 `tmp/balance.md`.

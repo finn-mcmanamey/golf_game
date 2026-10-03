@@ -12,10 +12,18 @@ function strikeAll() {
   for (const A of F) {
     if (!A.alive) continue;
     for (const B of F) {
-      if (B === A || B.team === A.team || !B.alive) continue;
+      if (B === A || B.team === A.team || !B.alive || outOfReach(A, B, 0)) continue;
       for (const rig of rigsOf(A)) strike(A, B, rig);
     }
   }
+}
+
+// Broad phase for crowded (up to 8 fighter) matches: A's weapons can't touch B (or B's weapons) from this far.
+// Generous on purpose (giant, weapon levels, flung chains): it only skips pairs that are clearly apart.
+function weaponReach(f) { let r = 0; for (const rig of rigsOf(f)) r = Math.max(r, rig.w.len); return (90 + r * 1.9) * f.scale; }
+function outOfReach(A, B, both) {
+  const dx = A.P[2].x - B.P[2].x, dy = A.P[2].y - B.P[2].y, R = weaponReach(A) + (both ? weaponReach(B) : 150 * B.scale);
+  return dx * dx + dy * dy > R * R;
 }
 
 // Hit-cooldown keys ('3m', '3o') are built once per fighter id instead of a new string every check.
@@ -71,8 +79,11 @@ function damage(B, amount, o = {}) {
   if (G_STATE.ending && G_STATE.winner >= 0 && B.team === G_STATE.winner) return 0;
   const x = o.x ?? B.P[1].x, y = o.y ?? B.P[1].y;
   if (direct && B.status.shield) { blockHit(B, A, x, y, o); return 0; }
+  const guard = direct ? guardHit(B, A, o, x, y, amount) : 1;     // 22-moves: a raised guard takes chip damage, a parry none
+  if (guard <= 0) return 0;
+  if (guard < 1) o = Object.assign({}, o, { kb: (o.kb || 0) * BLOCK.kbMul, blocked: true });
   const shatter = direct && B.status.freeze;
-  const amt = Math.max(1, Math.round(amount * (A ? dmgMul(A) * weaponPower(A, kind) : 1) * (direct ? takenMul(B) : 1) * (B.dmgTakenMul || 1) * aiArmorMul(B, A)));
+  const amt = Math.max(1, Math.round(amount * guard * (A ? dmgMul(A) * weaponPower(A, kind) : 1) * (direct ? takenMul(B) : 1) * (B.dmgTakenMul || 1) * aiArmorMul(B, A)));
   B.hp = Math.max(0, B.hp - amt);
   B.flash = .12; B.stats.dmgTaken += amt;
   if (A) {
@@ -91,7 +102,10 @@ function damage(B, amount, o = {}) {
 }
 
 // A weapon's `power` (balance knob, default 1) scales what its wielder deals with it; skills and statuses are unaffected.
-const weaponPower = (A, kind) => kind === 'melee' || kind === 'proj' || kind === 'explode' ? (A.w.power || 1) : 1;
+// Weapon levels (33-power) add to it: Lv2 and Lv3 hit harder with that weapon.
+// The Brute class (24-classes) adds meleeCls on top for melee hits.
+const weaponPower = (A, kind) => kind === 'melee' || kind === 'proj' || kind === 'explode' ?
+  (A.w.power || 1) * (A.lvlDmg || 1) * (kind === 'melee' ? A.meleeCls || 1 : 1) : 1;
 
 // Hits within 0.1 s of the last counted one (a pellet spread, a kunai fan, a minigun burst) are one combo step.
 // Each fighter has one combo label that updates in place. In crowded matches CPUs only show milestones (5, 10, ...).
@@ -110,7 +124,7 @@ function countCombo(A) {
 function knockback(B, o, amt) {
   B.stagger = Math.max(B.stagger, clamp(amt * TUNE.staggerPerDmg, .06, TUNE.staggerMax));
   if (!o.kb) return;
-  const kb = o.kb * (B.hp > 0 ? 1 : 1.6) / Math.pow(B.scale, 1.5) * (B.kbMul || 1);
+  const kb = o.kb * (B.hp > 0 ? 1 : 1.6) / Math.pow(B.scale, 1.5) * (B.kbMul || 1) * (B.kbCls || 1) * mountMul(B, 'kb');   // v3: class mass, mounts
   const nx = o.nx || 0, ny = o.ny || 0, lift = 60 + kb * .18;
   const parts = o.parts || [1, 2];
   for (const j of ALL_BODY) {
@@ -167,7 +181,7 @@ function clashAll() {
   for (let i = 0; i < F.length; i++) {
     for (let j = i + 1; j < F.length; j++) {
       const A = F[i], B = F[j];
-      if (A.team !== B.team && A.alive && B.alive) clash(A, B);
+      if (A.team !== B.team && A.alive && B.alive && !outOfReach(A, B, 1)) clash(A, B);
     }
   }
 }
@@ -300,7 +314,8 @@ function projHit(p, B, T, x, y) {
   if (p.explode > 0) { p.x = x; p.y = y; killProj(p, 'hit', B); return; }   // the blast deals the damage
   const sp = Math.hypot(p.vx, p.vy) || 1;
   const dealt = damage(B, p.dmg * (T.head ? p.headMul : 1), { src: p.owner, x, y, nx: p.vx / sp, ny: p.vy / sp,
-    kb: p.kb ?? Math.min(sp * .28, 450), head: T.head, kind: 'proj', status: p.status, parts: [T.a, T.b, 2], color: p.color, small: p.small });
+    kb: p.kb ?? Math.min(sp * .28, 450), head: T.head, kind: p.dmgKind || 'proj', status: p.status, parts: [T.a, T.b, 2], color: p.color, small: p.small, proj: p });
+  if (p.reflected) { p.reflected = false; return; }   // parried (22-moves): it flies back at its owner instead
   hook(p, 'onHit', p, B, dealt);
   if (p.pierce > 0) p.pierce--; else killProj(p, 'hit', B);
 }
@@ -331,7 +346,7 @@ function projHitsWorld(p, x0, y0) {
 function killProj(p, why, target) {
   if (p.dead) return;
   p.dead = true;
-  if (p.explode > 0) explode(p.x, p.y, p.explode, p.dmg, p.owner, { status: p.status, color: p.color, kb: p.kb, team: p.team });
+  if (p.explode > 0) explode(p.x, p.y, p.explode, p.dmg, p.owner, { status: p.status, color: p.color, kb: p.kb, team: p.team, kind: p.blastKind });
   else if (why === 'world') burst(p.x, p.y, p.color, 5, 160, { life: .25 });
   hook(p, 'onExpire', p, why, target);
 }
@@ -349,7 +364,7 @@ function explode(x, y, radius, dmg, owner, o = {}) {
     let nx = c.x - x, ny = c.y - y - 30;
     const n = Math.hypot(nx, ny) || 1;
     damage(B, dmg * fall, { src: owner, x: c.x, y: c.y, nx: nx / n, ny: ny / n, kb: (o.kb ?? 650) * fall,
-      kind: o.kind || 'explode', status: o.status, parts: ALL_BODY, color: o.color });
+      kind: o.kind || 'explode', status: o.status, parts: ALL_BODY, color: o.color, blast: true });
   }
   const color = o.color || '#ffb347';
   ring(x, y, radius, color, .35, 6); ring(x, y, radius * .55, '#ffffff', .22, 3);

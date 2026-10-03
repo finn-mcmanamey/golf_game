@@ -273,10 +273,12 @@ function drawIceBlock(f) {
 }
 
 function drawFighter(f) {
+  if (!f.alive && f.shatterT > 0) return;          // K.O.'d: the body burst into neon pieces (36-shatter)
   const P = f.P, sc = f.scale, base = fighterAlpha(f);
   ctx.save();
   ctx.globalAlpha = base; ctx.lineCap = ctx.lineJoin = 'round';
   drawTrail(f, base);
+  drawFighterUnder(f);                             // v3: hoverboard, dragon (22-moves dispatches)
   if (f.alive && (f.status.haste || f.dashT > 0)) {   // afterimage
     ctx.globalAlpha = base * .22;
     ctx.save(); ctx.translate(-f.face * 16 * sc, 0); drawBody(f, f.color, 6 * sc); ctx.restore();
@@ -288,6 +290,7 @@ function drawFighter(f) {
   for (const rig of rigsOf(f)) hook(rig.w, 'draw', ctx, f, weaponView(f, rig));
   drawStatusOverlays(f);
   for (const key of f.skills) if (key && SKILLS[key] && SKILLS[key].draw) hook(SKILLS[key], 'draw', ctx, f);
+  drawFighterOver(f);                              // v3: guard arc, element glow, Lv3 trail, mech/jetpack, ultimates
   ctx.restore();
   if (f.alive) drawTags(f);
 }
@@ -410,14 +413,15 @@ function drawAmmo(f, x, y, dir) {
     ctx.fillStyle = '#c9cdee'; ctx.fillText('RELOAD', x, y - 11);
     return w;
   }
-  if (r.ammo <= 12) {
-    for (let k = 0; k < r.ammo; k++) {
+  const cap = ammoCap(f);
+  if (cap <= 12) {
+    for (let k = 0; k < cap; k++) {
       ctx.fillStyle = k < f.ammo ? f.w.color : 'rgba(255,255,255,.14)';
       ctx.fillRect(x + dir * k * 7 - (dir < 0 ? 4 : 0), y - 7, 4, 14);
     }
-    return r.ammo * 7;
+    return cap * 7;
   }
-  ctx.fillStyle = f.w.color; ctx.fillText(`${f.ammo}/${r.ammo}`, x, y);
+  ctx.fillStyle = f.w.color; ctx.fillText(`${f.ammo}/${cap}`, x, y);
   return 44;
 }
 
@@ -425,10 +429,14 @@ function drawCard(f, x, y, w, right) {
   f.hpShow = lerp(f.hpShow, f.hp, .08);
   const dir = right ? -1 : 1, ax = right ? x + w : x, frac = f.hp / f.maxHp;
   ctx.textBaseline = 'alphabetic'; ctx.textAlign = right ? 'right' : 'left';
-  ctx.font = `17px ${FONT_DISPLAY}`; ctx.fillStyle = f.color; ctx.fillText(f.name, ax, y - 8);
-  const nw = ctx.measureText(f.name).width;
-  ctx.font = `600 14px ${FONT_BODY}`; ctx.fillStyle = '#c9cdee';
-  ctx.fillText(f.w.name + (f.off && !f.off.w.hidden ? ' + ' + f.off.w.name : ''), ax + dir * (nw + 12), y - 8);
+  const cw = drawClassIcon(f, ax + dir * 9, y - 14);
+  ctx.font = `17px ${FONT_DISPLAY}`; ctx.fillStyle = f.color; ctx.textAlign = right ? 'right' : 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.fillText(f.name, ax + dir * cw, y - 8);
+  const nw = ctx.measureText(f.name).width + cw;
+  ctx.font = `600 14px ${FONT_BODY}`; ctx.fillStyle = f.element && ELEMENTS[f.element] ? ELEMENTS[f.element].color : '#c9cdee';
+  const wl = weaponLabel(f) + (f.off && !f.off.w.hidden ? ' + ' + f.off.w.name : '');
+  ctx.fillText(wl, ax + dir * (nw + 12), y - 8);
+  if (f.lvl > 1) drawLevelTag(f, ax + dir * (nw + 18 + ctx.measureText(wl).width), y - 13, dir);
   ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x - 3, y - 3, w + 6, 24);
   ctx.fillStyle = 'rgba(255,255,255,.45)'; fillBar(x, y, w, 18, f.hpShow / f.maxHp, right);
   ctx.fillStyle = f.alive ? f.color : '#444a66'; fillBar(x, y, w, 18, frac, right);
@@ -437,12 +445,88 @@ function drawCard(f, x, y, w, right) {
   ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(7,8,15,.85)'; ctx.fillStyle = '#ffffff'; ctx.lineJoin = 'round';
   const hpText = f.alive ? String(Math.ceil(f.hp)) : 'K.O.', hx = right ? x + 6 : x + w - 6;
   ctx.strokeText(hpText, hx, y + 10); ctx.fillText(hpText, hx, y + 10);
+  drawMeters(f, x, y + 21, w, right, 4);
   let cx = ax + dir * 13;
-  const ry = y + 38;
+  const ry = y + 46;
   for (let k = 0; k < 2; k++) if (f.skills[k]) { drawSkillIcon(f, k, cx, ry); cx += dir * 32; }
+  cx = drawThrowIcons(f, cx, ry, dir);
   if (f.w.ranged) cx += dir * (drawAmmo(f, cx - dir * 4, ry, dir) + 8);
+  if (f.mount) cx = drawMountTimer(f, cx, ry, dir);
   drawCardStatuses(f, cx, ry, dir);
   drawPips(f.team, right ? x + 7 : x + w - 7, ry, -dir);
+}
+
+// ---------- v3 HUD pieces ----------
+// Class badge before the name. Returns the width it took.
+function drawClassIcon(f, x, y) {
+  if (!f.cls || f.cls.key === 'none') return 0;
+  circle(ctx, x, y, 9, 'rgba(8,9,20,.85)', f.cls.color, 1.5);
+  ctx.fillStyle = f.cls.color; ctx.font = `600 11px ${FONT_BODY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(f.cls.icon, x, y + .5);
+  return 22;
+}
+function drawLevelTag(f, x, y, dir) {
+  const txt = 'LV' + f.lvl, col = f.lvl >= 3 ? '#ffd84a' : '#5ef2ff';
+  ctx.font = `11px ${FONT_DISPLAY}`; ctx.textBaseline = 'middle'; ctx.textAlign = dir > 0 ? 'left' : 'right';
+  glow(ctx, col, f.lvl >= 3 ? 10 : 0, () => { ctx.fillStyle = col; ctx.fillText(txt, x, y); });
+}
+// Stamina (thin, cyan) and super meter (gold, glowing and labelled when full) under the health bar.
+function drawMeters(f, x, y, w, right, h) {
+  ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x - 3, y - 1, w + 6, h * 2 + 5);
+  const st = f.stamina / (f.maxStamina || 100);
+  ctx.fillStyle = f.guardBroken > 0 ? '#ff8a2e' : f.blocking ? '#ffffff' : '#7fd8ff'; fillBar(x, y, w, h - 1, st, right);
+  const full = f.super >= 100, sy = y + h + 1;
+  ctx.fillStyle = 'rgba(255,216,74,.18)'; ctx.fillRect(x, sy, w, h + 1);
+  if (full) glow(ctx, '#ffd84a', 12 + 6 * Math.sin(G_STATE.t * 8), () => { ctx.fillStyle = '#ffd84a'; ctx.fillRect(x, sy, w, h + 1); });
+  else { ctx.fillStyle = '#c9a43a'; fillBar(x, sy, w, h + 1, f.super / 100, right); }
+  if (full && h >= 4 && f.ctrl === 'human' && !f.autopilot && typeof keyHint === 'function') {
+    ctx.font = `10px ${FONT_DISPLAY}`; ctx.fillStyle = '#07080f'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+    ctx.fillText(`SUPER · ${keyHint(f.slot, 'super')}`, x + w / 2, sy + 3);
+  }
+}
+// The two throwables with how many are left.
+function drawThrowIcons(f, cx, y, dir) {
+  for (let k = 0; k < 2; k++) {
+    const def = THROWABLES[f.throws[k]];
+    if (!def) continue;
+    const n = f.throwN[k];
+    circle(ctx, cx, y, 10, 'rgba(8,9,20,.85)', rgba(def.color, n > 0 ? .9 : .25), 1.5);
+    ctx.fillStyle = n > 0 ? def.color : rgba(def.color, .3); ctx.font = `600 11px ${FONT_BODY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(def.icon, cx, y + .5);
+    if (n > 1) { ctx.font = `700 9px ${FONT_BODY}`; ctx.fillStyle = '#ffffff'; ctx.fillText('×' + n, cx + 9, y + 9); }
+    cx += dir * 25;
+  }
+  return cx + dir * 4;
+}
+function drawMountTimer(f, cx, y, dir) {
+  const def = MOUNTS[f.mount.key], frac = clamp(f.mount.t / def.time, 0, 1);
+  circle(ctx, cx + dir * 4, y, 11, 'rgba(8,9,20,.85)');
+  ctx.strokeStyle = def.color; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(cx + dir * 4, y, 11, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke();
+  ctx.fillStyle = def.color; ctx.font = `600 12px ${FONT_BODY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(def.icon, cx + dir * 4, y + .5);
+  return cx + dir * 30;
+}
+
+// Small card for crowded matches (5-8 fighters): name, health, stamina + super, round pips.
+function drawCompactCard(f, x, y, w) {
+  f.hpShow = lerp(f.hpShow, f.hp, .08);
+  const frac = f.hp / f.maxHp, cw = drawClassIcon(f, x + 9, y - 10);
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  ctx.font = `13px ${FONT_DISPLAY}`; ctx.fillStyle = f.color; ctx.fillText(f.name, x + cw, y - 5);
+  const nw = ctx.measureText(f.name).width + cw;
+  ctx.font = `600 11px ${FONT_BODY}`; ctx.fillStyle = '#9096c2';
+  ctx.fillText(weaponLabel(f) + (f.lvl > 1 ? ' LV' + f.lvl : '') + (f.mount ? ' · ' + MOUNTS[f.mount.key].name : ''), x + nw + 8, y - 5);
+  ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x - 2, y - 2, w + 4, 16);
+  ctx.fillStyle = 'rgba(255,255,255,.4)'; fillBar(x, y, w, 12, f.hpShow / f.maxHp, false);
+  ctx.fillStyle = f.alive ? f.color : '#444a66'; fillBar(x, y, w, 12, frac, false);
+  ctx.font = `700 10px ${FONT_BODY}`; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#ffffff';
+  ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(7,8,15,.85)';
+  const hpText = f.alive ? String(Math.ceil(f.hp)) : 'K.O.';
+  ctx.strokeText(hpText, x + w - 4, y + 6.5); ctx.fillText(hpText, x + w - 4, y + 6.5);
+  drawMeters(f, x, y + 15, w, false, 3);
+  const n = Math.min(G_STATE.winScore, 9), won = G_STATE.score[f.team] || 0;
+  for (let k = 0; k < n; k++) circle(ctx, x + w - 4 - k * 11, y - 10, 3.5, k < won ? f.color : 'rgba(255,255,255,.14)');
 }
 
 function drawCardStatuses(f, x, y, dir) {
@@ -468,17 +552,20 @@ function drawHUD() {
   const n = cards.length;
   if (!n) return;
   // Scaled by VIEW.hudK around the top centre, so on small screens the cards fit in the narrower width Wh (in rows).
-  const k = VIEW.hudK, hs = VIEW.s * k, Wh = VIEW.hudW, L = (W - Wh) / 2, two = n === 2;
+  const k = VIEW.hudK, hs = VIEW.s * k, Wh = VIEW.hudW, L = (W - Wh) / 2, two = n === 2, compact = n > 4;
   ctx.setTransform(hs, 0, 0, hs, VIEW.cx - W / 2 * hs, VIEW.hudY);
-  const perRow = two ? 2 : clamp(Math.floor((Wh - 44) / 256), 1, n), rows = two ? 1 : Math.ceil(n / perRow);
+  // Up to 4 fighters: full cards (2 per row on narrow screens). 5-8: compact cards, 4 per row (2 on narrow screens).
+  const perRow = two ? 2 : compact ? clamp(Math.floor((Wh - 44) / 200), 2, 4) : clamp(Math.floor((Wh - 44) / 256), 1, n);
+  const rows = two ? 1 : Math.ceil(n / perRow), rowH = compact ? 46 : 84;
   const cw = two ? Math.min(430, Math.floor((Wh - 92) / 2)) : Math.floor((Wh - 60 - (perRow - 1) * 16) / perRow);
   cards.forEach((f, i) => {
     const right = two && i === 1, col = two ? i : i % perRow, row = two ? 0 : Math.floor(i / perRow);
-    drawCard(f, two ? (right ? L + Wh - 34 - cw : L + 34) : L + 30 + col * (cw + 16), 30 + row * 76, cw, right);
+    if (compact) drawCompactCard(f, L + 30 + col * (cw + 16), 26 + row * rowH, cw);
+    else drawCard(f, two ? (right ? L + Wh - 34 - cw : L + 34) : L + 30 + col * (cw + 16), 30 + row * rowH, cw, right);
   });
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.font = `15px ${FONT_DISPLAY}`; ctx.fillStyle = '#9096c2';
   const midGap = two && Wh - 68 - 2 * cw >= 130;   // room for the round label between two cards
-  const centre = W / 2, cy = midGap ? 52 : 30 + rows * 76;
+  const centre = W / 2, cy = midGap ? 52 : (compact ? 22 : 30) + rows * rowH;
   ctx.fillText(G_STATE.demo ? 'DEMO' : hook(G_STATE.mode, 'roundLabel') || 'ROUND ' + G_STATE.round, centre, cy);   // modes may relabel (WAVE 3)
   const left = G_STATE.roundLimit - G_STATE.roundT;
   if (!G_STATE.demo && !G_STATE.ending && left < 10 && left > 0) {
@@ -489,7 +576,7 @@ function drawHUD() {
     ctx.font = `600 12px ${FONT_BODY}`; ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = 'rgba(200,205,240,.55)';
     ctx.fillText('MUTED (M)', L + Wh - 14, H - 12);
   }
-  ctx.translate(0, (rows - 1) * 76 + (two && !midGap ? 54 : 0));   // mode HUDs sit below the (taller) card block
+  ctx.translate(0, (rows - 1) * rowH + (compact ? rowH - 84 : 8) + (two && !midGap ? 54 : 0));   // mode HUDs sit below the (taller) card block
   hook(G_STATE.mode, 'hud', ctx);
 }
 
@@ -550,6 +637,7 @@ function render(dt) {
   if (dt > 0) for (const f of F) recordTrail(f);
   for (const f of F) if (!f.alive) drawFighter(f);
   for (const f of F) if (f.alive) drawFighter(f);
+  shatterDraw(ctx);          // neon limbs of K.O.'d fighters (36)
   drawProjectiles();
   drawFx(ctx);
   hook(MAP, 'drawFg', ctx, t);
@@ -563,6 +651,7 @@ function render(dt) {
   drawHUD();
   setArenaTransform();
   drawBanner(dt);
+  powerDrawScreen(ctx, dt);   // the ultimate's cut-in band, above banners (33)
   kcDrawOverlay(ctx);   // replay letterbox (88)
   ctx.restore();
 }

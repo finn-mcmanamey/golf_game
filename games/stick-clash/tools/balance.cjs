@@ -1,4 +1,4 @@
-// Weapon balance: every visible weapon fights every other, CPU vs CPU (no skills, no orbs), two halves per pair with
+// Weapon balance: every visible weapon fights every other, CPU vs CPU (no skills, orbs, classes or throwables), two halves per pair with
 // sides swapped, maps rotated over all visible arenas, on 4 parallel pages. Prints each weapon's round win rate and
 // writes tmp/balance-weapons-<diff>.json (per weapon and per pair). Run `node build.mjs` first.
 //   node tools/balance.cjs [secsPerPair=120] [diff=normal] [workers=4] [onlyKeysComma]
@@ -28,7 +28,8 @@ const [secs = 120, diff = 'normal', workers = 4, only = ''] = process.argv.slice
         const r = { a, b, wa: 0, wb: 0, rounds: 0, time: 0, timeouts: 0 };
         for (let k = 0; k < 2; k++) {
           const swap = k % 2;
-          SC.start({ mode: 'watch', diff, orbs: false, map: maps[(n * 2 + k) % maps.length], weapons: swap ? [b, a] : [a, b], skills: [['none', 'none'], ['none', 'none']], winScore: 999 });
+          SC.start({ mode: 'watch', diff, orbs: false, map: maps[(n * 2 + k) % maps.length], weapons: swap ? [b, a] : [a, b], skills: [['none', 'none'], ['none', 'none']],
+            classes: ['none', 'none'], throws: [['none', 'none'], ['none', 'none']], winScore: 999 });   // v3: weapons only
           SC.G.state = 'play'; SC.sim(secs / 2);
           for (const l of SC.G.log) {
             if (l.winner < 0) { r.rounds++; r.time += l.time; r.timeouts++; continue; }

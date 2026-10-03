@@ -52,14 +52,15 @@ SCREENS.controls = () => {
     }
   }
   const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
-  const padRows = [['Stick / D-pad', 'Move'], ['A', 'Jump (again in the air: double jump)'], ['X', 'Attack'], ['B', 'Skill 1'],
-    ['Y', 'Skill 2'], ['RB', 'Dash'], ['RT · LT · LB', 'Also attack · dash · skill 1'], ['Start', 'Pause'], ['In menus', 'D-pad moves, A selects, B goes back']];
+  const padRows = [['Stick / D-pad', 'Move'], ['A', 'Jump (again in the air: double jump; at a wall: wall jump)'], ['X', 'Attack'], ['B', 'Skill 1'],
+    ['Y', 'Skill 2'], ['RB', 'Dash'], ['LT (hold)', 'Block · tap it just before a hit to parry'], ['RT', 'Grab, press again to throw'],
+    ['LB', 'Throwable'], ['R3 · Back', 'Super (when the meter is full)'], ['Start', 'Pause'], ['In menus', 'D-pad moves, A selects, B goes back']];
   const padCard = el('section', { class: 'set-group' }, el('h3', { text: 'Gamepads' }),
     el('p', { class: 'hint', text: pads.length ? `Connected: ${pads.map(p => p.id.replace(/\s*\(.*\)/, '')).join(', ')}` : 'No gamepad found. Plug one in and press a button.' }),
     el('dl', { class: 'pad-map' }, padRows.map(([k, v]) => [el('dt', {}, el('kbd', { text: k })), el('dd', { text: v })])),
     el('p', { class: 'hint', text: 'With one player, P1 answers to both key sets and every gamepad. With two, pad 1 is P1 and pad 2 is P2.' }));
   const keysCard = el('section', { class: 'set-group' }, el('h3', { text: 'Keyboard' }),
-    el('p', { class: 'hint', text: 'Click a key, then press the new one (Esc cancels). Double-tap left or right to dash. Esc or P pauses, M mutes (both reserved).' }),
+    el('p', { class: 'hint', text: 'Click a key, then press the new one (Esc cancels). Double-tap left or right to dash. Block + attack also grabs. Esc or P pauses, M mutes (both reserved).' }),
     grid);
   return sheet('Controls', el('div', { class: 'set-grid two' }, keysCard, padCard),
     [uiButton('Reset keys', () => { resetBinds(); refreshScreen(); }), el('button', { class: 'go', onclick: () => { uiSfx('click'); goBack(); } }, 'Done')]);
@@ -98,7 +99,30 @@ SCREENS.howto = () => {
       el('p', { text: 'Guns and magic aim at the nearest foe on their own. Watch your ammo and reload bar in the corner.' })),
     card('✦', 'Skills',
       el('p', {}, 'Each fighter carries two skills (', k(0, 'skill1'), k(0, 'skill2'), ' / ', k(1, 'skill1'), k(1, 'skill2'), '). The icons under your health bar fill up as the cooldown recovers.')),
-    card('◉', 'Power-up orbs', el('p', { text: 'Glowing orbs appear on floors and platforms. Walk through one to grab it.' }), el('ul', { class: 'orb-list' }, orbs)),
+    card('◆', 'Block and parry',
+      el('p', {}, 'Hold ', k(0, 'block'), ' / ', k(1, 'block'), ' to raise your guard: hits from the front only chip you, but each one drains the stamina bar under your health. Empty it and your guard breaks (you are stunned).'),
+      el('p', { text: 'Raise the guard just before a hit lands (a fresh press, not held) to PARRY: no damage, stamina back, and the attacker is staggered. A parried shot flies back at the shooter.' })),
+    card('✋', 'Grab and throw',
+      el('p', {}, 'Up close, press ', k(0, 'grab'), ' / ', k(1, 'grab'), ' (or block + attack) to grab. Grabs go straight through a guard. Press again to throw them the way you are holding: they tumble like a rag doll. Grabbed? Mash any button to break free.')),
+    card('🧱', 'Walls',
+      el('p', { text: 'In the air, hold toward a wall to slide down it slowly, and press jump to kick off it. Works on the arena edges and on tall blocks.' })),
+    card('♜', 'Classes',
+      el('p', { text: 'Pick a class in the loadout. Each changes health, speed and weight and adds a passive:' }),
+      el('ul', { class: 'orb-list' }, listOf(CLASSES).map(c => el('li', {}, el('b', { style: { color: c.color, borderColor: c.color }, text: c.icon }),
+        el('span', {}, el('strong', { text: c.name }), ' ' + c.passive))))),
+    card('★', 'Super and ultimates',
+      el('p', {}, 'Dealing and taking damage fills the gold super meter. When it glows, press ', k(0, 'super'), ' / ', k(1, 'super'), ' to unleash your weapon type\'s ultimate:'),
+      el('ul', { class: 'orb-list' }, Object.keys(ULTIMATES).map(cat => el('li', {}, el('b', { style: { color: ULTIMATES[cat].color, borderColor: ULTIMATES[cat].color }, text: CAT_ICONS[cat] || '★' }),
+        el('span', {}, el('strong', { text: ULTIMATES[cat].name }), ' ' + (CAT_NAMES[cat] || cat)))))),
+    card('⬆', 'Weapon levels',
+      el('p', { text: 'Your weapon levels up as it deals damage, for the rest of the match: Lv2 reaches further and hits harder, Lv3 hits harder still and leaves an elemental trail that burns, chills, shocks or poisons.' })),
+    card('●', 'Throwables',
+      el('p', {}, 'Pick two in the loadout; each can be thrown once a round with ', k(0, 'throw'), ' / ', k(1, 'throw'), '. They are lobbed at the nearest foe.'),
+      el('ul', { class: 'orb-list' }, listOf(THROWABLES).map(t => el('li', {}, el('b', { style: { color: t.color, borderColor: t.color }, text: t.icon }),
+        el('span', {}, el('strong', { text: t.name }), ' ' + t.desc))))),
+    card('✊', 'Disarms and supply drops',
+      el('p', { text: 'A big hit can knock the weapon out of a hand. It lands on the ground for anyone to take: walk over it bare-handed, or press grab next to it to swap. Fight on with your fists; after 5 seconds a supply crate with a random weapon parachutes in next to you.' })),
+    card('◉', 'Power-up orbs', el('p', { text: 'Glowing orbs appear on floors and platforms. Walk through one to grab it. Elemental orbs fuse with your weapon for the round (a flaming chainsaw!). Rare mount orbs give you a hoverboard, mech suit, jetpack or dragon for a few seconds.' }), el('ul', { class: 'orb-list' }, orbs)),
     card('🌋', 'Arenas', el('p', { text: 'Lava, spikes and electric floors hurt. Bottomless arenas have no floor, so knockback can win the round. Moving platforms carry you; you can jump up through thin ledges.' })),
     card('💡', 'Tips', el('ul', {},
       el('li', { text: 'Jump and swing: an airborne spin carries extra speed.' }),

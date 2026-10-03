@@ -2,14 +2,19 @@
 // f.inp. Held things (move, jump held, attack held) are read every frame; presses (jump, attack, skills, dash) are
 // one-shot flags. When only one human is playing, slot 0 answers to both key sets and every gamepad.
 
-const BIND_ACTIONS = ['left', 'right', 'jump', 'attack', 'skill1', 'skill2', 'dash'];
-const ACTION_LABELS = { left: 'Move left', right: 'Move right', jump: 'Jump', attack: 'Attack', skill1: 'Skill 1', skill2: 'Skill 2', dash: 'Dash' };
+const BIND_ACTIONS = ['left', 'right', 'jump', 'attack', 'skill1', 'skill2', 'dash', 'block', 'grab', 'throw', 'super'];
+const ACTION_LABELS = { left: 'Move left', right: 'Move right', jump: 'Jump', attack: 'Attack', skill1: 'Skill 1', skill2: 'Skill 2', dash: 'Dash',
+  block: 'Block (hold)', grab: 'Grab / throw', throw: 'Throwable', super: 'Super' };
+// v3 actions sit next to each hand: P1 F block, C grab, R throwable, X super; P2 , block, L grab, ; throwable, Enter super.
 const DEFAULT_BINDS = [
-  { left: 'KeyA', right: 'KeyD', jump: 'KeyW', attack: 'KeyS', skill1: 'KeyQ', skill2: 'KeyE', dash: 'ShiftLeft' },
-  { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', attack: 'ArrowDown', skill1: 'Period', skill2: 'Slash', dash: 'ShiftRight' },
+  { left: 'KeyA', right: 'KeyD', jump: 'KeyW', attack: 'KeyS', skill1: 'KeyQ', skill2: 'KeyE', dash: 'ShiftLeft',
+    block: 'KeyF', grab: 'KeyC', throw: 'KeyR', super: 'KeyX' },
+  { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', attack: 'ArrowDown', skill1: 'Period', skill2: 'Slash', dash: 'ShiftRight',
+    block: 'Comma', grab: 'KeyL', throw: 'Semicolon', super: 'Enter' },
 ];
-// Standard gamepad layout: A jump, B skill 1, X attack, Y skill 2, RB dash, Start pause, d-pad move.
-const PAD_BUTTONS = { jump: 0, skill1: 1, attack: 2, skill2: 3, dash: 5, pause: 9, left: 14, right: 15 };
+// Standard gamepad layout: A jump, B skill 1, X attack, Y skill 2, LB throwable, RB dash, LT block (hold), RT grab,
+// R3 (right stick click) super, Start pause, d-pad move. Kept as data so a later remapping screen can edit it.
+const PAD_BUTTONS = { jump: 0, skill1: 1, attack: 2, skill2: 3, throw: 4, dash: 5, block: 6, grab: 7, super: 11, pause: 9, left: 14, right: 15 };
 const DOUBLE_TAP_MS = 260;
 
 let BINDS = loadBinds();
@@ -19,9 +24,18 @@ let PADS = [];                     // per connected pad: { slot, held: {action: 
 const TAPS = [{}, {}];             // last left/right press per slot, for double-tap dash
 let KEY_CAPTURE = null;            // set by the rebinding UI: the next key goes to this callback
 
+// Saved binds from before v3 lack the new actions: their defaults are added unless that key is already taken.
 function loadBinds() {
   const saved = store.get('binds', null);
-  return DEFAULT_BINDS.map((b, i) => Object.assign({}, b, saved && saved[i]));
+  const out = DEFAULT_BINDS.map((b, i) => Object.assign({}, b, saved && saved[i]));
+  if (!saved) return out;
+  out.forEach((b, i) => {
+    for (const a of BIND_ACTIONS) {
+      if (saved[i] && saved[i][a] !== undefined) continue;          // the player's own choice stays
+      if (out.some((o, j) => BIND_ACTIONS.some(x => (j !== i || x !== a) && o[x] === b[a]))) b[a] = null;
+    }
+  });
+  return out;
 }
 function saveBinds() { store.set('binds', BINDS); }
 // Binds a key; if it was used elsewhere, the two actions swap keys so nothing is left unbound.
@@ -66,6 +80,7 @@ function togglePause() {
 function pressAction(slot, act) {
   if (G_STATE.state !== 'play') return;
   if (act === 'left' || act === 'right') {   // double-tap a direction to dash
+    for (const f of humansIn(slot)) if (f.heldBy) f.inp.mash = true;     // wiggling counts toward escaping a grab
     const t = TAPS[slot], now = performance.now(), dash = t.act === act && now - t.at < DOUBLE_TAP_MS;
     t.act = act; t.at = dash ? 0 : now;
     if (!dash) return;
@@ -109,12 +124,13 @@ function readHuman(f) {
   f.inp.mx = clamp(mx, -1, 1);
   f.inp.jumpHeld = heldAction(f.slot, 'jump');
   f.inp.attackHeld = heldAction(f.slot, 'attack');
+  f.inp.blockHeld = heldAction(f.slot, 'block');
 }
 
 // ---------- gamepads ----------
 // Pads are tracked by their browser index, so unplugging one doesn't scramble the others' held buttons.
 // In two-human modes the first connected pad drives P1 and the second P2; with one human every pad drives P1.
-const PAD_ALT = { attack: [7], dash: [6], skill1: [4] };   // RT attacks, LT dashes, LB is skill 1 too
+const PAD_ALT = { super: [8] };   // Back / View also fires the super
 const PAD_DEADZONE = .3;
 let PAD_HELD = new Map();          // gamepad index -> { action: held } from the last poll
 let PAD_POLL_STATE = null;         // game state at the last poll
@@ -283,5 +299,15 @@ function updateTouchSkills() {
     btn.style.setProperty('--cd', clamp(f.skillCd[k] / def.cd, 0, 1).toFixed(3));
     btn.setAttribute('aria-label', def.name);
   }
+  updateTouchV3(f);
+}
+// Super lights up when the meter is full; the throwable button shows the next throwable and how many are left.
+function updateTouchV3(f) {
+  const sup = touchButton('super'), thr = touchButton('throw');
+  if (sup) sup.classList.toggle('ready', !!f && f.super >= 100);
+  if (!thr) return;
+  const slot = f ? (f.throwN[0] > 0 ? 0 : f.throwN[1] > 0 ? 1 : -1) : -1, def = f && THROWABLES[f.throws[slot < 0 ? 0 : slot]];
+  thr.dataset.n = String(f ? f.throwN[0] + f.throwN[1] : 0);
+  if (def) { if (thr.textContent !== def.icon) thr.textContent = def.icon; thr.style.setProperty('--sc', def.color); }
 }
 setInterval(() => { try { updateTouchSkills(); } catch (e) { report(e, 'touch skills'); } }, 100);

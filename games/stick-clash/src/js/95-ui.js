@@ -195,11 +195,19 @@ SCREENS.maps = () => {
     modeUsesRounds(mode) ? stepper('Rounds to win', SETTINGS.rounds, 1, 9, v => { SETTINGS.rounds = v; saveSettings(); })
       : el('p', { class: 'hint', text: `${mode.name} sets its own rounds.` }),
     mode.cpu ? diffPicker() : null,
+    mode.crowd ? stepper('Fighters', crowdSize(mode), mode.crowd[0], mode.crowd[1], v => { (MENU.crowd = MENU.crowd || {})[mode.key] = v; saveMenu(); }) : null,
     uiButton('All settings…', () => openScreen('settings', 'maps'), 'link'));
   // The quick settings live in the footer beside Fight!, so they're visible without scrolling past the arenas.
   return sheet('Choose an arena', grid,
     [uiButton('◂ Back', goBack, 'foot-back'), quick, el('button', { class: 'go', 'data-autofocus': '', onclick: startFromMenu }, 'Fight!')]);
 };
+
+// How many fighters a crowd mode (mode.crowd = [min, max, default]) starts with: the menu's choice or its default.
+function crowdSize(mode) {
+  if (!mode || !mode.crowd) return undefined;
+  const [lo, hi, def] = mode.crowd, v = (MENU.crowd || {})[mode.key];
+  return clamp(v || def || lo, lo, hi);
+}
 
 // CPU level as a segmented control (levels come from AI_LEVELS so new ones appear automatically).
 function diffPicker() {
@@ -244,22 +252,26 @@ function menuCfg() {
   return {
     mode: mode.key, map: MENU.map, diff: AI_LEVELS[MENU.diff] ? MENU.diff : 'normal',
     loadouts: Array.from({ length: n }, (_, i) => loadoutForMatch(i)),
-    winScore: modeUsesRounds(mode) ? SETTINGS.rounds : undefined, hpMul: SETTINGS.hpMul, speed: SETTINGS.speed,
+    winScore: modeUsesRounds(mode) ? SETTINGS.rounds : undefined, hpMul: SETTINGS.hpMul, speed: SETTINGS.speed, fighters: crowdSize(mode),
     orbs: SETTINGS.items !== 'off', orbRate: ITEM_RATES[SETTINGS.items] || 1, killcam: !!SETTINGS.killcam,
   };
 }
 function loadoutForMatch(i) {
   const lo = menuLoadout(i);
   const hat = lo.hat === 'random' ? randomKey(HATS, h => h.key !== 'none') : lo.hat;
-  return { weapon: lo.weapon, hat, color: lo.color, skills: lo.skills.map(k => k === 'none' ? null : k) };
+  return { weapon: lo.weapon, hat, color: lo.color, skills: lo.skills.map(k => k === 'none' ? null : k), cls: lo.cls,
+    throws: lo.throws.map(k => k === 'none' ? null : k) };
 }
 // The saved loadout for picker i, filled with defaults (humans keep owned hats/colours only).
 function menuLoadout(i) {
   const cpuSide = isCpuPicker(i);
   const lo = MENU.loadouts[i] = MENU.loadouts[i] || {};   // edited in place: screens hold on to this object
-  const defaults = { weapon: 'random', skills: ['random', 'random'], hat: cpuSide ? 'random' : 'none', color: DEFAULT_COLORS[i % 4] };
+  const defaults = { weapon: 'random', skills: ['random', 'random'], hat: cpuSide ? 'random' : 'none', color: DEFAULT_COLORS[i % 4],
+    cls: 'random', throws: ['random', 'random'] };
   for (const k in defaults) if (lo[k] == null) lo[k] = defaults[k];
   if (!Array.isArray(lo.skills)) lo.skills = ['random', 'random'];
+  if (!Array.isArray(lo.throws)) lo.throws = ['random', 'random'];
+  if (lo.cls !== 'random' && !CLASSES[lo.cls]) lo.cls = 'random';
   if (lo.hat === 'random' && !cpuSide) lo.hat = 'none';
   if (lo.hat !== 'random' && (!HATS[lo.hat] || !ownsHat(lo.hat))) lo.hat = 'none';
   if (!/^#[0-9a-f]{6}$/i.test(lo.color || '') || !ownsColor(lo.color)) lo.color = DEFAULT_COLORS[i % 4];
