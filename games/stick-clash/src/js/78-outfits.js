@@ -358,7 +358,7 @@ function tauntStart(f) {
   if (!f.alive || f.mem.taunt || (f.mem.tauntCd || 0) > G_STATE.t || !canAct(f) || f.mount || f.holding || f.ult) return false;
   f.mem.taunt = { t: 0, pose: pick(TAUNT_POSES), hit: false };
   f.mem.tauntCd = G_STATE.t + TAUNT.cd;
-  float(f.P[0].x, f.P[0].y - 44, pick(['Come on!', 'Too easy!', 'Is that all?', '¯\\_(ツ)_/¯', 'Catch me!']), f.color, 16);
+  if (!aiBrain(f)) float(f.P[0].x, f.P[0].y - 44, pick(['Come on!', 'Too easy!', 'Is that all?', '¯\\_(ツ)_/¯', 'Catch me!']), f.color, 16);   // CPUs speak through their speech bubbles instead (67)
   emit('taunt', f);
   return true;
 }

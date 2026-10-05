@@ -311,7 +311,7 @@ Each fighter carries two skills (Skill 1 and Skill 2) with their own cooldowns, 
 | **Thorn Mail** | For 8 seconds, melee attackers take half the damage they deal you. |
 | **Fire / Ice / Shock / Poison Orb** | Fuses that element into your weapon for the round (burn, chill and freeze, arcing stun, poison). |
 | **Hoverboard** (rare) | 8 s: glide at high speed and ram foes. |
-| **Mech Suit** (rare) | 9 s: half damage, almost no knockback; attack throws a crushing mech punch. |
+| **Mech Suit** (rare) | 6 s: armour softens damage and most knockback; attack throws a crushing mech punch. |
 | **Jetpack** (rare) | 8 s: hold jump to fly; the exhaust burns anyone underneath. |
 | **Dragon** (rare) | 8 s: fly with jump and hold attack to breathe fire. |
 

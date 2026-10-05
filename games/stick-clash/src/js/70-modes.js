@@ -92,7 +92,7 @@ defMode('versus', {
     return { roster: [humanEntry(cfg, 0, 0, 0, 'YOU'), aiPersonaEntry(modeEntry({ ...loadoutOf(cfg, 1), team: 1, name: 'CPU' }), rival, { color: false })] };
   },
   results() {
-    const res = duelResults(), diff = modeDiff(), wins = store.get('wins', {});
+    const res = duelResults(), diff = modeDiff(), wins = store.getObj('wins');
     if (G_STATE.score[0] > G_STATE.score[1] && !G_STATE.cfg.autopilot) { wins[diff] = (wins[diff] || 0) + 1; store.set('wins', wins); }
     res.lines.push('Matches won vs CPU: ' + AI_ORDER.map(k => `${levelName(k)} ${wins[k] || 0}`).join(' · '));
     return res;
@@ -190,7 +190,7 @@ defMode('tournament', {
   },
   results() {
     const run = modeRun(), op = run.ladder[run.fight], champ = run.won >= TOURNEY_FIGHTS;
-    const best = Math.max(store.get('tourneyBest', 0), run.won);
+    const best = Math.max(store.getNum('tourneyBest'), run.won);
     if (!G_STATE.cfg.autopilot) store.set('tourneyBest', best);
     return champ
       ? { title: 'CHAMPION!', color: '#ffd84a', won: true, tournament: true, lines: [`You beat all ${TOURNEY_FIGHTS} challengers, ${op.name} included.`, `Ladder difficulty: ${levelName(modeDiff())}.`] }
@@ -267,11 +267,11 @@ defMode('survival', {
     return 'next';
   },
   hud(ctx) {
-    const run = modeRun(), best = store.get('survivalBest', 0);
+    const run = modeRun(), best = store.getNum('survivalBest');
     modeText(ctx, `Cleared ${run.cleared}  ·  Best ${Math.max(best, run.cleared)}`, W / 2, H - 22, 14, '#c9cdee', 'center', '600 ' + FONT_BODY);
   },
   results() {
-    const run = modeRun(), best = Math.max(store.get('survivalBest', 0), run.cleared);
+    const run = modeRun(), best = Math.max(store.getNum('survivalBest'), run.cleared);
     if (!G_STATE.cfg.autopilot) store.set('survivalBest', best);
     return { title: `${run.cleared} wave${run.cleared === 1 ? '' : 's'} survived`, color: run.cleared >= best && run.cleared ? '#ffd84a' : '#ff8a2e',
       lines: [`You fell on wave ${run.wave} (${levelName(modeDiff())}).`, run.cleared >= best && run.cleared ? 'New personal best!' : `Personal best: ${best} waves.`] };
@@ -345,7 +345,7 @@ defMode('bossrush', {
   },
   results() {
     const run = modeRun(), b = BOSSES[Math.min(run.boss, BOSSES.length - 1)];
-    const best = Math.max(store.get('bossBest', 0), run.boss);
+    const best = Math.max(store.getNum('bossBest'), run.boss);
     if (!G_STATE.cfg.autopilot) store.set('bossBest', best);
     return run.cleared
       ? { title: 'ALL BOSSES DOWN!', color: '#ffd84a', won: true, lines: [`Boss Rush cleared in ${Math.round(run.t)} s of fighting (${levelName(modeDiff())}).`] }

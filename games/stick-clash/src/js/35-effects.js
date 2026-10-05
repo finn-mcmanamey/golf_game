@@ -19,15 +19,18 @@ function burst(x, y, color, n = 10, speed = 250, o = {}) {
   if (PARTS.length > MAX_PARTS) PARTS.splice(0, PARTS.length - MAX_PARTS);
 }
 
-const MAX_FLOATS = 8;   // more live labels than this bury the fighters: the oldest small ones go first
+const MAX_FLOATS = 8, MAX_FLOATS_CROWD = 6;   // more live labels than this bury the fighters: the oldest small ones go first
 // `key` (optional) replaces the live label with the same key instead of stacking a new one (a fighter's combo count).
 function float(x, y, text, color = '#ffffff', size = 22, key = null) {
   if (G_STATE.sim || G_STATE.demo) return;      // the attract demo behind the menus stays free of text clutter
   if (FX_RECORD) FX_RECORD('float', arguments);
   if (key != null) FLOATS = FLOATS.filter(t => t.key !== key);
+  // The same words born together in the same spot ("BLOCKED" from both fighters) are one label, not a stack.
+  if (FLOATS.some(t => t.text === text && G_STATE.t - t.born < .25 && Math.abs(t.x - x) < 40 && Math.abs(t.y - y) < 40)) return;
   y = floatFreeY(x, y, String(text), size);
-  FLOATS.push({ x, y, text, color, size, life: 1, key });
-  while (FLOATS.length > MAX_FLOATS) floatDropOne();
+  FLOATS.push({ x, y, text, color, size, life: 1, key, born: G_STATE.t });
+  const cap = F.length > 4 ? MAX_FLOATS_CROWD : MAX_FLOATS;   // crowded matches get fewer labels
+  while (FLOATS.length > cap) floatDropOne();
 }
 function floatDropOne() {
   const small = FLOATS.findIndex(t => t.size < 24);

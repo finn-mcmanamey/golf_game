@@ -24,6 +24,7 @@ h4 { margin: 4px 0 0; font: 600 12px var(--body); letter-spacing: .1em; text-tra
 .menu-list { display: grid; gap: 8px; }
 .menu-item { display: grid; gap: 2px; text-align: left; padding: 11px 16px; border-radius: 10px; border: 1px solid var(--line);
   border-left: 3px solid var(--line2); background: rgba(14, 16, 32, .72); transition: transform .12s, border-color .12s, background .12s; }
+.menu-item { align-content: start; }   /* a taller neighbour must not spread the label and its subtitle apart */
 .menu-item .mi-label { font: 400 19px var(--display); letter-spacing: .02em; }
 .menu-item small { font: 500 12px var(--body); color: var(--dim); }
 .menu-item:hover, .menu-item:focus-visible { transform: translateX(6px); border-left-color: var(--gold); background: rgba(30, 32, 64, .85); }
@@ -212,10 +213,10 @@ h4 { margin: 4px 0 0; font: 600 12px var(--body); letter-spacing: .1em; text-tra
 h3.sub { margin-top: 18px; color: var(--fg); }
 
 /* ---------- how to play ---------- */
-.help-grid { columns: 3 300px; column-gap: 12px; }
-.help-card { break-inside: avoid; margin-bottom: 12px; border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 8px; background: rgba(0, 0, 0, .16); }
+.help-grid { columns: 3 340px; column-gap: 16px; }
+.help-card { break-inside: avoid; margin-bottom: 12px; border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: grid; gap: 10px; background: rgba(0, 0, 0, .16); }
 .help-card h3 { display: flex; gap: 10px; align-items: center; color: var(--fg); font-size: 17px; }
-.help-card p, .help-card li { font-size: 14px; color: var(--dim); }
+.help-card p, .help-card li { font-size: 14px; line-height: 1.5; color: var(--dim); }
 .help-card ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .help-card kbd { margin: 0 1px; }
 .orb-list { list-style: none; padding: 0 !important; }
@@ -310,6 +311,7 @@ h3.sub { margin-top: 18px; color: var(--fg); }
   .lo-desc { min-height: 0; font-size: 13px; }
 }
 @media (max-height: 520px) {
+  .sheet-foot .foot-back { display: none; }   /* the header already has Back; two of them waste a short screen */
   .overlay:has(> .sheet) { padding: 0; }
   .sheet { height: 100dvh; max-height: 100dvh; border-radius: 0; border: 0; }
   .sheet-head { padding: 6px 12px; } .sheet-head h2 { font-size: 20px; }
@@ -328,10 +330,22 @@ h3.sub { margin-top: 18px; color: var(--fg); }
   .title-col { width: min(640px, 100%); }
   .logo { display: flex; gap: .3em; }
   .logo .b { margin-left: 0; }
-  .menu-list { grid-template-columns: 1fr 1fr; }
-  .menu-item.go { grid-column: 1 / -1; }
+  /* Landscape phones: every entry in one wrapping strip (rows of three), so the whole menu and the badges fit. */
+  .title-wrap { padding-top: 8px; padding-bottom: 8px; }
+  .title-col { width: min(760px, 100%); gap: 6px; }
+  .logo { font-size: 38px; }
+  .title-col .tag { display: none; }
+  .menu-list { display: flex; flex-wrap: wrap; gap: 5px; }
+  .menu-pair { display: contents; }
+  .menu-item { flex: 1 1 28%; min-width: 0; padding: 5px 10px; }
+  .menu-list .menu-item .mi-label, .menu-list .menu-trio .mi-label { font-size: 14px; white-space: nowrap; }
+  .menu-item.go { flex-basis: 100%; padding: 7px 12px; }
+  .menu-item.go .mi-label { font-size: 18px; }
+  .title-foot { gap: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .title-col, .sheet, .toast, .reward, .tile.asking { animation: none; }
   .menu-item, .tile, .mode-card, .map-card { transition: none; }
 }
+.join-status { font-size: 14px; color: var(--fg); margin: 10px 0 12px; padding: 10px 14px; border-radius: 10px; background: rgba(255, 216, 74, .08); border: 1px solid rgba(255, 216, 74, .35); }
+.join-status.ok { background: rgba(94, 242, 255, .07); border-color: rgba(94, 242, 255, .35); }

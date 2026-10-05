@@ -125,7 +125,15 @@ const store = {
     try { const raw = localStorage.getItem(STORE_PREFIX + key); return raw == null ? fallback : JSON.parse(raw); } catch { return fallback; }
   },
   set(key, value) { try { localStorage.setItem(STORE_PREFIX + key, JSON.stringify(value)); } catch { /* private mode */ } },
+  // Typed reads: a save written by another version or edited by hand may hold the wrong kind of value, so every
+  // load site asks for the shape it needs and gets a safe default otherwise.
+  getObj(key) { const v = this.get(key, null); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; },
+  getArr(key) { const v = this.get(key, null); return Array.isArray(v) ? v : []; },
+  getNum(key, fallback = 0) { const v = this.get(key, null); return typeof v === 'number' && Number.isFinite(v) ? v : fallback; },
+  getBool(key, fallback = false) { const v = this.get(key, null); return typeof v === 'boolean' ? v : fallback; },
 };
+// A finite number from anything (else the fallback).
+const numOr = (v, fallback = 0) => typeof v === 'number' && Number.isFinite(v) ? v : fallback;
 
 // ---------- event bus ----------
 // Events: matchStart(cfg) roundStart(round) roundEnd(winnerTeam, reason) matchOver(result) state(now, before)

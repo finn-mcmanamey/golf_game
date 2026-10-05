@@ -6,7 +6,12 @@ const UI_ROOT = document.getElementById('ui');
 const CAT_NAMES = { blade: 'Blades', heavy: 'Heavy', polearm: 'Polearms', chain: 'Chains', fist: 'Fists', ranged: 'Ranged',
   magic: 'Magic', exotic: 'Exotic', shield: 'Shields' };
 const CAT_ICONS = { blade: '🗡', heavy: '🪓', polearm: '🔱', chain: '⛓', fist: '👊', ranged: '🏹', magic: '✨', exotic: '🌀', shield: '🛡' };
-const MENU = Object.assign({ mode: 'versus', map: 'random', diff: 'normal', loadouts: [] }, store.get('menu', {}));
+const MENU = Object.assign({ mode: 'versus', map: 'random', diff: 'normal', loadouts: [] }, store.getObj('menu'));
+// A saved menu may hold a quest mode (the hidden 'campaign' / 'challenge') or the wrong kind of value: back to safe choices.
+if (!MODES[MENU.mode] || MODES[MENU.mode].hidden) MENU.mode = 'versus';
+if (typeof MENU.map !== 'string') MENU.map = 'random';
+if (typeof MENU.diff !== 'string') MENU.diff = 'normal';
+if (!Array.isArray(MENU.loadouts)) MENU.loadouts = [];
 const PANELS = {};
 const UI = { screen: 'menu', next: null, back: {} };   // current menu screen, a screen to open after the next state change
 
@@ -25,7 +30,12 @@ function el(tag, props = {}, ...kids) {
   for (const kid of kids.flat(Infinity)) if (kid != null && kid !== false) e.append(kid);
   return e;
 }
-function saveMenu() { store.set('menu', MENU); }
+// The quest screens borrow MENU.mode for their hidden mode; what is saved is always the player's own mode.
+function saveMenu() {
+  const hidden = MODES[MENU.mode] && MODES[MENU.mode].hidden;
+  const own = typeof CAMP_UI !== 'undefined' && CAMP_UI.prevMode && MODES[CAMP_UI.prevMode] && !MODES[CAMP_UI.prevMode].hidden ? CAMP_UI.prevMode : 'versus';
+  store.set('menu', hidden ? Object.assign({}, MENU, { mode: own }) : MENU);
+}
 const capital = s => s ? s[0].toUpperCase() + s.slice(1) : '';
 
 // ---------- panels ----------
@@ -50,10 +60,11 @@ function showPanel(name) {
 const SCREENS = {};
 function openScreen(name, backTo) {
   if (!SCREENS[name]) return;
+  const content = SCREENS[name]();   // build first: if a builder throws, the old screen stays consistent
   if (backTo) UI.back[name] = backTo;
   if (!PANELS[name]) makePanel(name);
   UI.screen = name;
-  PANELS[name].replaceChildren(SCREENS[name]());
+  PANELS[name].replaceChildren(content);
   showPanel(name);
 }
 function goBack() {
@@ -379,6 +390,7 @@ function uiPadRead() {
 }
 function uiPadLoop(now) {
   requestAnimationFrame(uiPadLoop);
+  if (!activePanel()) { UI_PAD.held = {}; return; }   // mid-fight there is no menu to drive: don't poll the pads
   let now2 = null;
   try { now2 = uiPadRead(); } catch (e) { now2 = null; }
   if (!now2) { UI_PAD.held = {}; return; }

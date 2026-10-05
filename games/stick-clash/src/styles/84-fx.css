@@ -49,3 +49,5 @@
   .hl-card canvas, .hl-thumb { width: 100%; height: auto; aspect-ratio: 16 / 9; }
   .hl-btns { grid-template-columns: 1fr 1fr; }
 }
+.hl-empty { display: grid; justify-items: center; gap: 6px; text-align: center; padding: 48px 16px; max-width: 460px; margin: 0 auto; }
+.hl-empty b { font-size: 40px; }

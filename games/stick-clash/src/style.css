@@ -2,7 +2,7 @@
    Owners of other slices can add their own CSS as src/styles/NN-name.css (inlined after this file). */
 :root {
   --bg: #07080f; --panel: rgba(14, 16, 32, .94); --panel2: #0b0d1c; --line: #2b2f55; --line2: #3c4278;
-  --fg: #eef0ff; --dim: #9096c2; --faint: #5d6290;
+  --fg: #eef0ff; --dim: #9096c2; --faint: #8a90bd;
   --p1: #2ee6ff; --p2: #ff8a2e; --p3: #9dff5a; --p4: #ff5ad1; --gold: #ffd84a; --bad: #ff4a6a;
   --display: 'Bungee', Impact, 'Arial Black', sans-serif;
   --body: 'Chakra Petch', system-ui, 'Segoe UI', sans-serif;

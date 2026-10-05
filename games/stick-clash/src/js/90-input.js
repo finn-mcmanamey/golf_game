@@ -32,7 +32,9 @@ let KEY_CAPTURE = null;            // set by the rebinding UI: the next key goes
 
 // Saved binds from before v3 lack the new actions: their defaults are added unless that key is already taken.
 function loadBinds() {
-  const saved = store.get('binds', null);
+  const raw = store.get('binds', null);
+  const keep = (b, ok) => b && typeof b === 'object' ? Object.fromEntries(Object.entries(b).filter(([a, v]) => BIND_ACTIONS.includes(a) && ok(v))) : {};
+  const saved = Array.isArray(raw) ? raw.map(b => keep(b, v => v === null || typeof v === 'string')) : null;   // wrong-shaped saves are ignored
   const out = DEFAULT_BINDS.map((b, i) => Object.assign({}, b, saved && saved[i]));
   if (!saved) return out;
   out.forEach((b, i) => {
@@ -109,7 +111,12 @@ function onKeyDown(e) {
   const typing = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
   if (GAME_KEYS.has(e.code) && !typing && G_STATE.state === 'play') e.preventDefault();
   if (e.repeat) return;              // before pause/mute: holding Esc or M must not toggle them on and off
-  if (e.code === 'Escape' || (e.code === 'KeyP' && !typing)) { togglePause(); emit('escape', e); return; }
+  if (e.code === 'Escape' || (e.code === 'KeyP' && !typing)) {
+    // Inside Settings/Controls opened from the pause menu, Esc goes back one level like the Back button does.
+    if (G_STATE.state === 'paused' && UI.screen !== 'pause' && PANELS[UI.screen] && !PANELS[UI.screen].hidden) goBack();
+    else togglePause();
+    emit('escape', e); return;
+  }
   if (e.code === 'KeyM' && !typing) { toggleMute(); return; }
   KEYS.add(e.code);
   if (G_STATE.state !== 'play') return;
@@ -153,8 +160,9 @@ function readPadList() {
 // Each player's pad map: the defaults plus their saved changes from the remapping screen (store 'padmap').
 let PAD_MAPS = loadPadMaps();
 function loadPadMaps() {
-  const saved = store.get('padmap', null);
-  return Array.from({ length: MAX_FIGHTERS }, (_, i) => Object.assign({}, PAD_BUTTONS, saved && saved[i]));
+  const raw = store.get('padmap', null);
+  const keep = b => b && typeof b === 'object' ? Object.fromEntries(Object.entries(b).filter(([a, v]) => a in PAD_BUTTONS && Number.isInteger(v) && v >= 0 && v < 32)) : {};
+  return Array.from({ length: MAX_FIGHTERS }, (_, i) => Object.assign({}, PAD_BUTTONS, Array.isArray(raw) ? keep(raw[i]) : {}));
 }
 const padMapFor = slot => PAD_MAPS[slot] || PAD_BUTTONS;
 const padPressed = (gp, i) => { const b = gp.buttons[i]; return !!b && (b.pressed || b.value > .5); };

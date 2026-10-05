@@ -445,7 +445,8 @@ function campSpec(n) {
 // ---------- saved progress ----------
 // store 'quest' = { stars: { nodeId: 0-3 }, at: nodeId (where the walker stands), seen: { nodeId: 1 }, tree: { skillId: 1 } }
 function campSave() {
-  const s = Object.assign({ stars: {}, at: CAMP_NODES[0].id, seen: {}, tree: {} }, store.get('quest', {}));
+  const s = Object.assign({ stars: {}, at: CAMP_NODES[0].id, seen: {}, tree: {} }, store.getObj('quest'));
+  for (const k of ['stars', 'seen', 'tree']) if (!s[k] || typeof s[k] !== 'object' || Array.isArray(s[k])) s[k] = {};
   if (!CAMP_BY_ID[s.at]) s.at = CAMP_NODES[0].id;
   return s;
 }

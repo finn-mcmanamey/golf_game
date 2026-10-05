@@ -16,7 +16,11 @@ const RANK_DIV = 100, RANK_DIVS = 3, RANK_WIN = 25, RANK_LOSS = 18, RANK_STREAK 
 const RANK_GM = (RANK_TIERS.length - 1) * RANK_DIVS * RANK_DIV;           // points where Grandmaster starts
 const RANK_ROMAN = ['III', 'II', 'I'];
 
-function rankLoad() { return Object.assign({ pts: 0, best: 0, wins: 0, losses: 0, streak: 0 }, store.get('ranked', {})); }
+function rankLoad() {
+  const r = Object.assign({ pts: 0, best: 0, wins: 0, losses: 0, streak: 0 }, store.getObj('ranked'));
+  for (const k of ['pts', 'best', 'wins', 'losses', 'streak']) r[k] = numOr(r[k]);
+  return r;
+}
 
 // { tier, div (0 = III), label 'Gold II', color, icon, into (points into the division), floor (tier floor) }
 function rankOf(pts) {
@@ -49,9 +53,18 @@ defMode('ranked', {
     return { roster: [me, op], winScore: 2, run: { start: save.pts, title: op.rankTitle } };
   },
   roundLabel() { return `${rankOf(modeRun().start).label.toUpperCase()} · R${G_STATE.round}`; },
+  // Once the first FIGHT! has begun the match is on the record: quitting or restarting settles it as a loss.
+  onStep() { if (G_STATE.lock <= 0) modeRun().live = true; },
+  abandon() {
+    const run = modeRun();
+    if (!run.live || run.settled || G_STATE.cfg.autopilot) return;
+    run.settled = true;
+    rankSettle(false, false);
+  },
   onRoundStart() { if (G_STATE.round === 1) banner(rankOf(modeRun().start).label.toUpperCase(), 'RANKED MATCH', 1.8, rankOf(modeRun().start).color); },
   hud(ctx) { rankDrawBar(ctx, rankOf(modeRun().start), W / 2, H - 26); },
   results() {
+    modeRun().settled = true;
     const won = G_STATE.score[0] > G_STATE.score[1], r = rankSettle(won, !!G_STATE.cfg.autopilot);
     const sign = r.delta >= 0 ? '+' : '';
     const title = r.up ? `RANK UP: ${r.after.label}!` : r.down ? `Down to ${r.after.label}` : won ? 'Ranked win!' : 'Ranked loss';

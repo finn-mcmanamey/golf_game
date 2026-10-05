@@ -22,6 +22,7 @@ function liveCanvas(w, h, cls, draw) {
 }
 function uiLiveLoop(now) {
   requestAnimationFrame(uiLiveLoop);
+  if (!LIVE_CANVASES.size || !activePanel()) return;   // no menu open: nothing to paint
   for (const item of LIVE_CANVASES) {
     if (!item.c.isConnected) { LIVE_CANVASES.delete(item); continue; }
     if (item.c.offsetParent === null) continue;
@@ -239,10 +240,12 @@ SCREENS.loadout = () => {
 function previewPane(i, lo, label) {
   const w = WEAPONS[lo.weapon];
   const canvas = liveCanvas(300, 280, 'lo-canvas', (g, t, cw, ch) => drawLoadoutPreview(g, t, cw, ch, lo));
-  const skills = lo.skills.map((k, s) => {
+  // Several 'random' picks become one chip ("Random skill ×2"), not a row of identical ones.
+  const randoms = lo.skills.filter(k => k === 'random').length;
+  const skills = lo.skills.filter((k, s) => k !== 'random' || lo.skills.indexOf('random') === s).map(k => {
     const d = SKILLS[k];
     return el('span', { class: 'skill-chip', style: d ? { '--sc': d.color } : null },
-      el('b', { text: d ? d.icon : k === 'random' ? '🎲' : '–' }), d ? d.name : k === 'random' ? 'Random' : 'No skill');
+      el('b', { text: d ? d.icon : k === 'random' ? '🎲' : '–' }), d ? d.name : k === 'random' ? `Random skill${randoms > 1 ? ' ×' + randoms : ''}` : 'No skill');
   });
   return el('div', { class: 'lo-preview' },
     el('div', { class: 'lo-who' }, el('i', { style: { background: lo.color } }), label),
@@ -259,7 +262,9 @@ function previewPane(i, lo, label) {
 function loadoutChipsV3(lo) {
   const c = CLASSES[lo.cls], chip = (d, fallback) => el('span', { class: 'skill-chip', style: d ? { '--sc': d.color } : null },
     el('b', { text: d ? d.icon : '🎲' }), d ? d.name : fallback);
-  return [chip(c, 'Random class'), ...lo.throws.map(k => THROWABLES[k] ? chip(THROWABLES[k]) : k === 'random' ? chip(null, 'Random throwable') : null)];
+  const randomThrows = lo.throws.filter(k => k === 'random').length;
+  return [chip(c, 'Random class'), ...lo.throws.map((k, s) => THROWABLES[k] ? chip(THROWABLES[k]) :
+    k === 'random' && lo.throws.indexOf('random') === s ? chip(null, `Random throwable${randomThrows > 1 ? 's ×' + randomThrows : ''}`) : null)];
 }
 
 // ---------- class tab ----------

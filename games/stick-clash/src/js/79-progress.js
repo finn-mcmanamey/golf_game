@@ -14,8 +14,8 @@ const LOOK_NAMES = { outfit: 'Outfit', skin: 'Weapon skin', ko: 'K.O. effect', p
 const LOOK_FREE = { outfit: ['none', 'scarf'], skin: ['none'], ko: ['none', 'confetti'], pet: ['none'], pose: ['cheer', 'wave'], title: ['rookie'] };
 
 const PROG = (() => {
-  const p = store.get('prog', {}) || {};
-  return { xp: p.xp || 0, own: p.own || {}, title: p.title || 'rookie', secrets: p.secrets || {}, codex: p.codex || {}, seen: p.seen || 1 };
+  const p = store.getObj('prog'), obj = v => v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  return { xp: numOr(p.xp), own: obj(p.own), title: typeof p.title === 'string' ? p.title : 'rookie', secrets: obj(p.secrets), codex: obj(p.codex), seen: numOr(p.seen, 1) || 1 };
 })();
 function progSave() { store.set('prog', PROG); }
 const lookOwned = (kind, key) => (LOOK_FREE[kind] || []).includes(key) || ((PROG.own[kind] || []).includes(key));
@@ -146,7 +146,7 @@ function taskDraw(seed, n, avoid = []) {
 }
 const taskNew = (k, weekly) => ({ k, n: 0, need: TASKS[k].d * (weekly ? 5 : 1), done: false });
 function tasksNow() {
-  const s = store.get('tasks', {}) || {}, day = dayKey(), wk = weekKey();
+  const s = store.getObj('tasks'), day = dayKey(), wk = weekKey();
   let dirty = false;
   if (s.day !== day || !Array.isArray(s.daily)) { s.day = day; s.daily = taskDraw('d' + day, 3).map(k => taskNew(k, false)); dirty = true; }
   if (s.week !== wk || !Array.isArray(s.weekly)) { s.week = wk; s.weekly = taskDraw('w' + wk, 3).map(k => taskNew(k, true)); dirty = true; }
@@ -285,17 +285,31 @@ const LORE_FILL = {
   o: ['meteor crater', 'scrapyard raffle', 'lost temple', 'vending machine at the end of the world', 'thunder egg'],
 };
 const LORE_END = ['It hums when a rival is near.', 'Its owners rarely stay humble.', 'Nobody agrees on who made it first.',
-  'It has never lost a staring contest.', 'Handle with flair.', 'The crowds still chant about it.', 'It glows brightest at night.'];
-function codexLore(kind, key, name) {
+  'It has never lost a staring contest.', 'Handle with flair.', 'The crowds still chant about it.', 'It glows brightest at night.',
+  'It looks better after a few dents.', 'Rookies borrow it. Champions get it back.', 'It was last seen winning a bet.', 'Spectators duck on instinct.'];
+// Weapons also get a line about the kind of weapon they are, so a bow and a hammer don't read alike.
+const LORE_CAT = {
+  blade: ['A {n} is drawn fast and sheathed faster.', 'Smiths of the {p} test every {n} on a falling feather.', 'Duelists polish the {n} more than they polish their manners.'],
+  heavy: ['It takes two hands and a bad attitude to swing the {n}.', 'The {n} is slow, loud and very hard to argue with.'],
+  polearm: ['The {n} keeps trouble exactly one step away.', 'Guards of the {p} swear by the {n}: reach is respect.'],
+  chain: ['The {n} never travels in a straight line.', 'Hear the {n} rattle and count your steps backward.'],
+  fist: ['No handle, no excuses: the {n} is just you, louder.', 'Brawlers in the {p} wrap their knuckles in {n} lore.'],
+  ranged: ['A good {n} shot is ninety percent patience.', 'Scouts of the {p} carry a {n} and a very long grudge.', 'The {n} is happiest when the target thinks it is out of range.'],
+  magic: ['The {n} hums a note nobody can quite place.', 'Mages swear the {n} chose them, not the other way round.'],
+  exotic: ['Nobody has a manual for the {n}. Nobody wants one.', 'The {n} is what happens when a blacksmith gets curious.'],
+  shield: ['The {n} has never lost an argument, only gained dents.', 'Behind the {n}, even a rookie feels like a wall.'],
+};
+function codexLore(kind, key, name, cat) {
   const rng = taskRng(kind + key), pickR = a => a[Math.floor(rng() * a.length)];
-  const line1 = pickR(LORE[kind] || LORE.w).replace(/\{(\w+)\}/g, (_, k) => (k === 'n' ? name : pickR(LORE_FILL[k])));
+  const pool = kind === 'w' && LORE_CAT[cat] && rng() < .7 ? LORE_CAT[cat] : LORE[kind] || LORE.w;
+  const line1 = pickR(pool).replace(/\{(\w+)\}/g, (_, k) => (k === 'n' ? name : pickR(LORE_FILL[k])));
   return line1[0].toUpperCase() + line1.slice(1) + ' ' + pickR(LORE_END);
 }
 
 // ---------- fighter-creator presets ----------
 const PRESET_MAX = 8;
 const PRESET_FIELDS = ['color', 'hat', 'outfit', 'cls', 'weapon', 'skills', 'throws', 'skins', 'ko', 'pet', 'pose'];
-const presetList = () => (store.get('presets', []) || []).filter(p => p && p.name).slice(0, PRESET_MAX);
+const presetList = () => store.getArr('presets').filter(p => p && typeof p === 'object' && typeof p.name === 'string' && p.name).slice(0, PRESET_MAX);
 function presetSave(name, lo, index = -1) {
   const list = presetList(), p = { name: String(name || 'Fighter').slice(0, 18) };
   for (const k of PRESET_FIELDS) if (lo[k] != null) p[k] = JSON.parse(JSON.stringify(lo[k]));

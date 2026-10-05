@@ -580,7 +580,7 @@ const JUG_GOAL = 5, JUG_SCALE = 1.6, JUG_HP = 1.6, JUG_RESPAWN = 2;
 defMode('juggernaut', {
   name: 'Juggernaut', icon: '🗿', order: 78,
   desc: `One giant against everyone. KO the Juggernaut to become it. Points for KOs as the giant and for felling it; first to ${JUG_GOAL}.`,
-  players: [1, 1], cpu: true, pickers: 1, labels: ['You'], winScore: 1, roundLimit: 150, customRounds: true, crowd: [3, MAX_FIGHTERS, 5],
+  players: [1, 1], cpu: true, pickers: 1, labels: ['You'], winScore: 1, roundLimit: 150, customRounds: true, noScore: true, crowd: [3, MAX_FIGHTERS, 5],
   setup(cfg) {
     const roster = partyFfaRoster(cfg, partyCrowd(cfg, this));
     roster.forEach(r => { r.team = 0; });

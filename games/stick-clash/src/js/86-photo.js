@@ -124,8 +124,9 @@ function photoSave() {
     if (!blob) return fxModal('Could not save', el('p', { text: 'This browser could not turn the picture into a PNG.' }));
     const url = URL.createObjectURL(blob);
     fxDownload(url, name);
-    fxModal('Photo saved', el('img', { src: url, alt: 'Your photo', class: 'fx-preview' }),
+    const modal = fxModal('Photo saved', el('img', { src: url, alt: 'Your photo', class: 'fx-preview' }),
       el('p', { class: 'hint', text: 'If no download started (some embedded viewers block downloads), right-click or long-press the picture and save it.' }));
+    modal.addEventListener('fxclose', () => URL.revokeObjectURL(url));   // the picture is saved or dismissed: free the blob
   };
   try { out.toBlob(done, 'image/png'); } catch (e) { report(e, 'photo save'); done(null); }
 }
@@ -140,7 +141,7 @@ function fxDownload(url, name) {
 
 // A small dialog above everything (photo previews, export results). Closes on its button, Esc or a click outside.
 function fxModal(title, ...body) {
-  const close = () => { wrap.remove(); removeEventListener('keydown', onKey, true); };
+  const close = () => { wrap.remove(); removeEventListener('keydown', onKey, true); wrap.dispatchEvent(new Event('fxclose')); };
   const onKey = e => { if (e.code === 'Escape' || e.code === 'Enter') { e.preventDefault(); e.stopImmediatePropagation(); close(); } };
   const wrap = el('div', { class: 'fx-modal', onclick: e => { if (e.target === wrap) close(); } },
     el('div', { class: 'card' }, el('h2', { text: title }), body, el('button', { class: 'go', onclick: close }, 'OK')));

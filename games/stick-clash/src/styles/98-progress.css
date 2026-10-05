@@ -63,3 +63,7 @@
   .lvl-bar { grid-template-columns: auto minmax(0, 1fr); }
   .codex-grid { grid-template-columns: 1fr; }
 }
+.cx-weapon { width: 64px; height: 34px; flex: none; align-self: start; }
+.cx-swatch { display: block; width: 34px; height: 34px; border-radius: 8px; border: 2px solid var(--line2); font-size: 0; }
+.codex-card { grid-template-columns: 66px minmax(0, 1fr); }
+.codex-card .tr-icon { justify-self: center; }

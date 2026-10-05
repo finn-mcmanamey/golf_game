@@ -7,3 +7,22 @@
 .class-tile .cl-bars .bar { grid-template-columns: 52px 1fr; font-size: 10px; }
 .class-tile .cl-bars .bar b { height: 5px; }
 .class-tile .sk-text small { -webkit-line-clamp: 3; }
+
+/* Landscape phones (e.g. 844x390): the picker row and presets share one line, the preview and the pick list scroll on
+   their own, and the six tabs plus the weapon categories sit in single scrolling rows, so weapons are visible at once. */
+@media (max-height: 520px) and (min-width: 640px) {
+  .sheet-loadout .sheet-body { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 6px 12px; overflow: hidden; align-content: stretch; }
+  .sheet-loadout .player-tabs { grid-row: 1; grid-column: 1; flex-wrap: nowrap; }
+  .sheet-loadout .player-tabs button { padding: 5px 12px; font-size: 13px; }
+  .sheet-loadout .preset-bar { grid-row: 1; grid-column: 1 / -1; flex-wrap: nowrap; overflow-x: auto; }
+  .sheet-loadout .player-tabs + .preset-bar { grid-column: 2; }
+  .sheet-loadout .preset-bar .lbl { display: none; }
+  .sheet-loadout .lo-grid { grid-row: 2; grid-column: 1 / -1; min-height: 0; height: 100%; grid-template-columns: minmax(180px, 230px) minmax(0, 1fr); gap: 12px; align-items: stretch; }
+  .sheet-loadout .lo-preview { overflow: auto; max-height: 100%; min-height: 0; grid-auto-rows: max-content; align-content: start; }
+  .sheet-loadout .lo-canvas { max-height: 110px; }
+  .sheet-loadout .lo-pick { overflow: auto; max-height: 100%; min-height: 0; align-content: start; gap: 8px; }
+  .sheet-loadout .sub-tabs { flex-wrap: nowrap; gap: 5px; position: sticky; top: 0; z-index: 2; background: var(--panel); padding-bottom: 4px; }
+  .sheet-loadout .sub-tabs button { padding: 5px 4px; font-size: 13px; white-space: nowrap; }
+  .sheet-loadout .cat-chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .sheet-loadout .cat-chips button { white-space: nowrap; flex: none; }
+}

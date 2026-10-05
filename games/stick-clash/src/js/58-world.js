@@ -51,7 +51,7 @@ on('roundStart', () => {
   WX.gust = {};
   WX.baseWind = PHYS.windX;
   PHYS.friction *= WX.def.friction || 1;
-  WX.ann = WX.key === 'clear' ? null : { text: `${WX.def.icon}  ${WX.def.name.toUpperCase()}`, sub: WX.def.desc, t: 3.2 };
+  WX.ann = WX.key === 'clear' ? null : { text: `${WX.def.icon}  ${WX.def.name.toUpperCase()}`, sub: WX.def.desc, t: WX_ANN_LEN };
   brkReset();
 });
 
@@ -129,7 +129,6 @@ function worldDrawTop(ctx, t) {
   if (dark > .02) worldDrawDark(ctx, dark, t);
   if (k === 'fog') wxDrawFog(ctx, t);
   if (k === 'night') wxDrawMoon(ctx, t);
-  wxDrawAnnounce(ctx);
 }
 
 function wxDrawRain(ctx, t) {
@@ -189,16 +188,18 @@ function wxDrawMoon(ctx, t) {
   circle(ctx, 1142, 84, 26, 'rgba(10,14,30,.85)');
 }
 
-function wxDrawAnnounce(ctx) {
+// Short weather card, drawn by the HUD pass at top centre under the round label (not over the floor or the touch
+// pause button) at (x, y) in HUD coordinates.
+const WX_ANN_LEN = 1.8;
+function wxDrawAnnounce(ctx, x, y) {
   const a = WX.ann;
   if (!a || a.t <= 0) return;
-  ctx.save(); setArenaTransform();
-  ctx.globalAlpha = clamp(a.t, 0, 1) * clamp((3.2 - a.t) * 4, 0, 1);
-  const y = H - 92;
-  ctx.fillStyle = 'rgba(8,10,24,.78)'; ctx.beginPath(); ctx.roundRect(W / 2 - 220, y - 30, 440, 64, 14); ctx.fill();
-  ctx.strokeStyle = 'rgba(160,200,255,.5)'; ctx.lineWidth = 2; ctx.stroke();
-  ctx.textAlign = 'center'; ctx.fillStyle = '#e8f2ff'; ctx.font = `24px ${FONT_DISPLAY}`; ctx.fillText(a.text, W / 2, y + 2);
-  ctx.font = `15px ${FONT_BODY}`; ctx.fillStyle = 'rgba(200,220,255,.85)'; ctx.fillText(a.sub, W / 2, y + 23);
+  ctx.save();
+  ctx.globalAlpha = clamp(a.t, 0, 1) * clamp((WX_ANN_LEN - a.t) * 4, 0, 1);
+  ctx.fillStyle = 'rgba(8,10,24,.8)'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - 140, y - 4, 280, 46, 12) : ctx.rect(x - 140, y - 4, 280, 46); ctx.fill();
+  ctx.strokeStyle = 'rgba(160,200,255,.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#e8f2ff'; ctx.font = `19px ${FONT_DISPLAY}`; ctx.fillText(a.text, x, y + 19);
+  ctx.font = `13px ${FONT_BODY}`; ctx.fillStyle = 'rgba(210,225,255,.9)'; ctx.fillText(a.sub, x, y + 36);
   ctx.restore();
 }
 

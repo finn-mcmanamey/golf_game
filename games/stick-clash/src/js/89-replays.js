@@ -6,7 +6,7 @@
 // MediaRecorder records via captureStream, with the game's sound when WebAudio is running.
 
 const HL_KEEP = 5;
-const HL = { clips: [], pending: [], lastAmt: new WeakMap(), best: store.get('highlights', []), playing: null, rec: null,
+const HL = { clips: [], pending: [], lastAmt: new WeakMap(), best: store.getArr('highlights').filter(h => h && typeof h.title === 'string' && Number.isFinite(h.score) && Array.isArray(h.tags)), playing: null, rec: null,
   lastExport: null, nextId: 1 };
 
 // ---------- scoring and capture ----------
@@ -154,8 +154,9 @@ function hlExportDone(blob, audio) {
   if (!blob.size) return fxModal('Video export failed', el('p', { text: 'The recording came out empty. Try again with the tab in front.' }));
   const url = URL.createObjectURL(blob), name = 'stick-clash-highlight-' + Date.now() + '.webm';
   fxDownload(url, name);
-  fxModal('Highlight exported', el('video', { src: url, controls: true, loop: true, class: 'fx-preview' }),
+  const modal = fxModal('Highlight exported', el('video', { src: url, controls: true, loop: true, class: 'fx-preview' }),
     el('p', { class: 'hint', text: `${(blob.size / 1024).toFixed(0)} KB WebM. If no download started (some embedded viewers block downloads), right-click the video and choose "Save video as", or open the downloaded game file.` }));
+  modal.addEventListener('fxclose', () => URL.revokeObjectURL(url));
 }
 
 // ---------- Highlights screen ----------
@@ -169,7 +170,8 @@ function hlScreen() {
     el('div', { class: 'hl-btns' },
       uiButton('▶ Play', () => hlPlay(c), 'go', { 'data-key': 'hl-play-' + c.id }),
       uiButton('⬇ Export video', () => hlExport(c), null, { 'data-key': 'hl-export-' + c.id }))));
-  const empty = el('p', { class: 'tag', text: 'No highlights yet. Knock someone out in a match: the best five K.O.s of this session are kept here as replay clips you can watch and export as video.' });
+  const empty = el('div', { class: 'hl-empty' }, el('b', { text: '🎬' }), el('h3', { text: 'No highlights yet' }),
+    el('p', { class: 'tag', text: 'Knock someone out in a match: the best five K.O.s of this session are kept here as replay clips you can watch and export as video.' }));
   const best = HL.best.length ? el('section', { class: 'set-group' }, el('h3', { text: 'All-time best' }),
     el('ol', { class: 'hl-best' }, HL.best.map(b => el('li', {}, el('b', { text: b.title }), ` · ${b.score} pts`, b.tags.length ? ` · ${b.tags.join(', ')}` : '')))) : null;
   return sheet('Highlights', el('div', { class: 'hl-wrap' }, cards.length ? cards : empty, best), null);

@@ -169,7 +169,8 @@ SCREENS.codex = () => {
   return sheet('Codex', [tabs, el('div', { class: 'trophy-grid codex-grid' }, entries.map(codexCard))], null);
 };
 function codexEntries(tab) {
-  const reg = (kind, list, icon, lore = kind) => list.map(d => ({ name: d.name, icon: icon(d), text: d.desc || '', lore: codexLore(lore, d.key, d.name), stats: codexRow(kind, d.key) }));
+  const reg = (kind, list, icon, lore = kind) => list.map(d => ({ name: d.name, icon: icon(d), text: d.desc || '', lore: codexLore(lore, d.key, d.name, d.cat), stats: codexRow(kind, d.key),
+    weapon: kind === 'w' ? d.key : null, palette: kind === 'm' ? d.palette : null }));
   if (tab === 'w') return reg('w', listOf(WEAPONS), d => CAT_ICONS[d.cat] || '⚔');
   if (tab === 's') return reg('s', listOf(SKILLS), d => d.icon);
   if (tab === 'c') return reg('c', listOf(CLASSES), d => d.icon);
@@ -190,10 +191,20 @@ function codexEntries(tab) {
     ? { name: s.name, icon: '🗝', text: s.reward, lore: s.code ? `Code: ${s.code}` : s.hint, found: true }
     : { name: '???', icon: '❔', text: 'Not found yet.', lore: 'Hint: ' + s.hint, hidden: true });
 }
+// A weapon shows its own drawing (the loadout's icon), an arena a swatch of its own sky; everything else keeps its emoji.
+function codexIcon(e) {
+  if (e.weapon && WEAPONS[e.weapon]) {
+    const c = uiCanvas(64, 34, 'cx-weapon');
+    try { drawWeaponIcon(c, e.weapon, '#9fb4ff'); } catch (err) { return el('span', { class: 'tr-icon', text: e.icon }); }
+    return c;
+  }
+  if (e.palette && e.palette.sky1) return el('span', { class: 'tr-icon cx-swatch', style: { background: `linear-gradient(${e.palette.sky1}, ${e.palette.sky2 || e.palette.sky1} 70%, ${e.palette.ground || e.palette.sky2})`, borderColor: e.palette.line || '' } });
+  return el('span', { class: 'tr-icon', text: e.icon });
+}
 function codexCard(e) {
   const labels = e.labels || ['Used', 'Won', 'K.O.s'];
   return el('div', { class: 'trophy codex-card' + (e.hidden ? '' : ' got'), tabindex: '0' },
-    el('span', { class: 'tr-icon', text: e.icon }),
+    codexIcon(e),
     el('div', {}, el('strong', { text: e.name }), e.text ? el('small', { text: e.text }) : null, el('em', { class: 'cx-lore', text: e.lore }),
       e.stats ? el('div', { class: 'cx-stats' }, labels.map((l, k) => el('span', {}, l + ' ', el('b', { text: String(e.stats[k] || 0) })))) : null));
 }
@@ -203,14 +214,14 @@ const mutVisible = m => !m.secret || secretFound(m.secret);
 function mutatorsPicked() {
   const mode = MODES[MENU.mode] || {};
   if (MUT_OFF_MODES.has(mode.key)) return [];
-  return (MENU.mutators || []).filter(k => MUTATORS[k] && mutVisible(MUTATORS[k]));
+  return (MENU.mutators || []).filter(k => MUTATORS[k] && mutVisible(MUTATORS[k]) && !mutBlocked(mode.key, k));
 }
 function mutatorPanel() {
   const mode = MODES[MENU.mode] || {}, on = new Set(MENU.mutators || []);
   const toggle = k => { on.has(k) ? on.delete(k) : on.add(k); MENU.mutators = [...on]; saveMenu(); uiSfx('click'); refreshScreen(); };
   if (MUT_OFF_MODES.has(mode.key)) return el('section', { class: 'mut-panel' }, el('h4', { text: 'Mutators' }), el('p', { class: 'hint', text: `${mode.name} plays without mutators.` }));
   return el('section', { class: 'mut-panel' }, el('h4', { text: `Mutators${on.size ? ` · ${mutatorsPicked().length} on` : ''}` }),
-    el('div', { class: 'mut-grid' }, listOf(MUTATORS).filter(mutVisible).map(m => el('button', { class: 'mut-chip', 'aria-pressed': String(on.has(m.key)), 'data-key': 'mut-' + m.key,
+    el('div', { class: 'mut-grid' }, listOf(MUTATORS).filter(m => mutVisible(m) && !mutBlocked(mode.key, m.key)).map(m => el('button', { class: 'mut-chip', 'aria-pressed': String(on.has(m.key)), 'data-key': 'mut-' + m.key,
       title: m.desc, onclick: () => toggle(m.key) }, el('b', { text: m.icon }), el('strong', { text: m.name })))));
 }
 function miniSettingField() {

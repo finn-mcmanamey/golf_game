@@ -107,7 +107,7 @@ SCREENS.campaign = () => {
 function campNodeButton(n, s) {
   const open = campUnlocked(n.id, s), stars = s.stars[n.id] || 0, p = campUV(n), kind = CAMP_KINDS[n.kind];
   const fresh = open && !stars && !s.seen[n.id];
-  return el('button', { class: `camp-node k-${n.kind}${stars ? ' done' : ''}${fresh ? ' new' : ''}${n.id === CAMP_UI.sel ? ' sel' : ''}`,
+  return el('button', { class: `camp-node k-${n.kind}${stars ? ' done' : ''}${fresh ? ' new' : ''}${n.id === CAMP_UI.sel ? ' sel' : ''}${p.x < 14 ? ' edge-l' : p.x > 86 ? ' edge-r' : ''}`,
     style: { left: p.x + '%', top: p.y + '%', '--rc': CAMP_REALMS[n.r].color }, disabled: !open || null, 'data-key': 'node-' + n.id,
     'aria-label': `${n.name}, ${kind.label}${open ? `, ${stars} of 3 stars` : ', locked'}`,
     onpointerdown: () => { CAMP_UI.selBefore = CAMP_UI.sel; },

@@ -23,6 +23,20 @@ async function makeSaveCode() {
   const zip = typeof CompressionStream === 'function';
   return `SC${SAVE_CODE_V}${zip ? 'z' : 'p'}.${toB64u(zip ? await codecPipe(raw, CompressionStream) : raw)}.${fnv1a(json)}`;
 }
+// The kind of value each known save must hold (o = object, a = array, n = number, b = boolean, s = string) and the
+// numbers that must be finite inside the profile. A hand-edited code with the wrong shapes is refused, not imported.
+const SAVE_SHAPES = { settings: 'o', profile: 'o', prog: 'o', tasks: 'o', presets: 'a', binds: 'a', padmap: 'a', ranked: 'o', quest: 'o',
+  challenges: 'o', menu: 'o', highlights: 'a', wins: 'o', muted: 'b', camera: 'b', weather: 's', tourneyBest: 'n', survivalBest: 'n',
+  bossBest: 'n', zombieBest: 'n' };
+function saveShapeCheck(key, value) {
+  const short = key.replace(/^stickclash\.(v\d+\.)?/, ''), want = SAVE_SHAPES[short];
+  if (!want) return;
+  const kind = Array.isArray(value) ? 'a' : value === null ? 'x' : typeof value === 'object' ? 'o' : typeof value === 'number' ? 'n' : typeof value === 'boolean' ? 'b' : typeof value === 'string' ? 's' : 'x';
+  const num = (o, ks) => ks.every(k => o[k] === undefined || (typeof o[k] === 'number' && Number.isFinite(o[k])));
+  const ok = kind === want && (short !== 'profile' || (num(value, ['coins', 'earned']) && (value.stats === undefined || (value.stats && typeof value.stats === 'object' && !Array.isArray(value.stats))))) &&
+    (short !== 'ranked' || num(value, ['pts', 'best', 'wins', 'losses', 'streak'])) && (short !== 'prog' || num(value, ['xp']));
+  if (!ok) throw new Error(`The code holds a ${SAVE_NAMES[short] || short} save in the wrong shape, so it can’t be imported.`);
+}
 // Returns the decoded save object or throws an Error with a message for the player.
 async function readSaveCode(text) {
   const m = String(text).replace(/\s+/g, '').match(/^SC(\d+)([zp])\.([A-Za-z0-9_-]+)\.([0-9a-f]{8})$/);
@@ -37,7 +51,7 @@ async function readSaveCode(text) {
   if (!keys || typeof keys !== 'object') throw new Error('The code has no saves in it.');
   for (const [k, v] of Object.entries(keys)) {
     if (!k.startsWith(SAVE_KEY_PREFIX) || typeof v !== 'string') throw new Error('The code holds something that isn’t a save.');
-    JSON.parse(v);                                  // every save is JSON: a broken one throws (caught by the caller)
+    saveShapeCheck(k, JSON.parse(v));               // every save is JSON: a broken one throws (caught by the caller)
   }
   return data;
 }

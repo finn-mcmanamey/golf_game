@@ -39,6 +39,7 @@ function buildRoster(info) {
 }
 
 function startMatch(cfg) {
+  abandonMatch();                  // leaving a Ranked match unfinished (restart, quit) counts as a loss
   cfg = normalizeCfg(cfg);
   const mode = MODES[cfg.mode];
   Object.assign(G_STATE, { cfg, mode, demo: !!cfg.demo, round: 1, result: null, log: [] });
@@ -55,6 +56,12 @@ function startMatch(cfg) {
   newRound();
   emit('matchStart', cfg);
 }
+
+// Tells the running mode its match is being dropped before a result (modes may hook 'abandon').
+function abandonMatch() {
+  if (G_STATE.mode && !G_STATE.demo && G_STATE.state !== 'over') hook(G_STATE.mode, 'abandon');
+}
+addEventListener('pagehide', abandonMatch);   // closing the tab mid-match too
 
 // A 'random' weapon or skill is rolled once per match, so the player keeps what they just learned between rounds.
 // Modes with rerollRandom: true (Weapon Roulette) roll again every round.
@@ -131,7 +138,7 @@ function checkRoundEnd() {
 function endRound(winner, reason) {
   Object.assign(G_STATE, { ending: true, winner, endReason: reason, koT: TUNE.koDelay });
   for (const f of F) if (!f.summon && G_STATE.roster[f.id]) G_STATE.roster[f.id].superKeep = f.super;   // the meter carries over
-  if (winner >= 0) G_STATE.score[winner]++;
+  if (winner >= 0 && winner < G_STATE.score.length) G_STATE.score[winner]++;   // party modes may crown a team beyond the scored ones (Juggernaut's giant)
   G_STATE.log.push({ round: G_STATE.round, winner, reason, time: G_STATE.roundT, map: MAP.key,
     fighters: F.filter(f => !f.summon).map(f => ({ wkey: f.wkey, skills: f.skills.slice(), dmg: f.stats.dmgDealt, hits: f.stats.hits, kos: f.stats.kos,
       skillsUsed: f.stats.skills, shots: f.stats.shots, upright: f.aliveT ? f.upT / f.aliveT : 1, alive: f.alive })) });
@@ -234,6 +241,7 @@ function boot() {
   validateContent();
   startMatch(demoConfig());
   emit('boot');
+  cleanSettings();   // settings other slices added at boot get the same checks
   requestAnimationFrame(frame);
 }
 

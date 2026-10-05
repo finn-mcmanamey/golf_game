@@ -78,7 +78,7 @@ const CHALLENGES = [
 ];
 const CHAL_BY_ID = Object.fromEntries(CHALLENGES.map(c => [c.id, c]));
 
-function chalSave() { return Object.assign({}, store.get('challenges', {})); }
+function chalSave() { return Object.assign({}, store.getObj('challenges')); }
 const chalStarTotal = s => CHALLENGES.reduce((t, c) => t + (s[c.id] || 0), 0);
 
 // The challenge as a trial spec; a mirror match copies the player's own loadout onto the foe.

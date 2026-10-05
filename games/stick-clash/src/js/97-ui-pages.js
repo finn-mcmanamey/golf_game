@@ -7,7 +7,12 @@ function setSetting(key, value) {
   SETTINGS[key] = value;
   saveSettings();
   const cfg = G_STATE.cfg;
-  if (cfg && !G_STATE.demo) Object.assign(cfg, { speed: SETTINGS.speed, orbs: SETTINGS.items !== 'off', orbRate: ITEM_RATES[SETTINGS.items] || 1, killcam: !!SETTINGS.killcam });
+  if (cfg && !G_STATE.demo) {
+    Object.assign(cfg, { speed: SETTINGS.speed, orbs: SETTINGS.items !== 'off', orbRate: ITEM_RATES[SETTINGS.items] || 1, killcam: !!SETTINGS.killcam });
+    // The match mutators (79) edited these same fields at match start and won't run again on a restart: put them back.
+    if (mutActive('speed')) cfg.speed *= 1.5;
+    if (mutActive('orbstorm')) { cfg.orbs = true; cfg.orbRate *= 3; }
+  }
 }
 
 SCREENS.settings = () => {
@@ -34,7 +39,10 @@ SCREENS.settings = () => {
       sliderField('Music volume', S.music, set('music'))));
   const reset = uiButton('Reset to defaults', () => {
     Object.assign(SETTINGS, SETTING_DEFAULTS); saveSettings();
-    CAM.follow = true; store.set('camera', true); MENU.diff = 'normal'; saveMenu();   // the two choices kept outside SETTINGS
+    CAM.follow = true; store.set('camera', true); MENU.diff = 'normal';   // choices kept outside SETTINGS
+    MENU.mutators = []; store.set('weather', 'random'); saveMenu();
+    if (MUTED) setMuted(false);
+    if (typeof setSetting === 'function') setSetting('rounds', SETTINGS.rounds);   // pushes the reset speed and items into a running match
     refreshScreen();
   });
   return sheet('Settings', body, [reset, el('button', { class: 'go', onclick: () => { uiSfx('click'); goBack(); } }, 'Done')]);
@@ -55,7 +63,7 @@ SCREENS.controls = () => {
       grid.append(btn);
     }
   }
-  const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
+  const pads = readPadList();
   const padRows = [['Stick / D-pad', 'Move'], ['A', 'Jump (again in the air: double jump; at a wall: wall jump)'], ['X', 'Attack'], ['B', 'Skill 1'],
     ['Y', 'Skill 2'], ['RB', 'Dash'], ['LT (hold)', 'Block · tap it just before a hit to parry'], ['RT', 'Grab, press again to throw'],
     ['LB', 'Throwable'], ['R3 · Back', 'Super (when the meter is full)'], ['D-pad ↑', 'Taunt (from a safe distance: a little super)'], ['Start', 'Pause'], ['In menus', 'D-pad moves, A selects, B goes back']];
@@ -80,8 +88,11 @@ function bindCaptured(slot, action, code) {
 // Cancels a pending rebind and puts the listening button's label back.
 function bindStopListening() {
   cancelKeyCapture();
-  for (const b of document.querySelectorAll('.binds .key.listening')) {
+  REMAP.listen = null;             // the gamepad remap grid listens too; leaving any screen stops it
+  // Only the keyboard grid has 'bind-<slot>-<action>' keys; the pad grid ('pad-<action>') is rebuilt by its own screen.
+  for (const b of document.querySelectorAll('.binds:not(.padbinds) .key.listening')) {
     const [, slot, action] = b.dataset.key.split('-');
+    if (!BINDS[+slot]) continue;
     b.classList.remove('listening'); b.textContent = keyLabel(BINDS[+slot][action]);
   }
 }
@@ -257,6 +268,7 @@ function rewardBox() {
 
 function scoreLine() {
   const sc = G_STATE.score;
+  if (G_STATE.mode && G_STATE.mode.noScore) return null;   // the mode's own result lines say who won (Juggernaut)
   if (sc.length !== 2) return el('p', { class: 'res-score small', text: sc.map((s, t) => `${teamName(t)} ${s}`).join(' · ') });
   return el('p', { class: 'res-score' }, el('b', { style: { color: teamColor(0) }, text: sc[0] }), el('span', { text: '–' }), el('b', { style: { color: teamColor(1) }, text: sc[1] }));
 }

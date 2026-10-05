@@ -5,6 +5,11 @@
 const MUTATORS = {};
 function defMutator(key, def) { return defLook(MUTATORS, key, def); }
 const MUT_OFF_MODES = new Set(['ranked', 'campaign', 'challenge']);
+// Mutators a mode can't take because they fight its own rules: Gun Game and Roulette hand out the weapons themselves,
+// and the ladders (Tournament, Boss Rush) are balanced and rewarded for normal fights.
+const MUT_LADDER_BLOCK = ['randomweapons', 'speed', 'sudden', 'vampire', 'supercharged'];
+const MUT_MODE_BLOCKS = { gungame: ['randomweapons'], roulette: ['randomweapons'], tournament: MUT_LADDER_BLOCK, bossrush: MUT_LADDER_BLOCK };
+const mutBlocked = (modeKey, mutKey) => (MUT_MODE_BLOCKS[modeKey] || []).includes(mutKey);
 let MUT_ON = [];          // the defs active in the current match
 
 function mutActive(key) { return MUT_ON.some(m => m.key === key); }
@@ -35,7 +40,10 @@ defMutator('orbstorm', { name: 'Orb Storm', icon: '🌠', desc: 'Power-up orbs r
 
 const mutAllowed = () => !G_STATE.demo && !MUT_OFF_MODES.has(G_STATE.mode && G_STATE.mode.key);
 // Read from the live cfg: the first round starts (roundStart) before matchStart is emitted.
-function mutRefresh() { MUT_ON = mutAllowed() ? ((G_STATE.cfg && G_STATE.cfg.mutators) || []).map(k => MUTATORS[k]).filter(Boolean) : []; }
+function mutRefresh() {
+  const mode = G_STATE.mode && G_STATE.mode.key;
+  MUT_ON = mutAllowed() ? ((G_STATE.cfg && G_STATE.cfg.mutators) || []).filter(k => !mutBlocked(mode, k)).map(k => MUTATORS[k]).filter(Boolean) : [];
+}
 on('matchStart', cfg => {
   mutRefresh();
   if (MUT_ON.length && !cfg.mutApplied) { cfg.mutApplied = true; mutRun('match', cfg); }   // a rematch reuses cfg

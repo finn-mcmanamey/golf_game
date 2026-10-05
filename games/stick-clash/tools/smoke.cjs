@@ -807,6 +807,7 @@ function summary(r) {
     await testUI(browser);
     await testV3Screens(browser);
     await testTouch(browser);
+    await require('./smoke-fixes.cjs').run(null, browser, { check, rows });   // review3 fixes: remap, Juggernaut, Mech Suit, HUD plate, flows, save shapes
     await require('./smoke-fx.cjs').run(browser, { check, rows, SHOTS });
     await require('./smoke-access.cjs').run(browser, { check, rows, SHOTS });   // touch stick, pads, accessibility, save codes   // announcer, crowd, music, bloom, photo mode, highlights
   } catch (e) {

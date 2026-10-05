@@ -89,13 +89,13 @@ defMount('hoverboard', { name: 'Hoverboard', icon: '≋', color: '#5ef2ff', time
 });
 
 // ---------- mech suit: slow, armoured, huge punches ----------
-defMount('mech', { name: 'Mech Suit', icon: '▣', color: '#ffd84a', time: 9, hp: 70, speedMul: .78, takenMul: .5, kbMul: .25,
-  desc: 'Armour that halves damage and shrugs off knockback. Attack throws a crushing mech punch.', ai: { range: 125, style: 'melee' },
+defMount('mech', { name: 'Mech Suit', icon: '▣', color: '#ffd84a', time: 6, hp: 30, speedMul: .72, takenMul: .85, kbMul: .6,
+  desc: 'Armour that softens damage and most knockback. Attack throws a crushing mech punch.', ai: { range: 125, style: 'melee' },
   attack(f, m) {
-    f.atkCd = .75; m.punchT = .22;
+    f.atkCd = .95; m.punchT = .22;
     const c = chest(f);
     kick(f.P[6], f.face * 1400, -100); kick(f.P[5], f.face * 700, 0);
-    for (const e of mountFoes(f, c.x + f.face * 70, c.y, 95)) mountHit(f, e, 18, { kb: 950, nx: f.face, ny: -.5 });
+    for (const e of mountFoes(f, c.x + f.face * 70, c.y, 95)) mountHit(f, e, 12, { kb: 950, nx: f.face, ny: -.5 });
     burst(c.x + f.face * 90, c.y, '#ffd84a', 10, 320);
     sfx('slam', .8);
   },

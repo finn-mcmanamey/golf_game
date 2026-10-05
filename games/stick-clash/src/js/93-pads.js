@@ -112,9 +112,13 @@ function joinScreen() {
   const grid = el('div', { class: 'join-grid', tabindex: '0', 'data-autofocus': '' }, Array.from({ length: MAX_FIGHTERS }, (_, i) => lobbyCard(i)));
   const hint = el('p', { class: 'hint', text: `${mode.name || 'Party'}: every pad presses A to join (B leaves, Start begins). A key from either keyboard set joins too. ` +
     'Empty seats are filled by CPUs.' });
-  return sheet('Players', el('div', {}, hint, grid), [uiButton('◂ Back', goBack, 'foot-back'),
+  // Say why Fight! is dimmed: nobody has taken a seat yet.
+  const status = el('p', { class: 'join-status' + (n ? ' ok' : ''), role: 'status', text: n
+    ? `${n} player${n > 1 ? 's' : ''} in. Press Fight! (or Start on a pad). The other seats are filled by CPUs.`
+    : 'Nobody has joined yet. Press A on a gamepad, or any key of a keyboard set, to take a seat. Fight! unlocks once one player is in.' });
+  return sheet('Players', el('div', {}, hint, status, grid), [uiButton('◂ Back', goBack, 'foot-back'),
     uiButton('Clear', () => { LOBBY.list = []; refreshScreen(); }),
-    el('button', { class: 'go', disabled: n ? null : true, onclick: lobbyStart }, n > 1 ? `Fight! (${n} players)` : 'Fight!')]);
+    el('button', { class: 'go', disabled: n ? null : true, title: n ? '' : 'Join first: press A or a key', onclick: lobbyStart }, n > 1 ? `Fight! (${n} players)` : 'Fight!')]);
 }
 function lobbyStart() { if (LOBBY.list.length) startFromMenu(); }
 

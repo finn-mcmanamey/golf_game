@@ -267,6 +267,10 @@ function aiTalkDraw(ctx) {
 function aiBubble(ctx, b, age) {
   const f = b.f, head = f.P[0], pop = Math.min(1, age * 9), fade = clamp((AI_TALK.life - age) / .3, 0, 1);
   const x = clamp(head.x, 90, W - 90), y = head.y - (HEAD_R + 34) * f.scale - Math.max(0, hatReach(f.hat) - 1) * HEAD_R;
+  if (IS_TOUCH && typeof ctx.getTransform === 'function') {   // not over the on-screen skill buttons (low corners)
+    const m = ctx.getTransform(), sx = (m.a * x + m.e) / VIEW.dpr, sy = (m.d * y + m.f) / VIEW.dpr;
+    if (sy > innerHeight * .45 && (sx < innerWidth * .26 || sx > innerWidth * .74)) return;
+  }
   ctx.save();
   ctx.globalAlpha = fade; ctx.translate(x, y); ctx.scale(pop, pop);
   ctx.font = `13px ${FONT_DISPLAY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -286,10 +290,11 @@ function aiPersonaHudTag(f, x, y, dir) {
   if (!p) return;
   ctx.font = `10px ${FONT_DISPLAY}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
   const txt = p.title.toUpperCase(), w = ctx.measureText(txt).width + 12, cx = x + dir * w / 2;
-  ctx.fillStyle = rgba(p.color, .18); ctx.strokeStyle = p.color; ctx.lineWidth = 1;
+  ctx.strokeStyle = p.color; ctx.lineWidth = 1;
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(cx - w / 2, y - 8, w, 16, 8); else ctx.rect(cx - w / 2, y - 8, w, 16);
-  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#0a0b18'; ctx.fill();            // opaque, so the chip reads on any arena
+  ctx.fillStyle = rgba(p.color, .18); ctx.fill(); ctx.stroke();
   ctx.fillStyle = p.color; ctx.fillText(txt, cx, y + .5);
 }
 

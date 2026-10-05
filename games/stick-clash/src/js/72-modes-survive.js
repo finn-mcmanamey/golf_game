@@ -84,7 +84,7 @@ defMode('zombies', {
     modeText(ctx, `Zombies left ${Math.max(0, run.left)}  ·  Destroyed ${run.kills}`, W / 2, PARTY_HUD_Y, 16, '#7dff6a', 'center', '600 ' + FONT_BODY);
   },
   results() {
-    const run = modeRun(), all = run.cleared >= ZOM_WAVES.length, best = Math.max(store.get('zombieBest', 0), run.cleared);
+    const run = modeRun(), all = run.cleared >= ZOM_WAVES.length, best = Math.max(store.getNum('zombieBest'), run.cleared);
     if (!G_STATE.cfg.autopilot) store.set('zombieBest', best);
     return all ? { title: 'HORDE DESTROYED!', color: '#7dff6a', won: true, waves: run.cleared, lines: [`All ${ZOM_WAVES.length} waves cleared. ${run.kills} zombies put back to rest.`] }
       : { title: 'Overrun', color: '#7dff6a', won: false, waves: run.cleared, lines: [`You held out for ${run.cleared} wave${run.cleared === 1 ? '' : 's'} and destroyed ${run.kills} zombies.`, `Best: ${best} waves.`] };

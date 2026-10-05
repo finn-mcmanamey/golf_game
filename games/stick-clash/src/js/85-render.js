@@ -9,7 +9,7 @@ const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 // of the HUD (canvas px). On a landscape screen the viewport is the letterboxed 16:9 arena (hv = H, zMin = 1).
 const VIEW = { s: 1, ox: 0, oy: 0, dpr: 1, vx: 0, vy: 0, vw: W, vh: H, cx: W / 2, cy: H / 2, hv: H, top: 0, zMin: 1, hudK: 1, hudW: W, hudY: 0 };
 const VIEW_HUD_CSS = .72;      // smallest on-screen (CSS px) scale for HUD text: 15px HUD text stays ~11px
-const CAM = { x: W / 2, y: H / 2, z: 1, fx: 0, fy: 0, focusT: 0, follow: store.get('camera', true), maxZoom: 1.24,
+const CAM = { x: W / 2, y: H / 2, z: 1, fx: 0, fy: 0, focusT: 0, follow: store.getBool('camera', true), maxZoom: 1.24,
   punch: 0 };   // punch: brief extra zoom on heavy hits (set by 87-juice, decays here)
 let BANNER = null;
 
@@ -432,18 +432,32 @@ function drawAmmo(f, x, y, dir) {
   return 44;
 }
 
+// Readability on bright arenas: one dark rounded plate behind every card (filled once, so overlaps don't double up)
+// and a soft dark shadow under card text.
+function hudPlatePath(rects) {
+  ctx.beginPath();
+  for (const [x, y, w, h] of rects) {
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, 10); else ctx.rect(x, y, w, h);
+  }
+}
+function hudTextShadow(on) {
+  ctx.shadowColor = on ? 'rgba(0,0,0,.9)' : 'transparent'; ctx.shadowBlur = on ? 3 : 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = on ? 1 : 0;
+}
+
 function drawCard(f, x, y, w, right) {
   f.hpShow = lerp(f.hpShow, f.hp, .08);
   const dir = right ? -1 : 1, ax = right ? x + w : x, frac = f.hp / f.maxHp;
   ctx.textBaseline = 'alphabetic'; ctx.textAlign = right ? 'right' : 'left';
   const cw = drawClassIcon(f, ax + dir * 9, y - 14);
+  hudTextShadow(true);
   ctx.font = `17px ${FONT_DISPLAY}`; ctx.fillStyle = f.color; ctx.textAlign = right ? 'right' : 'left'; ctx.textBaseline = 'alphabetic';
   ctx.fillText(f.name, ax + dir * cw, y - 8);
   const nw = ctx.measureText(f.name).width + cw;
-  ctx.font = `600 14px ${FONT_BODY}`; ctx.fillStyle = f.element && ELEMENTS[f.element] ? ELEMENTS[f.element].color : '#c9cdee';
+  ctx.font = `600 14px ${FONT_BODY}`; ctx.fillStyle = f.element && ELEMENTS[f.element] ? ELEMENTS[f.element].color : '#dfe2fa';
   const wl = weaponLabel(f) + (f.off && !f.off.w.hidden ? ' + ' + f.off.w.name : '');
   ctx.fillText(wl, ax + dir * (nw + 12), y - 8);
   const wlEnd = nw + 18 + ctx.measureText(wl).width;
+  hudTextShadow(false);
   if (f.lvl > 1) drawLevelTag(f, ax + dir * wlEnd, y - 13, dir);
   aiPersonaHudTag(f, ax + dir * (wlEnd + (f.lvl > 1 ? 34 : 2)), y - 13, dir);   // the CPU rival's title (67)
   ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x - 3, y - 3, w + 6, 24);
@@ -523,12 +537,14 @@ function drawCompactCard(f, x, y, w) {
   f.hpShow = lerp(f.hpShow, f.hp, .08);
   const frac = f.hp / f.maxHp, cw = drawClassIcon(f, x + 9, y - 10);
   ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  hudTextShadow(true);
   ctx.font = `13px ${FONT_DISPLAY}`; ctx.fillStyle = f.color; ctx.fillText(f.name, x + cw, y - 5);
   const nw = ctx.measureText(f.name).width + cw;
-  ctx.font = `600 11px ${FONT_BODY}`; ctx.fillStyle = '#9096c2';
+  ctx.font = `600 11px ${FONT_BODY}`; ctx.fillStyle = '#c4c9ee';
   const cwl = weaponLabel(f) + (f.lvl > 1 ? ' LV' + f.lvl : '') + (f.mount ? ' · ' + MOUNTS[f.mount.key].name : '');
   ctx.fillText(cwl, x + nw + 8, y - 5);
-  aiPersonaHudTag(f, x + nw + 14 + ctx.measureText(cwl).width, y - 9, 1);   // the CPU rival's title (67)
+  hudTextShadow(false);
+  aiPersonaHudTag(f, x + nw + 20 + ctx.measureText(cwl).width, y - 9, 1);   // the CPU rival's title (67)
   ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x - 2, y - 2, w + 4, 16);
   ctx.fillStyle = 'rgba(255,255,255,.4)'; fillBar(x, y, w, 12, f.hpShow / f.maxHp, false);
   ctx.fillStyle = f.alive ? f.color : '#444a66'; fillBar(x, y, w, 12, frac, false);
@@ -559,6 +575,7 @@ function drawPips(team, x, y, dir) {
   for (let k = 0; k < n; k++) circle(ctx, x + dir * k * 18, y, 6, k < won ? color : 'rgba(255,255,255,.12)');
 }
 
+const midGap0 = (two, Wh, cw) => two && Wh - 68 - 2 * cw >= 130;
 function drawHUD() {
   if (G_STATE.demo || G_STATE.state === 'killcam') return;   // replays (88) show their own caption; the attract demo plays behind the menus without health bars (added by the UI slice)
   const cards = F.filter(f => !f.summon);   // summoned helpers (e.g. decoys) get no health card
@@ -571,16 +588,24 @@ function drawHUD() {
   const perRow = two ? 2 : compact ? clamp(Math.floor((Wh - 44) / 200), 2, 4) : clamp(Math.floor((Wh - 44) / 256), 1, n);
   const rows = two ? 1 : Math.ceil(n / perRow), rowH = compact ? 46 : 84;
   const cw = two ? Math.min(430, Math.floor((Wh - 92) / 2)) : Math.floor((Wh - 60 - (perRow - 1) * 16) / perRow);
+  const cardX = (i) => two ? (i === 1 ? L + Wh - 34 - cw : L + 34) : L + 30 + (i % perRow) * (cw + 16);
+  const cardY = (i) => (compact ? 26 : 30) + (two ? 0 : Math.floor(i / perRow)) * rowH;
+  const plates = cards.map((f, i) => compact ? [cardX(i) - 8, cardY(i) - 24, cw + 16, 52] : [cardX(i) - 10, cardY(i) - 32, cw + 20, 100]);
+  const lblY = midGap0(two, Wh, cw) ? 52 : (compact ? 22 : 30) + rows * rowH;
+  plates.push([W / 2 - 62, lblY - 21, 124, G_STATE.roundLimit - G_STATE.roundT < 10 && !G_STATE.ending ? 56 : 28]);   // round label + countdown
+  hudPlatePath(plates); ctx.fillStyle = 'rgba(8,9,22,.55)'; ctx.fill();
   cards.forEach((f, i) => {
     const right = two && i === 1, col = two ? i : i % perRow, row = two ? 0 : Math.floor(i / perRow);
     if (compact) drawCompactCard(f, L + 30 + col * (cw + 16), 26 + row * rowH, cw);
     else drawCard(f, two ? (right ? L + Wh - 34 - cw : L + 34) : L + 30 + col * (cw + 16), 30 + row * rowH, cw, right);
   });
-  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.font = `15px ${FONT_DISPLAY}`; ctx.fillStyle = '#9096c2';
-  const midGap = two && Wh - 68 - 2 * cw >= 130;   // room for the round label between two cards
+  hudTextShadow(false);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.font = `15px ${FONT_DISPLAY}`; ctx.fillStyle = '#c4c9ee';
+  const midGap = midGap0(two, Wh, cw);   // room for the round label between two cards
   const centre = W / 2, cy = midGap ? 52 : (compact ? 22 : 30) + rows * rowH;
   ctx.fillText(G_STATE.demo ? 'DEMO' : hook(G_STATE.mode, 'roundLabel') || 'ROUND ' + G_STATE.round, centre, cy);   // modes may relabel (WAVE 3)
   const left = G_STATE.roundLimit - G_STATE.roundT;
+  wxDrawAnnounce(ctx, centre, cy + 14);   // weather card under the round label (58)
   if (!G_STATE.demo && !G_STATE.ending && left < 10 && left > 0) {
     ctx.font = `22px ${FONT_DISPLAY}`; ctx.fillStyle = left < 4 ? '#ff4a6a' : '#ffd84a';
     ctx.fillText(Math.ceil(left), centre, cy + 26);

@@ -10,7 +10,7 @@
 
 const SFX = {};
 const SFX_LAST = {};
-let AC = null, NOISE = null, MASTER = null, MUTED = store.get('muted', false);
+let AC = null, NOISE = null, MASTER = null, MUTED = store.getBool('muted');
 let AUDIO_FAILED = false;          // WebAudio missing or blocked: stop trying on every key press
 // Volume mix from the Settings screen (0..1 each). Sound effects go through SFX_BUS; music should use MUSIC_BUS.
 const AUDIO_MIX = { master: 1, sfx: 1, music: .6 };

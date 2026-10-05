@@ -446,9 +446,22 @@ const SETTING_DEFAULTS = {
   rounds: 5, hpMul: 1, speed: 1, items: 'normal', killcam: true, shake: true, particles: 'high', dmgNumbers: true,
   master: .9, sfx: 1, music: .6,
 };
-const SETTINGS = Object.assign({}, SETTING_DEFAULTS, store.get('settings', {}));
 const ITEM_RATES = { off: 0, low: .5, normal: 1, high: 2 };
 const PARTICLE_MULS = { low: .35, medium: .65, high: 1 };
+const SETTING_CHOICES = { hpMul: [.5, .75, 1, 1.5, 2], speed: [.75, 1, 1.25, 1.5], items: Object.keys(ITEM_RATES), particles: Object.keys(PARTICLE_MULS) };
+const SETTING_RANGES = { rounds: [1, 9, true], master: [0, 1], sfx: [0, 1], music: [0, 1] };
+// Puts every setting back to something valid: the right kind of value, one of the offered choices, inside its range.
+// A wrong 'speed' string would otherwise freeze every match.
+function cleanSettings() {
+  for (const k in SETTING_DEFAULTS) {
+    const d = SETTING_DEFAULTS[k], v = SETTINGS[k], ch = SETTING_CHOICES[k], rg = SETTING_RANGES[k];
+    if (ch) { if (!ch.includes(v)) SETTINGS[k] = d; }
+    else if (rg) { const n = numOr(v, d); SETTINGS[k] = clamp(rg[2] ? Math.round(n) : n, rg[0], rg[1]); }
+    else if (typeof d !== typeof v || (typeof d === 'number' && !Number.isFinite(v))) SETTINGS[k] = d;
+  }
+}
+const SETTINGS = Object.assign({}, SETTING_DEFAULTS, store.getObj('settings'));
+cleanSettings();
 
 function saveSettings() { store.set('settings', SETTINGS); applySettings(); }
 // Pushes the settings into the engine's knobs (effects, audio). Safe to call any time.
@@ -469,16 +482,23 @@ const PROFILE = loadProfile();
 let profileDirty = false;
 
 function loadProfile() {
-  const p = store.get('profile', {}) || {};
+  const p = store.getObj('profile'), obj = v => v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  const strings = v => Array.isArray(v) ? v.filter(x => typeof x === 'string') : [];
+  const statDefaults = {
+    matches: 0, wins: 0, losses: 0, roundsPlayed: 0, roundsWon: 0, kos: 0, ringouts: 0, dmg: 0, hits: 0, headHits: 0,
+    projHits: 0, bigHit: 0, bestCombo: 0, skills: 0, orbs: 0, jumps: 0, dashes: 0, shots: 0, playTime: 0, purchases: 0,
+    pvpWins: 0, tourneys: 0, bestWave: 0, cpuWins: {}, weaponUse: {}, weaponWins: {}, catWins: {}, mapWins: {},
+  };
+  // Each counter keeps the kind of value it starts as (a number, or a map); anything else in a save is dropped.
+  const saved = obj(p.stats), stats = {};
+  for (const k in statDefaults) {
+    const d = statDefaults[k], v = saved[k];
+    stats[k] = typeof d === 'number' ? numOr(v, d) : obj(v);
+  }
+  for (const k in saved) if (!(k in stats) && (typeof saved[k] === 'number' ? Number.isFinite(saved[k]) : obj(saved[k]) === saved[k])) stats[k] = saved[k];
   return {
-    coins: p.coins || 0, earned: p.earned || 0,
-    hats: Array.isArray(p.hats) ? p.hats : [], packs: Array.isArray(p.packs) ? p.packs : [],
-    ach: p.ach || {}, flags: p.flags || {},
-    stats: Object.assign({
-      matches: 0, wins: 0, losses: 0, roundsPlayed: 0, roundsWon: 0, kos: 0, ringouts: 0, dmg: 0, hits: 0, headHits: 0,
-      projHits: 0, bigHit: 0, bestCombo: 0, skills: 0, orbs: 0, jumps: 0, dashes: 0, shots: 0, playTime: 0, purchases: 0,
-      pvpWins: 0, tourneys: 0, bestWave: 0, cpuWins: {}, weaponUse: {}, weaponWins: {}, catWins: {}, mapWins: {},
-    }, p.stats),
+    coins: Math.max(0, numOr(p.coins)), earned: Math.max(0, numOr(p.earned)),
+    hats: strings(p.hats), packs: strings(p.packs), ach: obj(p.ach), flags: obj(p.flags), stats,
   };
 }
 function saveProfile() { profileDirty = false; store.set('profile', PROFILE); }
