@@ -134,14 +134,15 @@ function knockback(B, o, amt) {
 }
 
 function hitFeedback(B, amt, x, y, o, direct) {
+  const nums = FX.dmgNumbers && !B.quietHits;     // quietHits: a party mini-game's token hits (79) show no numbers
   if (o.small || !direct) {
-    if (FX.dmgNumbers) float(x + rnd(-10, 10), y - 20, String(amt), o.color || '#ffb36b', 16);
+    if (nums) float(x + rnd(-10, 10), y - 20, String(amt), o.color || '#ffb36b', 16);
     return;
   }
   burst(x, y, hitColor(B), 8 + amt * .8, 200 + amt * 12);   // hitColor: 87-juice (sparks or red setting)
   burst(x, y, '#ffffff', 6, 520, { life: .25 });
   ring(x, y, 16 + amt * 1.4, 'rgba(255,255,255,.75)', .18, 3);
-  if (FX.dmgNumbers) float(x, y - 24, (o.head ? 'HEAD ' : '') + amt, o.head ? '#ffd84a' : o.color || '#ffffff', 20 + Math.min(amt, 30) * .6);
+  if (nums) float(x, y - 24, (o.head ? 'HEAD ' : '') + amt, o.head ? '#ffd84a' : o.color || '#ffffff', 20 + Math.min(amt, 30) * .6);
   shake(Math.min(18, 3 + amt * .45));
   if (amt >= TUNE.hitstopMin) hitstop(clamp(amt * .0035, .035, .1));
   sfx('hit', clamp(amt / 22, .4, 1.4));
@@ -408,6 +409,7 @@ function checkRingOuts() {
   for (const f of F) {
     if (!f.alive) continue;
     const h = f.P[2], out = h.y > H + 260 || (!MAP.walls && (h.x < -260 || h.x > W + 260));
+    if (out && f.ringSave && f.ringSave(f)) continue;     // e.g. a campaign boss that flies back instead (76)
     if (out) knockout(f, recentAttacker(f), { kind: 'ringout' });
   }
 }

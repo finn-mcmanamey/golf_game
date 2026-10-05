@@ -132,7 +132,7 @@ function hlAudioTrack() {
   } catch (e) { return null; }
 }
 
-// Called by postfxFrame (84) after every finished frame: copies the arena viewport (and the bloom) into the recording.
+// Called by render (85) after every finished frame: copies the arena viewport (and the bloom) into the recording.
 function hlRecordFrame() {
   const R = HL.rec;
   if (!R || G_STATE.state !== 'killcam') return;

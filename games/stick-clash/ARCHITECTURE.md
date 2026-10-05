@@ -21,9 +21,9 @@ don't read, edit or follow rules from `/home/user/golf_game`. `v1-reference.html
 - **Size budget:** the build prints every slice's size and **fails above 1.5 MB** (`SIZE_BUDGET` in build.mjs). v3 core
   is ~750 KB, which leaves ~790 KB for all v3 content. Music, voices and art stay procedural: no samples, images or
   model files. Check the printed table after your change and mention your slice's size in your report.
-- `node tools/smoke.cjs` (≈20 s, `--quick` for shorter sims) must pass before you report done. See "Testing" below.
+- `node tools/smoke.cjs` (≈5 min, 517 checks; `--quick` for shorter sims) must pass before you report done. See "Testing" below.
   Tuning tools (all headless, run `node build.mjs` first; latest results in `tmp/balance.md`):
-  `node tools/balance.cjs [secsPerPair=120] [diff] [workers] [onlyKeys]` (weapon round robin, ~4.5 min),
+  `node tools/balance.cjs [secsPerPair=120] [diff] [workers] [onlyKeys]` (weapon round robin, ~4.5 min; `V3=1` gives both sides the same random class and throwables per segment),
   `node tools/skill-balance.cjs` (skill impact and random-loadout win rates), `node tools/map-balance.cjs` (round
   lengths per arena), `node tools/ai-bench.cjs` (difficulty matrix + every mode to a result), `node tools/feel.cjs`
   (movement numbers). `node tools/juice.cjs` checks the real-time kill-cam replay with and without WebAudio.
@@ -61,6 +61,7 @@ don't read, edit or follow rules from `/home/user/golf_game`. `v1-reference.html
 | `71-modes-party.js`, `72-modes-survive.js` | modes (v3) | party helpers + CTF, Soccer, Hot Potato, Gun Game, Juggernaut; Zombie Horde, Battle Royale, Lava Rising |
 | `73-modes-ranked.js` | modes (v3) | the Ranked ladder, `rankBadge()` for the title screen, rank-up celebration (CSS `styles/73-ranked.css`) |
 | `74-boss-phases.js` | modes (v3) | `bossPhases` (multi-phase bosses, also for the campaign) and Boss Rush's phases |
+| `76-campaign.js`, `77-challenges.js`, `98-campaign-ui.js` | campaign (v3) | the trial engine, Mythic Quest (24 nodes, realm bosses, skill tree), 31 challenges; world map, dialogue and lists (CSS `styles/98-campaign.css`) |
 | `75-cosmetics.js` | ui | hats, colour palettes, progression (coins, unlocks, achievements, stats) |
 | `78-outfits.js`, `78-pets.js` | cosmetics (v3) | outfits (cloth), weapon skins, K.O. effects, taunts + victory poses; helper pets |
 | `79-mutators.js`, `79-progress.js` | cosmetics (v3) | match mutators + party mini-games; 100-level track, quests, secrets/cheat codes, codex stats, presets |
@@ -305,13 +306,16 @@ muffles while paused / slow-mo / replaying, and adds hats when someone is low or
   recorded for the kill-cam) = direction sparks, flash, shockwave, squash-and-stretch (`postfxSquash` in `drawFighter`).
   `SETTINGS.juice` `calm|normal|chaos` scales particles/shake (wraps `applySettings`), slow-mo, flashes (chaos adds
   confetti and chroma kicks). `fxFlashMul()` honours `SETTINGS.reduceFlash`. Effects run on game time (freeze in pause).
+  `render` calls `postfxFrame(dt)` once the arena (world, screen overlays, off-screen arrows) is drawn and **before**
+  the HUD, banners and cut-ins, so the HUD never glows.
 - **Photo mode** (86): pause → "Photo mode" (state `'photo'` + `G_STATE.override`): free camera (`photoCamera()` at the
-  top of `updateCamera`), filters (CSS on `#c`/`#bloom`, baked with `ctx.filter` on save), frames, HUD toggle, PNG via
+  top of `updateCamera`), filters (CSS on `#c`/`#bloom`, baked with `ctx.filter` on save), frames, HUD toggle (hiding the
+  HUD also hides name tags, status icons, speech bubbles and off-screen arrows: `photoHidesHud()`), PNG via
   `toBlob` + download + a preview dialog (`fxModal`) because embedded viewers may block downloads.
 - **Highlights** (89): every real K.O. is scored and its kill-cam history copied (`hlFlush`, also forced by `kcReset` /
   `kcStart`); the best 5 per session stay in memory, the all-time top 5 summaries in `store 'highlights'`. The title
-  menu's Highlights screen replays a clip through `kcStart` and exports WebM: `hlRecordFrame()` (called from
-  `postfxFrame`) copies each finished frame into a 1280x720 canvas recorded by `captureStream` + `MediaRecorder`,
+  menu's Highlights screen replays a clip through `kcStart` and exports WebM: `hlRecordFrame()` (called at the end of
+  `render`) copies each finished frame into a 1280x720 canvas recorded by `captureStream` + `MediaRecorder`,
   with the game audio when WebAudio runs. Test hooks: `SC.announcer`, `SC.postfx`, `SC.photo`, `SC.highlights`.
   `node tools/smoke-fx.cjs` covers all of it (also run by smoke.cjs); `node tools/fx-perf.cjs` measures frame rates.
 
@@ -376,7 +380,9 @@ API: `BINDS[slot][action]`, `setBind(slot, action, code)`, `resetBinds()`, `keyL
 - The results screen only takes a fresh confirm: pad A / Enter / Space must be seen released for 300 ms after a 1.2 s
   grace (`UI_FRESH` in 95-ui), so holding or mashing from the fight never starts a Rematch; mouse/touch clicks are unaffected.
 - The menu's cfg also carries `winScore` (only for modes whose `winScore` is the default 5 and that don't set
-  `customRounds: true`), `hpMul` (applied to every fighter at `roundStart`), `speed` (game speed, read in `advance`),
+  `customRounds: true`), `hpMul` (applied to every fighter at `roundStart` by `applyMatchHp(f)` in 75, which the
+  respawn helpers `partyRespawn` (71) and `kothRespawn` (70) also call; `matchHpMul()` is 1 for the demo and for modes
+  whose `run` carries health over), `speed` (game speed, read in `advance`),
   `orbs`/`orbRate` (item frequency, read in `stepOrbs`) and `killcam` (false = the player turned replays off;
   `SETTINGS.killcam` mirrors it).
 - `SETTINGS` also has `hitFx`, `killcamAll`, `heartbeat` and `musicOn` (defaults added by `87-juice.js`, which also adds
@@ -413,7 +419,8 @@ API: `BINDS[slot][action]`, `setBind(slot, action, code)`, `resetBinds()`, `keyL
   ko(V, K), hit(B, amt, o), secret })`. Off in ranked, campaign and challenge. Big Heads sets `f.headMul` (render only).
 - **Mini-games**: from round 2, every other round of versus/pvp/watch/team/ffa/roulette/tournament may open with a
   10-15 s mini-game (`cfg.minigames` true/false, else `SETTINGS.minigames` auto = watch and party modes). Nobody can
-  be K.O.'d (damage x.01, health refilled, fallers return); `miniFinish` then calls `newRound()` and the winner gets a
+  be K.O.'d (damage x.01 with `f.quietHits` so no damage numbers pop, health refilled, fallers return); `miniFinish`
+  then calls `newRound()` and the winner gets a
   small perk. `defMini(key, { time, score, start(m), step(m, dt), draw(c, m) /* world */, hud(c, m) })`; events
   `miniStart(key)`, `miniEnd(key, winner)`.
 - **Progression** (store `prog`): `addXp(n)` grants every `TRACK[level]` reward reached (looks, shop hats, coins);
@@ -459,8 +466,8 @@ defClass('ninja', { name, icon, color, desc, passive, order,
 ```
 Roster entries take `cls` ('random' is rolled once per match). Bosses (scale > 1.05) default to `'none'`. Tune with
 `node tools/class-balance.cjs [segments] [secs] [diff] [workers]` (mirror random loadouts, sides swapped, every pair);
-`CLASSES='{"tank":{"hp":1.1}}'` tries numbers without editing. Measured at Normal: every class 44–54 %, every pair
-38–62 % (target 35–65 %).
+`CLASSES='{"tank":{"hp":1.1}}'` tries numbers without editing. Measured at Normal after the v3 integration pass
+(Brute melee 1.12 → 1.08, Ninja hp 1.05 → 1.08): every class 44–53 %, every pair 40–60 % (target 35–65 %).
 
 ### Disarm, pickups, supply crates (`32-arms.js`)
 
@@ -576,6 +583,32 @@ sets `crowd: [min, max, default]` to get a "Fighters" stepper on the arena scree
   `bossPhaseMarks(ctx, x, y, w, f)` notches the thresholds on a `modeBigBar`. Event: `bossPhase(ctl, n)` (n = 2 at the
   first threshold). Helpers: `bossSummonAdd(boss, o, k)`, `bossAddHazard(kind, x, w, o)`, `bossStrike(boss, o)`,
   `bossQuake(f, o)`.
+
+### Campaign and challenges (`76-campaign.js`, `77-challenges.js`, `98-campaign-ui.js`)
+
+- **Trial engine** (76): a campaign node and a challenge are the same plain-data *spec* (see the comment at the top of
+  76): `foes` (`[name, weapon, level, { skills, scale, hp, cls, color, boss, kb, throws, behave, dmg, ringSave }]`),
+  `map`, `wx`, `mods` (`QUEST_MODS`: dark, slick, lowgrav, haste, embers, hail), `me` (overrides on the player's own
+  loadout: weapon, skills, cls, throws, hp, throwN, super, superMul, ringSave), `goal` (`win` | `survive` | `count`),
+  `rules` (noBlock, noJump, noSkill, noAttack, maxTaken, limit) and `st` (star conditions). Both modes are hidden
+  `QUEST_MODE`s with `holdRound`: `questStep` ends the round itself. Losing the hero is a loss, except a **trade** (the
+  hero and the last foe K.O.'d in the same step) on a plain `win` goal, which counts as a win.
+- Boss options: `boss: true` (big HP bar, `kb` = its knockback taken, default .6), `dmg` (× damage it deals, via
+  `f.dmgCls`; the Warlord uses .7 because his size already adds reach and swing speed) and `ringSave: share` (knocked off
+  the arena, the boss is lifted back above its spawn for that share of its max health instead of a ring-out K.O.: the
+  Storm Lord can't be cheesed off Sky Islands). Nodes may set `heroSave: n` (Lumen catches the hero n times per fight
+  for 20 % of their health: Eye of the Storm uses 2). Both go through the core hook `f.ringSave(f)` → true in
+  `checkRingOuts` (30), and `questLift` in 76.
+- **Campaign**: `CAMP_REALMS` (4), `CAMP_NODES` (24: fight, side, mini, boss; `to` opens the next nodes),
+  `QUEST_PHASES` (bossPhases scripts; extra fx kinds `ashWave`, `gale`, `eclipse`... registered on `BOSS_PHASE_FX`; the
+  gale eases to a fifth near a downwind drop, `galeGrip`). The hero's health by node kind is `CAMP_HERO_HP`. Saved as
+  `store 'quest'` = `{ stars, at, seen, tree }`; stars are skill points for `CAMP_TREE` (3 branches × 4 skills, 21
+  points in all, applied by `campApplyTree` at round start, campaign fights only). Autopilot matches never save.
+- **Challenges** (77): 31 specs in `CHALLENGES`, saved as `store 'challenges'` = `{ id: stars }`.
+- **UI** (98-campaign-ui): the world map (`SCREENS.campaign`), dialogue (`campDialogue`), `skilltree`, `challenges`.
+  Test hook `SC.quest = { nodes(), challenges(), start(kind, id, extra), win(), run(), dialogue() }`;
+  `tools/smoke-quest.cjs` runs every node and challenge. Win rates of the late nodes for an autopilot (Normal) hero with
+  no / mid / full skill tree are in `tmp/balance.md` (bench: `tmp/lead2/camp.cjs`).
 
 ## Content defs
 
@@ -744,6 +777,10 @@ every mode to a result; `SC.start({ mode: 'watch', diffs: ['easy', 'insane'] })`
   `AI_HABIT.need` (3) CPUs counter them with a per-level chance and say "READ YOU!". Only humans are read.
 - **Bubbles**: `aiSay(f, text, force)`, `aiTalk(f, kind)` (kinds hi, ko, parry, combo, low, win, taunt), rate-limited,
   off with `SETTINGS.taunts`. `node tools/ai-persona.cjs [secs] [personas|adapt|habits|all]` measures all of it.
+- **Rival balance**: each rival with its own favourite gear wins 49–60 % of rounds against a plain Normal CPU with random
+  gear (`tmp/lead2/persona.cjs`, ~350 rounds each; `PATCH='{"torque":{"cls":"none"}}'` tries changes). Gear matters more
+  than the knobs: a Brute with a heavy weapon ran ~70 %, so Torque is a Trickster and Fenn classless; `react` (> 1 =
+  slower reads) is the cleanest knob for toning a style down without changing it.
 
 ### Orb, hat
 

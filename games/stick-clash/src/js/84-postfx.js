@@ -9,7 +9,7 @@
 // - Juice level (SETTINGS.juice 'calm' | 'normal' | 'chaos') scales particles, shake, slow-mo and flashes;
 //   SETTINGS.reduceFlash (accessibility, when present) tones flashes and bloom down further.
 // The renderer calls postfxSquash(ctx, f) in drawFighter, postfxDrawWorld(ctx) after the world and postfxFrame(dt)
-// after the whole frame.
+// once the arena is finished, before the HUD (so the HUD never glows).
 
 const POSTFX_DEFAULTS = { bloom: 'low', lights: true, juice: 'normal' };
 for (const k in POSTFX_DEFAULTS) {
@@ -357,7 +357,7 @@ function bloomRender2D(q) {
   ctx.restore();
 }
 
-// Called by render() after the frame is complete.
+// Called by render() once the arena is drawn, before the HUD (so the HUD never glows).
 function postfxFrame(dt) {
   if (typeof document === 'undefined') return;
   const t0 = performance.now(), q = bloomWanted();
@@ -371,7 +371,6 @@ function postfxFrame(dt) {
   }
   if (BLOOM.cv) BLOOM.cv.style.display = shown ? '' : 'none';
   BLOOM.ms += (performance.now() - t0 - BLOOM.ms) * .05;
-  hlRecordFrame();          // highlight video export copies the finished frame (89)
 }
 
 // Keeps the frame rate up: while bloom is on and frames stay slow (< 50 fps) for ~3 s, step down for this session:

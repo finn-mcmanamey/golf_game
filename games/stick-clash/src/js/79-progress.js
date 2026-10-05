@@ -245,7 +245,7 @@ function cheatKey(code) {
 
 // The secret weapon and hat (hidden until their codes are typed).
 defWeapon('rubber-chicken', {
-  name: 'Rubber Chicken', cat: 'exotic', hidden: true, order: 99, power: 1.1,
+  name: 'Rubber Chicken', cat: 'exotic', hidden: true, secret: true, order: 99, power: 1.1,   // secret: kept out of balance runs
   desc: 'Secret! A squeaky rubber chicken. Surprisingly heavy. Deeply embarrassing to lose to.',
   len: 58, mass: 1.05, dmg: 1.05, width: 9, kb: 1.2,
   ai: { range: 108, style: 'melee' },

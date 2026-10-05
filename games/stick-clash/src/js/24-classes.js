@@ -8,11 +8,11 @@ defClass('none', { name: 'Classic', hidden: true, icon: '○', desc: 'No class.'
 
 defClass('ninja', { name: 'Ninja', icon: '☾', color: '#5ef2ff', order: 10,
   desc: 'Fast and light. Gets knocked further.', passive: 'Extra mid-air jump (triple jump).',
-  hp: 1.05, speed: 1.14, mass: .9, stamina: .9, airJumps: 1 });
+  hp: 1.08, speed: 1.14, mass: .9, stamina: .9, airJumps: 1 });   // v3 balance: hp 1.05 -> 1.08 (43% -> ~50%)
 
 defClass('brute', { name: 'Brute', icon: '♜', color: '#ff8a2e', order: 20,
-  desc: 'Heavy hitter. Slow on its feet.', passive: 'Melee hits +12% and knock weapons loose more often.',
-  speed: .88, mass: 1.25, stamina: 1.1, melee: 1.12, disarm: 1.6 });
+  desc: 'Heavy hitter. Slow on its feet.', passive: 'Melee hits +8% and knock weapons loose more often.',
+  speed: .88, mass: 1.25, stamina: 1.1, melee: 1.08, disarm: 1.6 });   // v3 balance: melee 1.12 -> 1.08 (Brute rivals ran ~70%)
 
 defClass('mage', { name: 'Mage', icon: '✶', color: '#b98cff', order: 30,
   desc: 'Lives on its skills.', passive: 'Skill cooldowns 38% shorter. Super meter fills 15% faster.',

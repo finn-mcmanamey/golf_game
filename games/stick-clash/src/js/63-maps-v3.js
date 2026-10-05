@@ -274,8 +274,10 @@ defMap('jungle', {
   floor: 650, gravity: 2200,
   palette: { sky1: '#06180e', sky2: '#1e4a2a', ground: '#2a2a1a', line: '#9fe07a', accent: '#ffd84a', solid: '#5a5a42' },
   solids: [
-    { x: 0, y: 560, w: 300, h: 90, oneWay: false }, { x: 0, y: 470, w: 180, h: 180, oneWay: false },
-    { x: 980, y: 560, w: 300, h: 90, oneWay: false }, { x: 1100, y: 470, w: 180, h: 180, oneWay: false },
+    // The steps sink 14 px into the ground (like BRK_SINK): a block ending exactly at the floor let a fighter lying on
+    // the floor slide into it along the seam and stay wedged there.
+    { x: 0, y: 560, w: 300, h: 104, oneWay: false }, { x: 0, y: 470, w: 180, h: 194, oneWay: false },
+    { x: 980, y: 560, w: 300, h: 104, oneWay: false }, { x: 1100, y: 470, w: 180, h: 194, oneWay: false },
     { x: 560, y: 420, w: 160, restsOn: 'jp' }, brkSolid('pillar', 625, 434, 30, 216, { id: 'jp', look: JUNGLE_MOSS }),
     { x: 190, y: 330, w: 150 }, { x: 940, y: 330, w: 150 },
   ],
@@ -314,6 +316,7 @@ defMap('jungle', {
     }
   },
   drawSolid(ctx, s) {
+    if (s.y + s.h > this.floor) s = Object.assign({}, s, { h: this.floor - s.y });   // the sunk part stays out of sight
     mapSlab(ctx, s, '#5a5a42', '#9fe07a');
     if (!s.oneWay) { ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 2; ctx.beginPath(); for (let x = s.x + 45; x < s.x + s.w; x += 60) { ctx.moveTo(x, s.y + 4); ctx.lineTo(x, s.y + s.h); } ctx.stroke(); }
   },

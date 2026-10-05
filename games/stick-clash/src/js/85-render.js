@@ -298,7 +298,7 @@ function drawFighter(f) {
   for (const key of f.skills) if (key && SKILLS[key] && SKILLS[key].draw) hook(SKILLS[key], 'draw', ctx, f);
   drawFighterOver(f);                              // v3: guard arc, element glow, Lv3 trail, mech/jetpack, ultimates
   ctx.restore();
-  if (f.alive) drawTags(f);
+  if (f.alive && !photoHidesHud()) drawTags(f);    // photo mode (86) without HUD: no name tags or status icons
 }
 
 // Name tag for humans (so players can find themselves) and active status icons, above the head.
@@ -659,11 +659,12 @@ function render(dt) {
   worldDrawTop(ctx, t);      // weather, darkness and lights (58)
   postfxDrawWorld(ctx);      // dynamic lights, impact sparks and flashes (84)
   hook(G_STATE.mode, 'drawWorld', ctx);
-  aiTalkDraw(ctx);           // CPU speech bubbles (67)
+  if (!photoHidesHud()) aiTalkDraw(ctx);   // CPU speech bubbles (67), hidden with the HUD in photo mode
   setArenaTransform();
   drawScreenOverlays(dt);
   juiceDrawScreen(ctx, dt);   // K.O. chroma/vignette, low-health heartbeat (87)
-  drawOffscreen();
+  if (!photoHidesHud()) drawOffscreen();
+  postfxFrame(dt);           // bloom (84) from the finished arena, before the HUD so menus and numbers don't glow
   ctx.restore();             // the HUD may sit outside the world viewport (portrait: in the band above it)
   ctx.save();
   if (!photoHidesHud()) {     // photo mode (86) can hide the HUD, banners and cut-ins
@@ -676,5 +677,5 @@ function render(dt) {
   kcDrawOverlay(ctx);   // replay letterbox (88)
   photoDrawScreen(ctx);       // photo filters' overlays and frames (86)
   ctx.restore();
-  postfxFrame(dt);            // bloom (84), after the frame is complete
+  hlRecordFrame();            // highlight video export copies the finished frame (89)
 }

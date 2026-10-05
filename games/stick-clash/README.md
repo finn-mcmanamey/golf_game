@@ -1,13 +1,16 @@
 # Stick Clash
 
-Wobbly neon stickmen, floppy weapons, big knockbacks. Stick Clash is a physics fighting game for one or two players
-(plus up to 8 fighters with CPUs) that runs in any modern browser. There is nothing to install.
+Wobbly neon stickmen, floppy weapons, big knockbacks. Stick Clash is a physics fighting game for one to eight players
+(keyboard, gamepads or touch, with CPUs filling the empty seats) that runs in any modern browser. There is nothing to
+install, and the whole game is one offline HTML file.
 
 **To play:** open `dist/stick-clash.html` in Chrome, Edge, Firefox or Safari. If it isn't there yet, run
 `node build.mjs` first. It works offline from your disk.
 
-Everything is unlocked from the start: 51 weapons, 24 skills, 6 classes, 6 throwables, 8 ultimates, 15 arenas and
-13 modes. Coins you earn buy hats and colour packs in the Shop. They are just for style.
+Everything you fight with is unlocked from the start: 51 weapons, 24 skills, 6 classes, 6 throwables, 8 ultimates,
+23 arenas and 22 modes, plus the **Mythic Quest** campaign (24 stops across 4 realms) and **31 challenges**. Looks
+(outfits, weapon skins, K.O. effects, pets, victory poses, titles) unlock on the free 100-level **Track**, and coins buy
+hats and colour packs in the Shop. None of it changes how strong you are.
 
 ## Controls
 
@@ -23,6 +26,7 @@ Everything is unlocked from the start: 51 weapons, 24 skills, 6 classes, 6 throw
 | Grab, then again to throw (or block + attack) | C | L | RT |
 | Throwable | R | ; | LB |
 | Super (when the meter is full) | X | Enter | R3 (right stick click) or Back |
+| Taunt (and your victory pose) | T | ' | D-pad up |
 | Pause | Esc or P | Esc or P | Start |
 | Mute | M | M | |
 
@@ -31,8 +35,13 @@ Everything is unlocked from the start: 51 weapons, 24 skills, 6 classes, 6 throw
 - **Rebinding:** every key can be changed under **Controls**.
 - **Menus:** use the arrow keys or WASD, Enter to select and Esc to go back. A gamepad works the same way with the
   d-pad, A and B.
-- **Touch screens:** on-screen buttons appear during a match. Slide your thumb between ◀ and ▶ to turn, and the skill
-  buttons show each skill's cooldown. ◆ blocks while held; ★ (super), ● (throwable) and ✋ (grab) sit in a row above.
+- **Touch screens:** put your left thumb down anywhere on the left half and a stick appears under it: slide to run,
+  push up to jump, pull down to block. On the right, tap to attack, swipe up to jump, sideways to dash, down to grab.
+  The action buttons sit in an arc around Attack (size and see-through-ness in Settings).
+- **Gamepads:** up to 8 at once. Every button can be remapped per player (**Controls → Gamepad buttons**), and pads
+  rumble on hits (Settings). In party modes, **press A to join** on the arena screen.
+- **One-button mode** (Settings → Accessibility): you walk to the foe and hop by yourself; the one button attacks,
+  hold it to block, double-tap for your super (or a skill or throwable).
 
 ### How fighting works
 
@@ -79,7 +88,7 @@ Pick one in the loadout (the **Class** tab). Every class wins 44-54% against the
 | Class | Body | Passive |
 |---|---|---|
 | **Ninja** | Fast, light (knocked further) | Extra mid-air jump (triple jump) |
-| **Brute** | Slow, heavy | Melee hits +12% and knock weapons loose more often |
+| **Brute** | Slow, heavy | Melee hits +8% and knock weapons loose more often |
 | **Mage** | Balanced | Skill cooldowns 38% shorter; super meter fills 15% faster |
 | **Gunner** | Balanced | +50% ammo, reloads 60% faster, one extra throwable |
 | **Tank** | Slow, heavy, hits a little softer | +15% health, +50% guard stamina, hard to knock away |
@@ -126,6 +135,8 @@ Pick one in the loadout (the **Class** tab). Every class wins 44-54% against the
 | **Weapon Roulette** | Random weapons every round, re-spun every 15 s mid-fight. Adapt fast! First to 5. |
 | **King of the Hill** | Stand in the glowing zone to score. It moves, and KOs respawn. First to 15 takes the round. |
 | **Training** | An unkillable dummy, a damage meter and instant swaps: 1 weapon, 2/3 skills, 4 dummy mode, 5 dummy weapon. |
+| **Mythic Quest** | The campaign: walk a world map through four realms (Ember Wastes, Frostspire, Sky Citadel, Shadow Depths), with battles, side quests, mini-bosses and four realm bosses (Ash Titan, Frost Queen, Storm Lord, the Warlord) who change their attacks and the arena as they weaken. Earn up to 3 stars per stop and spend them on a small skill tree (health, damage, cooldowns...) that only works in the campaign. |
+| **Challenges** | 31 bite-size trials rated with 1–3 stars: win with only a frying pan, parry five blows, ring a giant off the edge, survive three Hard CPUs... |
 | **Ranked** | Climb Bronze, Silver, Gold, Platinum, Diamond, Master and Grandmaster (three divisions each) against CPUs that get tougher with your rank. Best of 3; wins gain points (more on a streak), losses cost some, and you never drop out of a tier you reached. Your rank shows on the title screen. |
 | **Capture the Flag** | 2v2 up to 4v4. Grab the other team's flag and run it to your base; touch your dropped flag to return it. First to 3 captures. |
 | **Soccer** | A giant physics ball and two goals. Kick it, swing at it, shoot it or blast it in. First to 3 goals. |
@@ -136,11 +147,27 @@ Pick one in the loadout (the **Class** tab). Every class wins 44-54% against the
 | **Battle Royale** | Eight fighters, one winner. A storm closes in from the edges and supply drops (a weapon and health) fall inside the safe zone. |
 | **Lava Rising** | The floor is lava and it keeps rising; new platforms appear above it. Last one up scores; first to 2. |
 
+Free-for-All, CPU vs CPU and the party modes take up to 8 fighters (the **Fighters** stepper on the arena screen).
+On the arena screen you can also add **mutators** (Low Gravity, Tiny Fighters, Vampire, Ricochet, Sudden Death, Random
+Weapons, Supercharged, Orb Storm, Explosive K.O.s, Speed ×1.5, and a secret one) and pick the **weather**. In CPU vs
+CPU and the party modes, every other round opens with a short **party mini-game** (Sumo Shove, Dodgeball Rain, Hot
+Floor, Reflex Duel); the winner carries a small perk into the real round (Settings → Party mini-games).
+
 Boss Rush bosses now have **phases**: at half health and at a quarter they change their attacks and the arena
 (spikes or lava at the edges, rock and hail storms, sliding platforms, summoned guards, a howling wind).
 
 The CPU has four levels: **Easy**, **Normal**, **Hard** and **Insane**. Each one beats the level below it in roughly
 70–80% of rounds.
+
+### CPU rivals
+
+In 1P vs CPU (the loadout's **Rival** row), Tournament, Free-for-All and Ranked, CPUs can be one of ten named rivals,
+each with a look, favourite gear and a fighting style: **Torque** the Rusher, **Mirage** the Trickster, **Vale** the
+Zoner, **Dazzle** the Show-off, **Tamsin** the Parry Master, **Grizz** the Grappler, **Magpie** the Orb Hunter,
+**Fenn** the Berserker, **Ivo** the Tactician and **Skitter** the Coward. They talk back in speech bubbles (Settings →
+Taunts & reactions). When you play alone, **adaptive difficulty** nudges the CPU a little up or down to keep fights
+close (never past the next level, never in Ranked), and CPUs **learn your habits**: lean on the same jump-in, dash-in,
+guard or skill too often and they start countering it ("READ YOU!").
 
 ## Weapons
 
@@ -307,15 +334,66 @@ Each fighter carries two skills (Skill 1 and Skill 2) with their own cooldowns, 
 | **Rainbow Bounce** | Trampolines launch you sky-high. Bounce over foes and land on top of them. |
 | **Haunted Graveyard** | Dark and foggy: you only see what is near. Ghosts drift through and chill whoever they touch. |
 | **Orbital Station** | Zero-g columns let you float up to the high decks. Fight mid-air or ride them to safety. |
+| **Pirate Ship** | The deck rolls with the swell and footing slides downhill. Cannonballs land on the flashing red rings. |
+| **Train Roof** | Fight on a speeding train into a headwind. When TUNNEL flashes, drop into a gap between the cars. |
+| **Jungle Temple** | Grab a vine in mid-air (grab key) to swing over the spike pit; jump to let go. Stone faces spit darts. |
+| **Candy Land** | Caramel puddles stick to your feet; marshmallow blocks bounce you sky-high. |
+| **Volcano Eruption** | Mid-fight the volcano blows: side ledges sink into rising lava, new rock rises and lava bombs rain down. |
+| **Space Asteroid** | Every planetoid has its own gravity: run right round it, jump to hop to the next. Deep space is a ring-out. |
+| **Haunted Mansion** | The lights flicker and die every few seconds: fighters and blades glow in the dark. |
+| **Giant's Kitchen** | Tiny fighters on a giant countertop: a toaster launcher, a whirring blender and runaway fruit. |
 
 Arena traps always flash a warning before they strike, and they stay quiet for the first seconds of each round.
+Crates, glass panes and stone pillars on many arenas break under hits, shots and blasts (and what stood on them falls).
 
-## Coins, hats and trophies
+**Weather** (the arena screen's Weather stepper, random by default): rain and snow make the ground slippery, fog hides
+everything far from the fighters, wind gusts shove fighters and bend shots (each gust is announced), and night darkens
+the arena so only lamps, fighters and glowing weapons light it.
 
-- **Coins:** you earn them in every match, and more for wins, harder CPUs, tournament runs and survival waves.
-  Training earns nothing.
-- **Shop:** spend coins on 33 hats and colour packs. They only change your look.
+## Your fighter and progress
+
+- **Look tab** (in the loadout): an outfit with cloth physics (capes, scarves, coats that flap as you move), a skin for
+  each weapon type, a K.O. effect, a helper **pet**, a victory pose and a title. Press **taunt** mid-fight for a little
+  super meter (if you dare).
+- **Pets** follow you and help a little: Bit-Bot zaps a shot out of the air, Sprig heals you when you are low, Zappy and
+  Ember Wisp nip at nearby foes, Fetch brings orbs closer, Tick slows a bullet, Bubbles washes off a debuff and Glim
+  tops up your super. Pets are off in Ranked.
+- **Fighter Creator:** save named presets (weapon, skills, class, throwables, hat, colour and look) and load them in
+  one click.
+- **Track:** a free 100-level track. Every match, campaign stop, challenge and quest earns XP, and every level hands
+  out a reward (looks, hats, coins, titles).
+- **Quests:** three daily and one weekly task ("land 3 parries", "win on Candy Land"...) for bonus XP. You can re-roll
+  one a day.
+- **Codex:** every weapon, boss, realm and arena with a line of lore and your own stats with it.
+- **Secrets:** a few hidden things unlock by typing codes on the title screen or by doing something unusual. The
+  Codex gives hints.
+- **Coins and Shop:** coins come from every match (more for wins, harder CPUs, tournament runs and survival waves;
+  Training earns nothing) and buy 34 hats and colour packs.
 - **Trophies & Stats:** 28 trophies to unlock, plus your lifetime stats.
+- **Highlights:** the best K.O.s of the session (big blows, combos, ring-outs, comebacks) are kept as clips. Replay them
+  from the title screen and export one as a WebM video (in the downloaded file; some embedded viewers block downloads).
+- **Transfer progress** (Settings): copy one code that holds all your saves and paste it on another device.
+
+## Look and sound
+
+- An arcade **announcer**, a **crowd** that reacts to big hits, and procedural synthwave **music** with a track per
+  arena that builds as the fight heats up (all can be turned down or off in Settings).
+- **Bloom** glow (WebGL, with a simpler fallback), dynamic lights from muzzle flashes and blasts, and punchier impacts.
+  The **Effects** setting (Calm / Normal / Chaos) scales particles, shake, slow-motion and flashes.
+- **Photo mode** (pause menu): freeze the fight, pan and zoom a free camera, add a filter and a frame, hide the HUD, and
+  save a PNG.
+
+## Accessibility
+
+Settings → Accessibility: **colour-blind palettes** (deutan, protan, tritan) with a shape marker on every fighter and
+health card, **reduce flashing** (softer flashes, little shake, no strobing lightning; on by default when your system
+asks for reduced motion), **one-button mode** for P1, P2 or both, a **practice game speed** slider (25–100%, solo play,
+never Ranked), and gamepad rumble and phone haptics strength.
+
+## On a phone
+
+Open the HTML file in the phone's browser and play with the touch controls (landscape works best). The `mobile/`
+folder holds an Expo app that wraps the game for iOS (see `mobile/README.md`).
 
 ## Tips
 
@@ -326,6 +404,8 @@ Arena traps always flash a warning before they strike, and they stay quiet for t
 - Bare-handed? Run for a weapon on the floor, or wait for the supply crate.
 - Watch the arena: hazards glow or flash before they strike.
 - The deciding blow of a match is replayed in slow motion (press any key to skip).
+- Shield up against a rusher, parry the swing, then grab and throw. Rivals with a habit can be read too.
+- Bosses fight in phases: save your super for the last one.
 
 ## For developers
 

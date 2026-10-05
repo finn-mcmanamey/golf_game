@@ -64,6 +64,7 @@ function partyRespawn(old, x, y, over = {}) {
   const f = makeFighter(Object.assign({}, r, { id: old.id, x, y, face: x < W / 2 ? 1 : -1, weapon: resolveWeapon(r.weapon),
     skills: old.skills, autopilot: old.autopilot, cls: resolveClass(r.cls || 'none'), throws: resolveThrows(r.throws) }, over));
   f.inv = 1.2;                                                      // brief spawn protection
+  applyMatchHp(f);                                                  // the Settings health multiplier (75)
   F = F.map(o => o === old ? f : o);
   const c = chest(f);
   ring(c.x, c.y, 80, f.color, .4, 5); burst(c.x, c.y, f.color, 20, 300);

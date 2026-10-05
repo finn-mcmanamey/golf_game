@@ -150,7 +150,8 @@ async function testOrbsHatsStatuses(page) {
     const e = () => SC.errors.length;
     for (const k of Object.keys(SC.reg.ORBS)) {
       const e0 = e();
-      SC.start({ mode: 'watch', weapons: ['blade', 'blade'] }); SC.sim(1.2);
+      // No skills: a random Magnet skill on the other CPU yanks the orb away before it can be touched.
+      SC.start({ mode: 'watch', weapons: ['blade', 'blade'], skills: [['none', 'none'], ['none', 'none']] }); SC.sim(1.2);
       const o = spawnOrb(k), f = SC.F[0], c = chest(f);
       let grabbed = false;
       if (o) { o.solid = null; o.x = c.x; o.y = c.y; SC.sim(.05); grabbed = o.taken; }
@@ -428,11 +429,13 @@ async function testV3Core(page) {
     let chanceDisarms = 0;                                   // strong hits knock weapons loose now and then
     for (let k = 0; k < 80 && !chanceDisarms; k++) { B.hp = B.maxHp; damage(B, 30, { src: A, kind: 'melee', nx: 1 }); if (B.wkey === 'fists') chanceDisarms++; }
     out.disarmChance = chanceDisarms > 0;
+    // Re-arm the foe: left bare-handed it calls its own supply crate, which can land on it (and be taken) first.
+    if (B.wkey === 'fists') equipWeapon(B, 'blade');
     // Bare-handed for 5 s: a supply crate drops next to them; touching it hands over its weapon.
     for (const p of pickupsLive()) p.dead = true;
     SC.sim(.1); disarm(A, B, { nx: 1 }); for (const p of pickupsLive()) p.dead = true;
     SC.sim(6);
-    const crate = pickupsLive().find(p => p.pickup === 'crate');
+    const crate = pickupsLive().find(p => p.pickup === 'crate' && Math.abs(p.x - A.P[2].x) < 260);
     SC.sim(3);
     if (crate) { __V.place(A, crate.x); SC.sim(.3); }
     out.supplyCrate = !!crate && A.wkey !== 'fists';
@@ -478,8 +481,10 @@ async function testV3Core(page) {
     SC.start({ mode: 'watch', fighters: 8, map: 'neon' });
     const t0 = performance.now(); SC.sim(30); const ms = (performance.now() - t0) / (30 * 120);
     const r0 = performance.now(); for (let k = 0; k < 20; k++) SC.render(1 / 60); const rms = (performance.now() - r0) / 20;
-    out.eightFighters = SC.F.length === 8 && Math.min(...spread) >= 5 && !__T.nan() && ms < 2.5;
-    notes.eightFighters = `min distinct spawns ${Math.min(...spread)}, ${ms.toFixed(2)} ms/step, ${rms.toFixed(1)} ms/frame`;
+    // Mirror Decoys are appended to F as summons: count the real fighters only.
+    const eight = SC.F.filter(f => !f.summon).length, nan8 = __T.nan();
+    out.eightFighters = eight === 8 && Math.min(...spread) >= 5 && !nan8 && ms < 2.5;
+    notes.eightFighters = `${eight} fighters${nan8 ? ' NaN!' : ''}, min distinct spawns ${Math.min(...spread)}, ${ms.toFixed(2)} ms/step, ${rms.toFixed(1)} ms/frame`;
     SC.start({ mode: 'ffa', fighters: 8, autopilot: true }); SC.sim(75);       // a round ends by 61 s at the latest
     const crowd = SC.F.filter(f => !f.summon).length;
     out.ffaEight = crowd === 8 && SC.G.log.length > 0 && !__T.nan();
@@ -528,12 +533,14 @@ async function testPartyModes(page) {
     out.p2 = ctl && ctl.idx === 1 && BANNER && BANNER.a === ctl.phases[0].name;
     boss.hp = boss.maxHp * .2; SC.sim(.3);
     out.p3 = ctl && ctl.idx === 2 && PROJ.filter(p => p.kind === 'mode-hazard').length >= 2;
-    SC.start({ mode: 'watch', map: 'neon', weapons: ['blade', 'blade'] }); SC.G.lock = 0;
+    // No skills: a Mirror Decoy (a summon of the other fighter) would count as a leftover add.
+    SC.start({ mode: 'watch', map: 'neon', weapons: ['blade', 'blade'], skills: [['none', 'none'], ['none', 'none']] }); SC.G.lock = 0;
     const c2 = bossPhases(SC.F[1], [{ at: .5, name: 'TEST PHASE', fx: [['adds', { n: 2 }], ['rain', { every: .2, first: 0 }], ['platforms', {}]] }]);
     SC.F[1].hp = SC.F[1].maxHp * .4; SC.sim(.5);
     out.adds = SC.F.filter(f => f.summon && f.owner === SC.F[1]).length === 2 && PROJ.some(p => p.zone && p.danger > 0);
-    knockout(SC.F[1], SC.F[0]); SC.sim(.2);
-    out.cleanup = c2.done && !SC.F.some(f => f.summon && f.alive);
+    const boss2 = SC.F[1];
+    knockout(boss2, SC.F[0]); SC.sim(.2);
+    out.cleanup = c2.done && !SC.F.some(f => f.summon && f.alive && f.owner === boss2);
     out.rank = rankOf(0).label === 'Bronze III' && rankOf(299).label === 'Bronze I' && rankOf(300).label === 'Silver III' && rankOf(RANK_GM + 50).gm
       && rankSettle(true, true).delta > 0;
     out.errors = SC.errors.slice(e0).map(e => e.msg);
@@ -689,8 +696,11 @@ async function testUI(browser) {
     return mx < 0 && (await page.evaluate(() => SC.F[0].P[2].x)) - x0 < -15;
   });
   await step('attack key swings', async () => {
+    // Counts 'attack' events: a tap on the Buzzsaw only spins it up (a 30 ms cooldown, no shot), so cooldown or shot
+    // checks 60 ms later miss it.
+    await page.evaluate(() => { window.__atk = 0; window.__atkOff = on('attack', f => { if (f === SC.F[0]) __atk++; }); });
     await page.keyboard.press('KeyS'); await page.waitForTimeout(60);
-    return page.evaluate(() => SC.F[0].swingT > 0 || SC.F[0].atkCd > 0 || SC.F[0].stats.shots > 0);   // fast guns' cooldown is < 60ms
+    return page.evaluate(() => { __atkOff(); return __atk > 0; });
   });
   await step('block key raises the guard', async () => {
     await page.keyboard.down('KeyF'); await page.waitForTimeout(150);

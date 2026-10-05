@@ -58,6 +58,8 @@ const MINIS = {};
 function defMini(key, def) { return defLook(MINIS, key, Object.assign({ time: 12, score: 'high' }, def)); }
 const MINI_MODES = new Set(['versus', 'pvp', 'watch', 'team', 'ffa', 'roulette', 'tournament']);
 const MINI_DEFAULT_ON = new Set(['watch', 'pvp', 'team', 'ffa']);    // CPU vs CPU and party modes
+if (!('minigames' in SETTING_DEFAULTS)) SETTING_DEFAULTS.minigames = 'auto';   // so Settings > Reset covers it
+if (!('minigames' in SETTINGS)) SETTINGS.minigames = 'auto';
 const MINI_PERKS = [
   ['shield', 'a shield', f => addStatus(f, 'shield', 20, 1)], ['haste', 'a head start', f => addStatus(f, 'haste', 4)],
   ['super', '+35 super', f => gainSuper(f, 35)], ['regen', 'regeneration', f => addStatus(f, 'regen', 4)]];
@@ -83,7 +85,7 @@ on('roundStart', round => {
 function miniStart(round, key) {
   const def = MINIS[key] || MINIS[randomKey(MINIS)];        // key: tests pick a game
   MINI = { def, round, t: 0, pts: F.map(() => 0), data: {}, over: false };
-  for (const f of F) f.dmgTakenMul = .01;
+  for (const f of F) { f.dmgTakenMul = .01; f.quietHits = true; }   // hits only shove: no damage, no "1" numbers
   hook(def, 'start', MINI);
   banner(def.name.toUpperCase(), 'MINI-GAME · ' + def.how, 2.4, '#ffd84a');
   emit('miniStart', def.key);

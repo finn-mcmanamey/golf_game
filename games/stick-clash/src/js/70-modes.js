@@ -680,6 +680,7 @@ function kothRespawn(old) {
   const f = makeFighter(Object.assign({}, r, { id: old.id, x: sp[0], y: sp[1], face: sp[0] < W / 2 ? 1 : -1, weapon: old.wkey,
     skills: old.skills, autopilot: old.autopilot }));
   f.inv = 1.2;                                        // brief spawn protection
+  applyMatchHp(f);                                    // the Settings health multiplier (75)
   F = F.map(o => o === old ? f : o);
   const c = chest(f);
   ring(c.x, c.y, 80, f.color, .4, 5); burst(c.x, c.y, f.color, 20, 300);

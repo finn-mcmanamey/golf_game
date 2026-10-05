@@ -27,9 +27,9 @@ function aiPersonaOf(f) {
 
 // ---------- the rivals ----------
 defPersona('torque', {
-  name: 'Torque', title: 'Rusher', color: '#ff8a2e', hat: 'horns', cls: 'brute',
+  name: 'Torque', title: 'Rusher', color: '#ff8a2e', hat: 'horns', cls: 'trickster',   // v3 balance: brute + heavy ran 66-73%
   weapons: ['battle-axe', 'hammer', 'chainsaw'], cats: ['heavy'], skills: ['lunge', 'frenzy', 'uppercut'], throws: ['grenade', 'cluster'],
-  mul: { attack: 1.2, idle: .2, walk: 1.4, spacing: .6, guard: .4, block: .6 }, add: { brawl: .5 },
+  mul: { attack: 1.1, idle: .2, walk: 1.4, spacing: .6, guard: .4, block: .6, react: 1.25 }, add: { brawl: .2 },   // balance: ~56% vs a plain Normal CPU
   act(f, L, c) {     // closes long gaps with a dash and swings on arrival
     if (c.style === 'melee' && c.d > c.range * 1.4 && c.d < 520 && f.dashCd <= 0 && f.grounded && chance(.45)) { f.inp.dash = c.dir; f.ai.armed = true; }
   },
@@ -88,7 +88,7 @@ defPersona('tamsin', {
 defPersona('grizz', {
   name: 'Grizz', title: 'Grappler', color: '#ffd84a', hat: 'viking', cls: 'brute',
   weapons: ['fists', 'frying-pan', 'mace'], cats: ['fist'], skills: ['grapple', 'magnet', 'slam'], throws: ['sticky', 'mine'],
-  mul: { grab: 2.6, hold: .7 },
+  mul: { grab: 2, hold: .7, react: 1.15 },   // balance: ~56% (was 60-63%)
   act(f, L, c) {     // walks into hugging range and grabs
     const foe = f.ai.foe;
     if (c.d > GRAB.reach * 2.2 || Math.abs(c.dy) > 50) return;
@@ -113,14 +113,15 @@ defPersona('magpie', {
     low: ['Need a power-up!'], win: ['Finders keepers!'] },
 });
 defPersona('fenn', {
-  name: 'Fenn', title: 'Berserker', color: '#ff4a6a', hat: 'mohawk', cls: 'brute',
-  weapons: ['double-axe', 'greatsword', 'scythe'], cats: ['heavy'], skills: ['frenzy', 'slam', 'tremor'], throws: ['grenade', 'cluster'],
-  mul: { guard: 0, block: .3, parry: .3, idle: 0, dodge: .6, attack: 1.25, super: 2 }, add: { brawl: .6 },
-  act(f, L, c) {     // the more hurt, the wilder: always armed, dashes in more as health drops
+  name: 'Fenn', title: 'Berserker', color: '#ff4a6a', hat: 'mohawk', cls: 'none',   // no class: brute + heavy ran ~70%
+  weapons: ['double-axe', 'battle-axe', 'scythe'], cats: ['heavy'], skills: ['frenzy', 'slam', 'tremor'], throws: ['grenade', 'cluster'],
+  // balance (v3 integration): 70% vs a plain Normal CPU -> ~60%: slower reads, and the ultimate goes off the moment it's full
+  mul: { guard: 0, block: .3, parry: .3, idle: 0, dodge: .6, attack: 1.15, super: 2, react: 1.25 }, add: { brawl: .25 },
+  act(f, L, c) {     // the more hurt, the wilder: always armed, dashes in more as health drops, no patience for the super
     const rage = 1 - f.hp / f.maxHp;
     f.ai.armed = true;
     if (c.d > c.range && f.dashCd <= 0 && chance(.15 + rage * .5)) f.inp.dash = c.dir;
-    if (f.super >= 100 && c.d < 260) f.inp.super = true;
+    if (f.super >= 100 && !f.ult) f.inp.super = true;
   },
   lines: { hi: ['RAAAGH!'], ko: ['MORE!', 'WHO\'S NEXT?!'], parry: ['GRR!'], combo: ['SMASH! SMASH!'],
     low: ['NOW I\'M ANGRY!', '💢'], win: ['BLOOD AND THUNDER!'] },
@@ -141,10 +142,10 @@ defPersona('ivo', {
 defPersona('skitter', {
   name: 'Skitter', title: 'Coward', color: '#c0ff7a', hat: 'bunny', cls: 'ninja',
   weapons: ['slingshot', 'shotgun', 'kunai'], cats: ['ranged'], skills: ['vanish', 'blink', 'mend'], throws: ['smoke', 'ice'],
-  mul: { dodge: 1.4, guard: 1.3 },
+  mul: { dodge: 1.5, guard: 1.3, aimErr: .7, react: .85 },   // balance: jumpy reflexes and steadier aim (40% -> ~50%)
   act(f, L, c) {     // low and losing: runs (toward orbs if any), fights back only when cornered
     const foe = f.ai.foe;
-    if (f.hp / f.maxHp > .35 || f.hp >= foe.hp || aiCornered(f, c.dir, 140)) return;
+    if (f.hp / f.maxHp > .25 || f.hp >= foe.hp || aiCornered(f, c.dir, 140)) return;
     aiGoTo(f, f.P[2].x - c.dir * 300, null);
     f.ai.armed = c.d < c.range;
     if (c.d < 220 && f.dashCd <= 0 && chance(.4)) f.inp.dash = -c.dir;

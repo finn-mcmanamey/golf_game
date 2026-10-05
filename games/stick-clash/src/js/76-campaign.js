@@ -2,7 +2,7 @@
 // skill tree, and the trial engine it shares with the challenge levels (77-challenges.js).
 //
 // A trial spec (campaign node or challenge) is plain data:
-//   foes:  [[name, weapon, level, { skills, scale, hp, cls, color, boss, kb, throws, behave }], ...]   (team 1, together;
+//   foes:  [[name, weapon, level, { skills, scale, hp, cls, color, boss, kb, throws, behave, dmg, ringSave }], ...]   (team 1, together;
 //          behave: 'roam' = moves but never attacks)
 //   map:   key or [keys] (first registered wins)   wx: weather key   mods: ['dark', 'slick', ...] (QUEST_MODS)
 //   me:    { weapon, skills, cls, throws, hp, throwN, super, superMul }   overrides on the player's own loadout
@@ -40,7 +40,7 @@ function questFoe([name, weapon, level, o = {}], i, color, shift) {
   const scale = o.scale || 1;
   return modeEntry({ team: 1, name: name.toUpperCase(), weapon: modeWeapon([weapon], o.cats), skills: questSkills(o.skills),
     color: o.color || color, hat: o.hat || 'none', scale, hpMul: o.hp || 1, aiLevel: aiShift(level || 'normal', shift || 0),
-    spawn: i + 1, cls: o.cls || (scale > 1.05 ? 'none' : 'random'), throws: o.throws || ['random', 'random'], isBoss: !!o.boss, qKb: o.kb, qBehave: o.behave });
+    spawn: i + 1, cls: o.cls || (scale > 1.05 ? 'none' : 'random'), throws: o.throws || ['random', 'random'], isBoss: !!o.boss, qKb: o.kb, qBehave: o.behave, qRing: o.ringSave, qDmg: o.dmg });
 }
 function questRoster(cfg, spec, color) {
   const shift = DIFF_SHIFT[cfg.diff] || 0;
@@ -73,6 +73,7 @@ function questRoundStart() {
   const me = modePlayer(), m = run.spec.me || {};
   if (me && m.throwN) me.throwN = me.throws.map(k => k ? m.throwN : 0);
   if (me && m.super) me.super = m.super;
+  if (me && m.ringSave) { run.saves = m.ringSave; me.ringSave = questHeroSave; }
   if (me && m.superMul) me.superMul = (me.superMul || 1) * m.superMul;
   for (const k of run.spec.mods || []) if (QUEST_MODS[k] && QUEST_MODS[k].start) QUEST_MODS[k].start(run);
 }
@@ -82,6 +83,36 @@ function questTag(f) {
   if (!r || f.summon) return;
   if (r.qBehave) f.ai.behave = r.qBehave;
   if (r.isBoss) { f.isBoss = true; f.kbMul = r.qKb ?? .6; }
+  if (r.qRing) f.ringSave = questRingSave;
+  if (r.qDmg) f.dmgCls = (f.dmgCls || 1) * r.qDmg;     // o.dmg: a big boss's damage dealt (its size already adds reach and speed)
+}
+// A boss with ringSave: o.ringSave in its spec rides the wind back up when knocked off the arena: the fall costs it
+// that share of its health (a K.O. if that's all it had left) instead of ending the fight at once.
+function questRingSave(f) {
+  const r = G_STATE.roster[f.id];
+  return questLift(f, (r && r.qRing) || .2, 'THE STORM RETURNS', `${f.name} rides the wind back`);
+}
+// The hero's version (node heroSave: n): Lumen catches you n times per fight on an arena with a bottomless drop.
+function questHeroSave(f) {
+  const run = questRun();
+  if (!run || !(run.saves > 0) || !questLift(f, .2, 'LUMEN CATCHES YOU', run.saves > 1 ? 'Careful at the edges!' : 'That was the last time!')) return false;
+  run.saves--;
+  return true;
+}
+// Puts a fallen fighter back above its spawn for `share` of its max health; false when that would K.O. it anyway.
+function questLift(f, share, title, sub) {
+  const cost = Math.round(f.maxHp * share);
+  if (f.hp <= cost) return false;
+  const sp = spawnPoint(f.id), h = f.P[2];
+  moveFighter(f, sp[0] - h.x, sp[1] - 260 - h.y);
+  for (const p of f.P) setVel(p, 0, 0);
+  damage(f, cost, { src: recentAttacker(f), kind: 'ringout', small: true });
+  f.inv = Math.max(f.inv || 0, 1);
+  const c = chest(f);
+  ring(c.x, c.y, 90, f.color, .5, 5); burst(c.x, c.y, f.color, 30, 380);
+  banner(title, `${sub} · −${cost}`, 1.2, f.color);
+  sfx('gust');
+  return true;
 }
 
 function questStep(dt) {
@@ -90,8 +121,12 @@ function questStep(dt) {
   run.t += dt;
   for (const k of run.spec.mods || []) if (QUEST_MODS[k] && QUEST_MODS[k].step) QUEST_MODS[k].step(run, dt);
   if (run.force) return questEnd(0, 'goal');
-  if (!me || !me.alive) return questEnd(1, 'ko');
   const rules = run.spec.rules || {}, goal = run.spec.goal || { kind: 'win' };
+  if (!me || !me.alive) {
+    // A trade (you and the last foe K.O.'d in the same instant) still wins a plain "defeat them" fight.
+    const trade = me && goal.kind !== 'survive' && goal.kind !== 'count' && !run.broke && !F.some(f => f.team !== 0 && f.alive && !f.summon);
+    return questEnd(trade ? 0 : 1, 'ko');
+  }
   if (rules.noBlock && me.blocking) run.broke = 'You blocked!';
   if (rules.maxTaken && run.taken > rules.maxTaken) run.broke = `You took ${Math.round(run.taken)} damage!`;
   if (run.broke) return questFail(run.broke);
@@ -243,9 +278,20 @@ BOSS_PHASE_FX.gale = (ctl, o) => {
     fire(dt, alive);
     if (ctl.data.gale <= 0) return;
     ctl.data.gale -= dt;
-    for (const e of enemiesOf(alive[0])) if (e.alive) for (const p of e.P) kick(p, ctl.data.galeDir * (o.force || 1100) * dt, 0);
+    for (const e of enemiesOf(alive[0])) {
+      if (!e.alive) continue;
+      // Near a drop on the downwind side the gust eases to a fifth: it shoves you to the brink, a hit has to do the rest.
+      const k = galeGrip(e, ctl.data.galeDir) ? 1 : .2;
+      for (const p of e.P) kick(p, ctl.data.galeDir * (o.force || 1100) * k * dt, 0);
+    }
   };
 };
+// True when there is ground 150 px downwind of a fighter standing (or hovering just above it) on an open arena.
+function galeGrip(f, dir) {
+  if (MAP.walls) return true;
+  const x = f.P[2].x + dir * 150, g = groundBelow(x, feetY(f) - 30);
+  return g != null && g < feetY(f) + 120;
+}
 // The Warlord: the dark deepens and he steps out of the shadows behind his foe, mid-swing.
 BOSS_PHASE_FX.eclipse = (ctl, o) => {
   const fire = questPeriodic(o, boss => {
@@ -356,8 +402,8 @@ const CAMP_NODES = [
   { id: 's4', r: 2, x: 67, y: 60, kind: 'mini', name: 'Thunder Spire', to: ['s5'], map: 'storm', phases: 'mini', par: 55,
     foes: [['Thunder Sentinel', 'storm-staff', 'normal', { scale: 1.3, hp: .9, boss: true, skills: ['lightning', 'blink'] }]],
     pre: [['THUNDER SENTINEL', 'Intruder detected. Storm protocol engaged.']] },
-  { id: 's5', r: 2, x: 72, y: 34, kind: 'boss', name: 'Eye of the Storm', to: ['d1'], map: 'sky', phases: 'storm', par: 85,
-    foes: [['Storm Lord', 'trident', 'normal', { scale: 1.5, hp: .9, boss: true, kb: .9, color: '#ffe94a', skills: ['lightning', 'repulse'] }]],
+  { id: 's5', r: 2, x: 72, y: 34, kind: 'boss', name: 'Eye of the Storm', to: ['d1'], map: 'sky', phases: 'storm', par: 85, heroSave: 2,
+    foes: [['Storm Lord', 'trident', 'normal', { scale: 1.5, hp: .9, boss: true, kb: .9, ringSave: .25, color: '#ffe94a', skills: ['lightning', 'repulse'] }]],
     pre: [['STORM LORD', 'I am the wind that knocks you off the edge of the world!'], [LUMEN, 'Stay off the edges when the gale blows. Or push HIM off!']],
     post: [[LUMEN, 'Three flames! Only the Warlord\'s own is left.'], [LUMEN, 'He waits in the Shadow Depths. It\'s dark down there: let your weapon light the way.']] },
 
@@ -377,7 +423,7 @@ const CAMP_NODES = [
     foes: [['Gloamguard', 'sword-shield', 'normal', { scale: 1.3, hp: .9, boss: true, skills: ['parry', 'repulse'] }]],
     pre: [['GLOAMGUARD', 'The Warlord\'s door stays shut. Forever.']] },
   { id: 'd5', r: 3, x: 96, y: 66, kind: 'boss', name: 'The Unlit Throne', to: [], map: 'neon', mods: ['dark'], phases: 'warlord', par: 95, final: true,
-    foes: [['The Warlord', 'double-axe', 'hard', { scale: 1.55, hp: .8, boss: true, color: '#b98cff', skills: ['frenzy', 'vanish'] }]],
+    foes: [['The Warlord', 'double-axe', 'hard', { scale: 1.55, hp: .8, dmg: .7, boss: true, color: '#b98cff', skills: ['frenzy', 'vanish'] }]],
     pre: [['THE WARLORD', 'Four flames, one candle and a little stick. Did you think it would be easy?'], [LUMEN, 'This is it. For every Wick!']],
     post: [[LUMEN, 'Look! The Great Candle burns again!'], [LUMEN, 'Light returns to every realm. Well walked, little Wick.'],
       [LUMEN, 'When you want more, the Challenges are waiting on the title screen.']] },
@@ -392,7 +438,7 @@ const CAMP_KINDS = { fight: { icon: '⚔', label: 'Battle' }, side: { icon: '✦
 const CAMP_HERO_HP = { fight: 1.3, side: 1.3, mini: 1.4, boss: 1.6 };
 // A node as a trial spec (the star rules: health and the node's par time).
 function campSpec(n) {
-  return { foes: n.foes, map: n.map, wx: n.wx, mods: n.mods, me: { hp: n.heroHp || CAMP_HERO_HP[n.kind] }, goal: { kind: 'win' }, rules: {},
+  return { foes: n.foes, map: n.map, wx: n.wx, mods: n.mods, me: { hp: n.heroHp || CAMP_HERO_HP[n.kind], ringSave: n.heroSave }, goal: { kind: 'win' }, rules: {},
     st: ['hp', n.kind === 'boss' ? .3 : .4, 'time', n.par || 45] };
 }
 

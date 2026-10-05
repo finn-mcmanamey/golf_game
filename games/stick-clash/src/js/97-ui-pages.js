@@ -32,7 +32,11 @@ SCREENS.settings = () => {
       sliderField('Master volume', S.master, set('master')),
       sliderField('Effects volume', S.sfx, set('sfx')),
       sliderField('Music volume', S.music, set('music'))));
-  const reset = uiButton('Reset to defaults', () => { Object.assign(SETTINGS, SETTING_DEFAULTS); saveSettings(); refreshScreen(); });
+  const reset = uiButton('Reset to defaults', () => {
+    Object.assign(SETTINGS, SETTING_DEFAULTS); saveSettings();
+    CAM.follow = true; store.set('camera', true); MENU.diff = 'normal'; saveMenu();   // the two choices kept outside SETTINGS
+    refreshScreen();
+  });
   return sheet('Settings', body, [reset, el('button', { class: 'go', onclick: () => { uiSfx('click'); goBack(); } }, 'Done')]);
 };
 

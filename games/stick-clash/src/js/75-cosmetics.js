@@ -595,16 +595,24 @@ on('matchStart', () => {
   applySettings();
 });
 
-on('roundStart', () => {
-  MATCH_TRACK.taken = [];
+// The Settings "Health" multiplier for this match (1 when it doesn't apply: the demo, or a mode that carries health over).
+function matchHpMul() {
   const hpMul = G_STATE.cfg && G_STATE.cfg.hpMul;
   const run = (G_STATE.info && G_STATE.info.run) || {};
-  if (G_STATE.demo || !(hpMul > 0) || hpMul === 1 || 'hp' in run) return;   // modes that carry health over manage it themselves
-  for (const f of F) {
-    if (f.summon) continue;
-    const frac = f.hp / f.maxHp;                   // keep whatever share of health the mode gave this fighter
-    f.maxHp = Math.round(f.maxHp * hpMul); f.hp = f.hpShow = Math.max(1, Math.round(f.maxHp * frac));
-  }
+  return G_STATE.demo || !(hpMul > 0) || 'hp' in run ? 1 : hpMul;
+}
+// Scales one fighter's health by it. Called at each round start and by the respawn helpers (70 KOTH, 71 party modes),
+// so a fighter that respawns mid-round gets the same health bar as at the start.
+function applyMatchHp(f) {
+  const m = matchHpMul();
+  if (m === 1 || f.summon || f.matchHpDone) return;
+  f.matchHpDone = true;                            // once per fighter: a mode may respawn someone inside onRoundStart
+  const frac = f.hp / f.maxHp;                     // keep whatever share of health the mode gave this fighter
+  f.maxHp = Math.round(f.maxHp * m); f.hp = f.hpShow = Math.max(1, Math.round(f.maxHp * frac));
+}
+on('roundStart', () => {
+  MATCH_TRACK.taken = [];
+  for (const f of F) applyMatchHp(f);
 });
 
 on('damage', (B, amt, o) => {
