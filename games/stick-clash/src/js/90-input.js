@@ -21,8 +21,9 @@ const DOUBLE_TAP_MS = 260;
 
 let BINDS = loadBinds();
 const KEYS = new Set();            // key codes currently held
-const TOUCH = new Set();           // actions held on the on-screen buttons (slot 0)
-const TOUCH_AXIS = { mx: 0 };      // the touch stick's analog x (91-touch), slot 0
+const TOUCH = new Set();           // actions held on the on-screen buttons (they drive TOUCH_SLOT)
+const TOUCH_AXIS = { mx: 0 };      // the touch stick's analog x (91-touch), for TOUCH_SLOT
+let TOUCH_SLOT = 0;                // the player the touch screen drives: 0, or the lobby's touch seat (93-pads; -1 = nobody)
 let PADS = [];                     // per connected pad: { slot, held: {action: bool}, axis }
 const TAPS = Array.from({ length: MAX_FIGHTERS }, () => ({}));   // last left/right press per slot, for double-tap dash
 // Players who joined in the party lobby (93-pads), in join order: [{ pad: gamepad index } | { keys: 0 | 1 }].
@@ -90,7 +91,7 @@ function togglePause() {
 
 // One-shot press of an action for every human fighter on that slot.
 function pressAction(slot, act) {
-  if (G_STATE.state !== 'play') return;
+  if (slot < 0 || G_STATE.state !== 'play') return;   // slot -1: the touch screen drives nobody in this lobby
   if (act === 'left' || act === 'right') {   // double-tap a direction to dash
     for (const f of humansIn(slot)) if (f.heldBy) f.inp.mash = true;     // wiggling counts toward escaping a grab
     const t = TAPS[slot], now = performance.now(), dash = t.act === act && now - t.at < DOUBLE_TAP_MS;
@@ -130,7 +131,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && G_S
 
 function heldAction(slot, act) {
   if (bindsFor(slot).some(b => b[act] && KEYS.has(b[act]))) return true;
-  if (slot === 0 && TOUCH.has(act)) return true;
+  if (slot === TOUCH_SLOT && TOUCH.has(act)) return true;
   return PADS.some(p => p.slot === slot && p.held[act]);
 }
 
@@ -138,7 +139,7 @@ function heldAction(slot, act) {
 function readHuman(f) {
   let mx = (heldAction(f.slot, 'right') ? 1 : 0) - (heldAction(f.slot, 'left') ? 1 : 0);
   for (const p of PADS) if (p.slot === f.slot && Math.abs(p.axis) > .3 && !mx) mx = p.axis;
-  if (f.slot === 0 && !mx) mx = TOUCH_AXIS.mx;
+  if (f.slot === TOUCH_SLOT && !mx) mx = TOUCH_AXIS.mx;
   f.inp.mx = clamp(mx, -1, 1);
   f.inp.jumpHeld = heldAction(f.slot, 'jump');
   f.inp.attackHeld = heldAction(f.slot, 'attack');
@@ -178,6 +179,14 @@ function padSlot(gp, n, solo) {
   return solo ? 0 : Math.min(n, Math.max(1, humanCount() - 1));
 }
 
+// A pad the browser could not map to the standard layout has its buttons anywhere: say so once, with the fix.
+const PAD_WARNED = new Set();
+function padLayoutCheck(gp) {
+  if (PAD_WARNED.has(gp.index) || typeof gp.mapping !== 'string' || gp.mapping === 'standard') return;
+  PAD_WARNED.add(gp.index);
+  if (typeof toast === 'function') toast('Unknown button layout', 'Remap in Settings → Gamepad buttons', '🎮', '#ff8a2e');
+}
+
 function pollPads() {
   const list = readPadList(), solo = humanCount() <= 1, seen = new Map();
   // On the first poll after a state change, buttons already down are not fresh presses: A on "Resume" must not
@@ -185,6 +194,7 @@ function pollPads() {
   const changed = PAD_POLL_STATE !== null && PAD_POLL_STATE !== G_STATE.state;
   PAD_POLL_STATE = G_STATE.state;
   PADS = list.map((gp, n) => {
+    padLayoutCheck(gp);
     const old = PAD_HELD.get(gp.index) || {}, held = {};
     const slot = padSlot(gp, n, solo);
     for (const a in PAD_BUTTONS) {
@@ -246,14 +256,14 @@ function nativeHaptic(style) {
   const native = window.StickClashNative;
   try {
     if (native && typeof native.haptic === 'function') native.haptic(style);
-    else if (IS_TOUCH && navigator.vibrate) navigator.vibrate(HAPTIC_MS[style] || 20);
+    else if ((typeof DEVICE !== 'undefined' ? DEVICE.touch : IS_TOUCH) && navigator.vibrate) navigator.vibrate(HAPTIC_MS[style] || 20);
   } catch (e) { /* best effort */ }
 }
-// One place for "this player felt something": pad rumble for that player, phone haptics for P1 (the device owner).
+// One place for "this player felt something": pad rumble for that player, phone haptics for the touch player.
 function feel(f, strength, ms, style) {
   if (!f || G_STATE.sim || G_STATE.demo || f.ctrl !== 'human' || f.autopilot) return;
   padRumble(f, strength, ms);
-  if (f.slot === 0 && style) nativeHaptic(style);
+  if (style && f.slot === TOUCH_SLOT) nativeHaptic(style);
 }
 on('damage', (B, amt, o) => {
   if (!o || o.small) return;
@@ -269,16 +279,17 @@ on('guardBreak', f => feel(f, .7, 220, 'warning'));
 on('ultimate', f => feel(f, 1, 520, 'heavy'));
 
 // ---------- touch ----------
-// Shown only on touch-first devices (coarse pointer), during play, and hidden again once a keyboard is used.
+// Shown during play when touch controls are wanted (92-device: SETTINGS.touchMode; Auto = a coarse pointer until a key
+// or pad is used, and any touch brings them back). Without 92-device: a coarse pointer until a hardware key is pressed.
 // Movement is the floating stick and the right side takes swipes (91-touch); these are the action buttons.
 const TOUCH_EL = document.getElementById('touch');
 const IS_TOUCH = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-let TOUCH_KEYBOARD = false;          // a hardware key was pressed on a touch device: hide the buttons
+let TOUCH_KEYBOARD = false;          // fallback without 92-device: a hardware key was pressed, hide the buttons
 
 function touchButton(act) { return TOUCH_EL && TOUCH_EL.querySelector(`button[data-act="${act}"]`); }
 
 // Holds a touch action while it is pressed (presses once on the way down). Shared with the stick and swipes.
-function touchHold(act) { if (!TOUCH.has(act)) { TOUCH.add(act); pressAction(0, act); } }
+function touchHold(act) { if (!TOUCH.has(act)) { TOUCH.add(act); pressAction(TOUCH_SLOT, act); } }
 function touchRelease(act) { TOUCH.delete(act); }
 
 function bindTouchButton(btn) {
@@ -288,7 +299,7 @@ function bindTouchButton(btn) {
   btn.addEventListener('pointerdown', e => {
     e.preventDefault();
     initAudio();
-    if (e.pointerType === 'touch') { TOUCH_KEYBOARD = false; updateTouchUI(); }
+    if (typeof inputSeen === 'function') inputSeen('touch');   // 92-device: the player is on the touch screen
     if (act === 'pause') { togglePause(); return; }
     held = true; btn.classList.add('on');
     touchHold(act);
@@ -305,7 +316,8 @@ bindTouch();
 
 function updateTouchUI() {
   if (!TOUCH_EL) return;
-  TOUCH_EL.hidden = !(IS_TOUCH && !TOUCH_KEYBOARD && G_STATE.state === 'play' && humanCount() > 0);
+  const want = typeof touchWanted === 'function' ? touchWanted() : IS_TOUCH && !TOUCH_KEYBOARD;
+  TOUCH_EL.hidden = !(want && TOUCH_SLOT >= 0 && G_STATE.state === 'play' && humanCount() > 0);
   if (TOUCH_EL.hidden) { TOUCH.clear(); TOUCH_AXIS.mx = 0; for (const b of TOUCH_EL.querySelectorAll('.on')) b.classList.remove('on'); }
   touchLayout();                     // 91-touch: size, opacity and the thumb arc for the current screen
 }
@@ -319,7 +331,8 @@ let ROTATE_SKIPPED = false;
 function updateRotatePrompt() {
   if (!ROTATE_EL || !PORTRAIT) return;
   const fighting = G_STATE.state === 'play' || G_STATE.state === 'paused';
-  const show = IS_TOUCH && PORTRAIT.matches && fighting && !ROTATE_SKIPPED && humanCount() > 0;
+  // A Split View / Stage Manager window is narrow without being a turned phone: 92-device checks the full width.
+  const show = IS_TOUCH && PORTRAIT.matches && fighting && !ROTATE_SKIPPED && humanCount() > 0 && (typeof deviceFullWidth !== 'function' || deviceFullWidth());
   ROTATE_EL.hidden = !show;
   // Deferred: this runs inside a 'state' event, and the other listeners must see that change finish first.
   if (show) setTimeout(() => { if (!ROTATE_EL.hidden && G_STATE.state === 'play') setState('paused'); }, 0);
@@ -332,12 +345,11 @@ if (ROTATE_EL) {
   on('state', updateRotatePrompt);
   if (PORTRAIT && PORTRAIT.addEventListener) PORTRAIT.addEventListener('change', updateRotatePrompt);
 }
-addEventListener('keydown', e => { if (IS_TOUCH && !e.repeat && !TOUCH_KEYBOARD && e.code !== 'Escape') { TOUCH_KEYBOARD = true; updateTouchUI(); } });
 
 // Skill buttons show P1's skill icons and fill up as the cooldown runs (CSS reads --cd and --sc).
 function updateTouchSkills() {
   if (!TOUCH_EL || TOUCH_EL.hidden) return;
-  const f = F.find(x => x.ctrl === 'human' && !x.autopilot && x.slot === 0);
+  const f = F.find(x => x.ctrl === 'human' && !x.autopilot && x.slot === TOUCH_SLOT);
   for (let k = 0; k < 2; k++) {
     const btn = touchButton('skill' + (k + 1)), def = f && SKILLS[f.skills[k]];
     if (!btn) continue;

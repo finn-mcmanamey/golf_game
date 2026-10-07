@@ -1,9 +1,11 @@
 // 89-replays.js: highlight clips. Every K.O. in a real match is scored (big final blow, combo, ring-out, ultimate,
 // comeback, deciding blow) and its kill-cam history (88's snapshots and timed events) is copied into a clip. The best
 // HL_KEEP clips of the session stay in memory; a small summary of the all-time best is saved in the store.
-// The Highlights screen (title menu) replays a clip through the kill-cam player and can export it as a WebM video:
-// the replay plays on screen while each finished frame (bloom included) is copied to a fixed 1280x720 canvas that
-// MediaRecorder records via captureStream, with the game's sound when WebAudio is running.
+// The Highlights screen (title menu) replays a clip through the kill-cam player and can export it as a video: the
+// replay plays on screen while each finished frame (bloom included) is copied to a fixed 1280x720 canvas that
+// MediaRecorder records via captureStream (MP4 where the browser encodes it, else WebM), with the game's sound when
+// WebAudio is running. Without MediaRecorder (iOS Safari inside some viewers) the frames become a 640x360 15 fps
+// GIF (89-gif). hlDeliver hands the file over: Share…, Download and a preview to long-press.
 
 const HL_KEEP = 5;
 const HL = { clips: [], pending: [], lastAmt: new WeakMap(), best: store.getArr('highlights').filter(h => h && typeof h.title === 'string' && Number.isFinite(h.score) && Array.isArray(h.tags)), playing: null, rec: null,
@@ -91,20 +93,31 @@ function hlEnded() {
 on('state', (now, before) => { if (before === 'killcam' && HL.playing) hlEnded(); });
 
 // ---------- video export ----------
-function hlExportSupport() {
-  if (typeof MediaRecorder === 'undefined') return 'This browser cannot record video (no MediaRecorder).';
-  if (!HTMLCanvasElement.prototype.captureStream) return 'This browser cannot capture the game canvas as video.';
-  if (!hlMime()) return 'This browser cannot encode WebM video.';
-  return '';
-}
+// MP4 first: it plays and shares everywhere (Photos, Messages); WebM where that is all the browser can encode.
+const HL_MIMES = ['video/mp4;codecs=avc1.42E01E', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
 function hlMime() {
-  const list = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
-  return list.find(m => { try { return MediaRecorder.isTypeSupported(m); } catch (e) { return false; } }) || '';
+  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') return '';
+  return HL_MIMES.find(m => { try { return MediaRecorder.isTypeSupported(m); } catch (e) { return false; } }) || '';
 }
+const hlExt = mime => (/mp4/.test(mime || '') ? 'mp4' : 'webm');
+const hlExportName = mime => `stick-clash-highlight-${Date.now()}.${hlExt(mime)}`;
+// 'video': MediaRecorder on the canvas stream; 'gif': no recorder or no video format, frames are encoded in JS;
+// 'none': a recorder with nothing to feed it (no captureStream).
+function hlExportHow() {
+  if (typeof MediaRecorder === 'undefined' || !hlMime()) return 'gif';
+  return HTMLCanvasElement.prototype.captureStream ? 'video' : 'none';
+}
+function hlExportSupport() { return hlExportHow() === 'none' ? 'This browser cannot capture the game canvas as video.' : ''; }
 
-function hlExport(clip) {
-  const why = hlExportSupport();
-  if (why) { HL.lastExport = { error: why }; fxModal('Video export unavailable', el('p', { text: why })); return false; }
+function hlExport(clip, how = hlExportHow()) {
+  if (how === 'gif') return hlExportGif(clip);
+  if (how === 'none') {
+    const why = hlExportSupport();
+    HL.lastExport = { error: why };
+    fxModalActions('Video export unavailable', [{ text: 'Make a GIF instead', cls: 'go', key: 'hl-gif', onclick: () => hlExport(clip, 'gif') }, { text: 'Cancel' }],
+      el('p', { text: why + ' A short GIF of the clip works everywhere instead.' }));
+    return false;
+  }
   const canvas = document.createElement('canvas');
   canvas.width = 1280; canvas.height = 720;
   const stream = canvas.captureStream(30), mime = hlMime(), chunks = [];
@@ -115,9 +128,27 @@ function hlExport(clip) {
   catch (e) { HL.lastExport = { error: e.message }; fxModal('Video export failed', el('p', { text: e.message })); return false; }
   rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
   rec.onstop = () => hlExportDone(new Blob(chunks, { type: mime.split(';')[0] }), audio);
-  HL.rec = { canvas, g: canvas.getContext('2d'), rec, mime, frames: 0 };
+  HL.rec = { canvas, g: canvas.getContext('2d'), rec, mime, frames: 0, lastAt: 0 };
   if (!hlPlay(clip, () => { if (rec.state !== 'inactive') rec.stop(); HL.rec = null; })) { HL.rec = null; return false; }
   rec.start(250);
+  return true;
+}
+
+// The GIF path: the replay plays on screen, 15 frames a second (at most 90, 6 s) are scaled to 640x360 and encoded as
+// they come (89-gif), so the file is ready the moment the replay ends.
+const HL_GIF = { w: 640, h: 360, fps: 15, max: 90 };
+function hlExportGif(clip) {
+  const canvas = document.createElement('canvas');
+  canvas.width = HL_GIF.w; canvas.height = HL_GIF.h;
+  const R = { canvas, g: canvas.getContext('2d', { willReadFrequently: true }), gif: gifEncoder(HL_GIF.w, HL_GIF.h, HL_GIF.fps), lastAt: 0, frames: 0, mime: 'image/gif' };
+  HL.rec = R;
+  const finish = () => {
+    HL.rec = null;
+    let blob = null;
+    try { blob = R.gif.finish(); } catch (e) { report(e, 'gif export'); }
+    hlExportDone(blob || new Blob([], { type: 'image/gif' }), null);
+  };
+  if (!hlPlay(clip, finish)) { HL.rec = null; return false; }
   return true;
 }
 
@@ -136,27 +167,58 @@ function hlAudioTrack() {
 function hlRecordFrame() {
   const R = HL.rec;
   if (!R || G_STATE.state !== 'killcam') return;
-  const g = R.g;
+  const now = performance.now();
+  if (R.gif && (now - R.lastAt < 1000 / HL_GIF.fps || R.frames >= HL_GIF.max)) return;
+  R.lastAt = now;
+  const g = R.g, w = R.canvas.width, h = R.canvas.height;
   g.globalCompositeOperation = 'source-over';
-  g.drawImage(cv, VIEW.vx, VIEW.vy, VIEW.vw, VIEW.vh, 0, 0, 1280, 720);
+  g.drawImage(cv, VIEW.vx, VIEW.vy, VIEW.vw, VIEW.vh, 0, 0, w, h);
   const b = BLOOM.cv;
   if (b && b.style.display !== 'none') {
     const s = b.width / cv.width;
     g.globalCompositeOperation = 'screen';
-    g.drawImage(b, VIEW.vx * s, VIEW.vy * s, VIEW.vw * s, VIEW.vh * s, 0, 0, 1280, 720);
+    g.drawImage(b, VIEW.vx * s, VIEW.vy * s, VIEW.vw * s, VIEW.vh * s, 0, 0, w, h);
   }
   R.frames++;
+  if (R.gif) { try { R.gif.addFrame(g.getImageData(0, 0, w, h)); } catch (e) { report(e, 'gif frame'); } }
 }
 
 function hlExportDone(blob, audio) {
   if (audio) try { MASTER.disconnect(audio.node); } catch (e) { /* already gone */ }
   HL.lastExport = { size: blob.size, type: blob.type };
-  if (!blob.size) return fxModal('Video export failed', el('p', { text: 'The recording came out empty. Try again with the tab in front.' }));
-  const url = URL.createObjectURL(blob), name = 'stick-clash-highlight-' + Date.now() + '.webm';
-  fxDownload(url, name);
-  const modal = fxModal('Highlight exported', el('video', { src: url, controls: true, loop: true, class: 'fx-preview' }),
-    el('p', { class: 'hint', text: `${(blob.size / 1024).toFixed(0)} KB WebM. If no download started (some embedded viewers block downloads), right-click the video and choose "Save video as", or open the downloaded game file.` }));
-  modal.addEventListener('fxclose', () => URL.revokeObjectURL(url));
+  if (!blob.size) return fxModal('Export failed', el('p', { text: 'The recording came out empty. Try again with the tab in front.' }));
+  const gif = blob.type === 'image/gif';
+  hlDeliver(blob, gif ? `stick-clash-highlight-${Date.now()}.gif` : hlExportName(blob.type), gif ? 'gif' : 'video');
+}
+
+// ---------- delivery (also used by photo mode, 86) ----------
+const hlKindName = (blob, kind) => (kind === 'png' ? 'PNG' : kind === 'gif' ? 'GIF' : /mp4/.test(blob.type) ? 'MP4 video' : 'WebM video');
+// Hands a finished picture or clip to the player. Share… (Web Share with the file) is the route that works inside
+// embedded viewers and on iOS, so it is the main button where the browser offers it; Download otherwise; and the
+// preview can always be long-pressed or right-clicked and saved.
+function hlDeliver(blob, name, kind) {
+  const url = URL.createObjectURL(blob), title = kind === 'png' ? 'Photo saved' : 'Highlight exported';
+  let file = null;
+  try { file = new File([blob], name, { type: blob.type }); } catch (e) { /* no File constructor */ }
+  let canShare = false;
+  try { canShare = !!(file && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) { canShare = false; }
+  const size = `${(blob.size / 1024).toFixed(0)} KB ${hlKindName(blob, kind)}. `;
+  const hint = el('p', { class: 'hint', text: size + (canShare ? 'Share… sends it to Photos, Files, Messages or another app.'
+    : 'If no download started (some embedded viewers block downloads), right-click or long-press the preview and save it.') });
+  const preview = kind === 'video' ? el('video', { src: url, controls: true, loop: true, playsinline: true, class: 'fx-preview' })
+    : el('img', { src: url, alt: kind === 'png' ? 'Your photo' : 'Your clip', class: 'fx-preview' });
+  const actions = [];
+  if (canShare) actions.push({ text: 'Share…', cls: 'go', key: 'fx-share', keep: true, onclick: () => {
+    navigator.share({ files: [file], title: 'Stick Clash' }).catch(e => {   // inside the click: the share sheet needs the gesture
+      if (e && e.name !== 'AbortError') hint.textContent = 'Sharing is blocked in this viewer: long-press the preview to save it.';
+    });
+  } });
+  actions.push({ text: '⬇ Download', cls: canShare ? null : 'go', key: 'fx-download', keep: true, onclick: () => fxDownload(url, name) });
+  actions.push({ text: 'Done', key: 'fx-done' });
+  if (!canShare) fxDownload(url, name);   // no share sheet: start the download at once, as before
+  const modal = fxModalActions(title, actions, preview, hint);
+  modal.addEventListener('fxclose', () => URL.revokeObjectURL(url));   // saved or dismissed: free the blob
+  return modal;
 }
 
 // ---------- Highlights screen ----------
@@ -169,7 +231,7 @@ function hlScreen() {
       el('span', { class: 'chips' }, c.tags.map(t => el('em', { text: t })), el('em', { class: 'hl-score', text: c.score + ' pts' }))),
     el('div', { class: 'hl-btns' },
       uiButton('▶ Play', () => hlPlay(c), 'go', { 'data-key': 'hl-play-' + c.id }),
-      uiButton('⬇ Export video', () => hlExport(c), null, { 'data-key': 'hl-export-' + c.id }))));
+      uiButton(hlExportHow() === 'gif' ? '⬇ Export GIF' : '⬇ Export video', () => hlExport(c), null, { 'data-key': 'hl-export-' + c.id }))));
   const empty = el('div', { class: 'hl-empty' }, el('b', { text: '🎬' }), el('h3', { text: 'No highlights yet' }),
     el('p', { class: 'tag', text: 'Knock someone out in a match: the best five K.O.s of this session are kept here as replay clips you can watch and export as video.' }));
   const best = HL.best.length ? el('section', { class: 'set-group' }, el('h3', { text: 'All-time best' }),
@@ -186,7 +248,11 @@ on('boot', () => {
     try { hlMenuItem(node); } catch (e) { report(e, 'highlights menu'); }
     return node;
   };
-  if (window.SC) window.SC.highlights = { HL, play: hlPlay, export: hlExport, flush: hlFlush, support: hlExportSupport };
+  if (window.SC) {
+    window.SC.highlights = { HL, play: hlPlay, export: hlExport, flush: hlFlush, support: hlExportSupport };
+    window.SC.export = { mime: hlMime, name: hlExportName, how: hlExportHow, ext: hlExt };
+    window.SC.gif = gifEncoder;
+  }
 });
 function hlMenuItem(node) {
   const labels = Array.from(node.querySelectorAll('.menu-item .mi-label'));

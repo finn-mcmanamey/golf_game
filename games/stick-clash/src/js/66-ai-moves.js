@@ -6,12 +6,13 @@
 //   mash: button presses per second to break out of a grab; hold: seconds before a CPU throws who it holds
 //   throw: chance per decision to use a throwable when its range fits; super: same for a full super meter
 //   wall: chance per second to kick off a wall when it helps; loot: chance to go for a weapon when bare-handed
+//   vine: chance per leap over the Jungle Temple's pit to catch a vine on the way (jungleCpuVines, 63-maps-v3)
 
 const AI_MOVE_LEVELS = {
-  easy: { guard: .1, block: .18, parry: .05, grab: .1, mash: 3, hold: .55, throw: .1, super: .3, wall: .3, loot: .6 },
-  normal: { guard: .14, block: .25, parry: .12, grab: .22, mash: 6, hold: .45, throw: .16, super: .5, wall: .6, loot: .8 },
-  hard: { guard: .22, block: .4, parry: .32, grab: .4, mash: 9, hold: .35, throw: .24, super: .8, wall: .85, loot: 1 },
-  insane: { guard: .3, block: .5, parry: .55, grab: .55, mash: 12, hold: .3, throw: .3, super: .95, wall: 1, loot: 1 },
+  easy: { guard: .1, block: .18, parry: .05, grab: .1, mash: 3, hold: .55, throw: .1, super: .3, wall: .3, loot: .6, vine: .25 },
+  normal: { guard: .14, block: .25, parry: .12, grab: .22, mash: 6, hold: .45, throw: .16, super: .5, wall: .6, loot: .8, vine: .5 },
+  hard: { guard: .22, block: .4, parry: .32, grab: .4, mash: 9, hold: .35, throw: .24, super: .8, wall: .85, loot: 1, vine: .75 },
+  insane: { guard: .3, block: .5, parry: .55, grab: .55, mash: 12, hold: .3, throw: .3, super: .95, wall: 1, loot: 1, vine: .9 },
 };
 for (const k in AI_MOVE_LEVELS) if (AI_LEVELS[k]) Object.assign(AI_LEVELS[k], AI_MOVE_LEVELS[k]);
 const AI_GUARD_MIN = 28;        // stamina below which a CPU stops guarding (a broken guard is worse than a hit)

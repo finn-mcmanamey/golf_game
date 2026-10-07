@@ -166,8 +166,30 @@ SCREENS.codex = () => {
   const tabs = el('div', { class: 'cat-chips codex-tabs', role: 'tablist' }, CODEX_TABS.map(([k, t]) =>
     el('button', { 'aria-pressed': String(CODEX_TAB.tab === k), 'data-key': 'cx-' + k, onclick: () => { CODEX_TAB.tab = k; uiSfx('click'); refreshScreen(); } }, t)));
   const entries = codexEntries(CODEX_TAB.tab);
-  return sheet('Codex', [tabs, el('div', { class: 'trophy-grid codex-grid' }, entries.map(codexCard))], null);
+  const entry = CODEX_TAB.tab === 'x' ? codexCodeEntry() : null;   // type a secret code here (phones have no title-screen keyboard)
+  return sheet('Codex', [tabs, entry, el('div', { class: 'trophy-grid codex-grid' }, entries.map(codexCard))], null);
 };
+// The Secrets tab's code box: letters and the four arrows go through cheatEnter (79); Enter or "Try code" submits.
+const CODEX_ENTRY = { text: '' };
+function codexCodeEntry() {
+  const status = el('p', { class: 'hint cx-status' });
+  const input = el('input', { class: 'cx-input', type: 'text', maxlength: 16, autocapitalize: 'characters', autocomplete: 'off', spellcheck: 'false',
+    value: CODEX_ENTRY.text, placeholder: 'CODE', 'aria-label': 'Secret code', 'data-key': 'cx-code',
+    oninput: e => { CODEX_ENTRY.text = e.target.value; },
+    // The menu's key navigation (WASD, arrows, Backspace) must not act while typing; Escape still goes back.
+    onkeydown: e => { if (e.key === 'Enter') tryCode(); if (e.key !== 'Escape') e.stopPropagation(); } });
+  function tryCode() {
+    const text = input.value.trim(), known = Object.keys(SECRETS).filter(secretFound), k = text && cheatEnter(text);
+    if (k && !known.includes(k)) { CODEX_ENTRY.text = ''; refreshScreen(); return; }   // secretUnlock showed the toast
+    uiSfx('deny');
+    status.textContent = k ? `Already found: ${SECRETS[k].name}.` : text ? 'Nothing happened. The hints below may help.' : 'Type a code first.';
+  }
+  const arrow = ch => uiButton(ch, () => { input.value = CODEX_ENTRY.text = (input.value + ch).slice(0, 16); input.focus(); }, 'cx-arrow',
+    { 'aria-label': 'Arrow ' + ch, 'data-key': 'cx-arrow-' + { '↑': 'up', '↓': 'down', '←': 'left', '→': 'right' }[ch] });
+  return el('section', { class: 'set-group cx-entry' }, el('h3', { text: 'Enter a code' }),
+    el('div', { class: 'cx-row' }, input, el('div', { class: 'cx-arrows' }, ['↑', '↓', '←', '→'].map(arrow)), uiButton('Try code', tryCode, 'go', { 'data-key': 'cx-try' })),
+    status);
+}
 function codexEntries(tab) {
   const reg = (kind, list, icon, lore = kind) => list.map(d => ({ name: d.name, icon: icon(d), text: d.desc || '', lore: codexLore(lore, d.key, d.name, d.cat), stats: codexRow(kind, d.key),
     weapon: kind === 'w' ? d.key : null, palette: kind === 'm' ? d.palette : null }));
@@ -179,16 +201,16 @@ function codexEntries(tab) {
   if (tab === 'b') return (typeof CAMP_NODES === 'object' ? CAMP_NODES : []).filter(n => n.kind === 'boss' || n.kind === 'mini').map(n => {
     const row = codexRow('b', n.id), boss = n.foes && n.foes[0] ? n.foes[0][0] : n.name, realm = CAMP_REALMS[n.r] || {};
     return { name: boss, icon: n.kind === 'boss' ? '👑' : '☠', text: `${n.kind === 'boss' ? 'Realm boss' : 'Mini-boss'} of ${realm.name || 'the realms'} · ${n.name}`,
-      lore: row[0] ? codexLore('m', n.id, n.name) : 'Face this foe in the Mythic Quest to learn more.', stats: row, labels: ['Fought', 'Beaten'] };
+      lore: row[0] ? codexLore('b', n.id, n.name) : 'Face this foe in the Mythic Quest to learn more.', stats: row, labels: ['Fought', 'Beaten'] };
   });
   if (tab === 'r') return (typeof CAMP_REALMS === 'object' ? CAMP_REALMS : []).map((r, i) => {
     const s = typeof campSave === 'function' ? campSave() : { stars: {} }, nodes = CAMP_NODES.filter(n => n.r === i);
     const cleared = nodes.filter(n => (s.stars || {})[n.id] > 0).length;
-    return { name: r.name, icon: ['🔥', '❄', '☁', '🌑'][i] || '🗺', text: `${cleared}/${nodes.length} places cleared`, lore: codexLore('m', r.key, r.name),
+    return { name: r.name, icon: ['🔥', '❄', '☁', '🌑'][i] || '🗺', text: `${cleared}/${nodes.length} places cleared`, lore: codexLore('r', r.key, r.name),
       stats: [cleared, nodes.reduce((a, n) => a + ((s.stars || {})[n.id] || 0), 0)], labels: ['Cleared', 'Stars'] };
   });
-  return Object.entries(SECRETS).map(([k, s]) => secretFound(k)
-    ? { name: s.name, icon: '🗝', text: s.reward, lore: s.code ? `Code: ${s.code}` : s.hint, found: true }
+  return Object.entries(SECRETS).map(([k, s]) => secretFound(k)   // found: the code (or feat) stays on the card and its lore joins it
+    ? { name: s.name, icon: '🗝', text: `${s.reward} · ${s.code ? 'Code: ' + s.code : s.hint}`, lore: codexLore('x', k, s.name), found: true }
     : { name: '???', icon: '❔', text: 'Not found yet.', lore: 'Hint: ' + s.hint, hidden: true });
 }
 // A weapon shows its own drawing (the loadout's icon), an arena a swatch of its own sky; everything else keeps its emoji.
@@ -234,6 +256,7 @@ function xpBox() {
   const L = trackLevel(PROG.xp);
   return el('div', { class: 'reward xp-box' },
     el('div', { class: 'reward-total' }, el('b', { text: `+${PROG_MATCH.xp}` }), ' XP', el('span', { class: 'xp-lvl', text: `Lv ${L.lvl}` })),
+    PROG_MATCH.mul < 1 ? el('p', { class: 'reward-mul', text: `× ${PROG_MATCH.mul} at practice speed` }) : null,
     el('div', { class: 'lvl-track' }, el('i', { style: { width: (L.need ? L.into / L.need * 100 : 100).toFixed(1) + '%' } })),
     el('ul', {}, PROG_MATCH.lines.map(([why, n]) => el('li', {}, why, el('span', { text: `+${n}` }))),
       PROG_MATCH.ups.map(l => el('li', { class: 'ach' }, `${trackIcon(TRACK[l])} Level ${l}: ${trackRewardName(TRACK[l])}`, el('span', { text: '★' })))));

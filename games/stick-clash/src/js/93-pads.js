@@ -2,7 +2,8 @@
 // - Remap (SCREENS.padmap, from Controls or Settings): pick a player, click an action, press a pad button. Two actions
 //   never share a button (they swap). Saved as store 'padmap' (only the changes from PAD_BUTTONS); Reset per player.
 // - Join lobby (SCREENS.join, from the arena screen of modes with a Fighters stepper): A joins a pad, B leaves,
-//   Start (or Fight!) begins; a key of either keyboard set joins that set. Players are P1..P8 in join order, and
+//   Start (or Fight!) begins; a key of either keyboard set joins that set; on a touch screen one seat can join with
+//   touch (it becomes TOUCH_SLOT, the player the on-screen controls drive). Players are P1..P8 in join order, and
 //   the match's CPU seats become those humans (filling the team with the fewest humans first).
 // - Every mode's setup is wrapped at boot to apply the lobby (cfg.joined) and the colour-blind palette (92).
 
@@ -73,7 +74,7 @@ const lobbyOpen = () => UI.screen === 'join' && PANELS.join && !PANELS.join.hidd
 const lobbyHas = pad => LOBBY.list.findIndex(j => j.pad === pad);
 
 function lobbyJoin(entry) {
-  if (LOBBY.list.length >= MAX_FIGHTERS) { uiSfx('deny'); return; }
+  if (LOBBY.list.length >= MAX_FIGHTERS || (entry.touch && LOBBY.list.some(j => j.touch))) { uiSfx('deny'); return; }   // one touch seat
   LOBBY.list.push(entry); uiSfx('unlock'); refreshScreen();
 }
 function lobbyLeave(k) { LOBBY.list.splice(k, 1); uiSfx('back'); refreshScreen(); }
@@ -99,24 +100,33 @@ addEventListener('keydown', e => {
   lobbyJoin({ keys: set });
 }, true);
 
+// Each seat's one-button chip (92-access): the same per-seat setting as in Settings → Accessibility.
+function lobbyOneChip(i) {
+  return el('button', { class: 'join-one', 'aria-pressed': String(oneButtonOn(i)), title: 'One-button mode for this seat', 'data-key': 'join-one-' + i,
+    onclick: () => { accessToggleSlot(i); uiSfx('click'); refreshScreen(); } }, '1-button');
+}
 function lobbyCard(i) {
   const j = LOBBY.list[i], color = DEFAULT_COLORS[i % DEFAULT_COLORS.length];
-  if (!j) return el('div', { class: 'join-card empty' }, el('b', { text: 'P' + (i + 1) }), el('span', { text: 'Press A to join' }));
+  if (!j) return el('div', { class: 'join-card empty' }, el('b', { text: 'P' + (i + 1) }), el('span', { text: 'Press A to join' }), lobbyOneChip(i));
   const how = j.keys != null ? `Keyboard (${keyLabel(BINDS[j.keys].left)} ${keyLabel(BINDS[j.keys].right)} …)` : j.label;
   return el('div', { class: 'join-card', style: { '--jc': color } }, el('b', { text: 'P' + (i + 1) }), el('span', { text: how }),
-    uiButton('Leave', () => lobbyLeave(i), 'join-leave', { 'data-key': 'join-leave-' + i }));
+    el('div', { class: 'row' }, uiButton('Leave', () => lobbyLeave(i), 'join-leave', { 'data-key': 'join-leave-' + i }), lobbyOneChip(i)));
 }
 
 function joinScreen() {
   const mode = MODES[MENU.mode] || {}, n = LOBBY.list.length;
   const grid = el('div', { class: 'join-grid', tabindex: '0', 'data-autofocus': '' }, Array.from({ length: MAX_FIGHTERS }, (_, i) => lobbyCard(i)));
+  const touchDev = typeof DEVICE !== 'undefined' && DEVICE.touch;
   const hint = el('p', { class: 'hint', text: `${mode.name || 'Party'}: every pad presses A to join (B leaves, Start begins). A key from either keyboard set joins too. ` +
-    'Empty seats are filled by CPUs.' });
+    (touchDev ? 'One seat can play on the touch screen. ' : '') + 'Empty seats are filled by CPUs.' });
+  // Touch screens: the on-screen controls take one seat (the stick and buttons then drive that player).
+  const touchBtn = touchDev ? uiButton('👆 Join with touch', () => lobbyJoin({ touch: true, label: 'Touch screen' }), null,
+    { 'data-key': 'join-touch', disabled: LOBBY.list.some(j => j.touch) || null }) : null;
   // Say why Fight! is dimmed: nobody has taken a seat yet.
   const status = el('p', { class: 'join-status' + (n ? ' ok' : ''), role: 'status', text: n
     ? `${n} player${n > 1 ? 's' : ''} in. Press Fight! (or Start on a pad). The other seats are filled by CPUs.`
     : 'Nobody has joined yet. Press A on a gamepad, or any key of a keyboard set, to take a seat. Fight! unlocks once one player is in.' });
-  return sheet('Players', el('div', {}, hint, status, grid), [uiButton('◂ Back', goBack, 'foot-back'),
+  return sheet('Players', el('div', {}, hint, status, grid), [uiButton('◂ Back', goBack, 'foot-back'), touchBtn,
     uiButton('Clear', () => { LOBBY.list = []; refreshScreen(); }),
     el('button', { class: 'go', disabled: n ? null : true, title: n ? '' : 'Join first: press A or a key', onclick: lobbyStart }, n > 1 ? `Fight! (${n} players)` : 'Fight!')]);
 }
@@ -157,7 +167,11 @@ function padsWrapModes() {
     m.setup.padsWrapped = true;
   }
 }
-on('matchStart', cfg => { JOINED = joinActive(cfg, G_STATE.mode) ? cfg.joined : null; });
+on('matchStart', cfg => {
+  JOINED = joinActive(cfg, G_STATE.mode) ? cfg.joined : null;
+  TOUCH_SLOT = JOINED ? JOINED.findIndex(j => j.touch) : 0;   // the touch screen drives its lobby seat, or nobody (-1)
+  if (typeof updateTouchUI === 'function') updateTouchUI();   // the 'state' event ran before JOINED was known
+});
 
 // ---------- wiring into the menus ----------
 function padsPoll() {

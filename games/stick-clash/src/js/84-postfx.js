@@ -210,8 +210,11 @@ function fxCompactBy(list, keep) {
 }
 
 // ---------- bloom ----------
+// locked: the governor found bloom is not what makes frames slow (or the device caps at 30 fps), so it stays at Low
+// for the session instead of going off. probe: a 60-frame measurement with bloom off, before any step down.
 const BLOOM = { gl: null, cv: null, mode: 'none', failed: false, progs: null, src: null, fb: [], w: 0, h: 0,
-  small: null, half: null, allowSoftware: false, ms: 0, dtAvg: 1 / 60, slowFrames: 0, tier: 0, frame: 0 };
+  small: null, half: null, allowSoftware: false, ms: 0, dtAvg: 1 / 60, slowFrames: 0, tier: 0, frame: 0,
+  locked: false, probe: null, cap: { n: 0, hits: 0 } };
 const BLOOM_Q = { low: { ds: 4, thr: .6, k: .8, passes: 1 }, high: { ds: 3, thr: .55, k: 1.05, passes: 2 } };
 
 const BLOOM_VS = 'attribute vec2 p;varying vec2 uv;void main(){uv=p*.5+.5;gl_Position=vec4(p,0.,1.);}';
@@ -228,7 +231,7 @@ const BLOOM_FS = {
 // Wanted quality right now ('off' | 'low' | 'high'); the frame governor (bloomGovern) may step it down.
 function bloomWanted() {
   const q = SETTINGS.bloom || 'off';
-  if (q === 'off' || BLOOM.tier >= 3) return 'off';
+  if (q === 'off' || BLOOM.tier >= 3 || BLOOM.probe) return 'off';   // probe: a moment without bloom, to measure
   return q === 'high' && BLOOM.tier >= 1 ? 'low' : q;
 }
 
@@ -373,15 +376,41 @@ function postfxFrame(dt) {
   BLOOM.ms += (performance.now() - t0 - BLOOM.ms) * .05;
 }
 
-// Keeps the frame rate up: while bloom is on and frames stay slow (< 50 fps) for ~3 s, step down for this session:
-// High -> Low, then glow at half rate, then off. (Software-rendered WebGL, e.g. without a GPU, needs this.)
+// Keeps the frame rate up. While bloom is on and frames stay slow (< 50 fps) for ~3 s, a probe turns bloom off for
+// 60 frames: if that barely helps (< 12% faster), bloom isn't the cost (a slow CPU, a frame cap) and it is locked at
+// Low for the session instead of being switched off; otherwise it steps down for the session: High -> Low, then glow
+// at half rate, then off (software-rendered WebGL, e.g. without a GPU, needs this). A steady 30 fps (iOS Low Power
+// Mode caps there) locks straight away, without a probe.
 function bloomGovern(dt, q) {
-  if (!(dt > 0) || G_STATE.state !== 'play' || q === 'off') { BLOOM.slowFrames = 0; return; }
+  if (!(dt > 0) || G_STATE.state !== 'play') { BLOOM.slowFrames = 0; return; }
+  if (BLOOM.probe) return bloomProbeStep(dt);
+  if (q === 'off') { BLOOM.slowFrames = 0; return; }
   BLOOM.dtAvg += (dt - BLOOM.dtAvg) * .05;
+  bloomCapCheck(dt);
   BLOOM.slowFrames = BLOOM.dtAvg > 1 / 50 ? BLOOM.slowFrames + 1 : 0;
   if (BLOOM.slowFrames < 180) return;
-  BLOOM.tier = q === 'high' && BLOOM.tier < 1 ? 1 : BLOOM.tier + 1;
-  BLOOM.slowFrames = 0; BLOOM.dtAvg = 1 / 60;
+  BLOOM.slowFrames = 0;
+  if (BLOOM.locked) { BLOOM.dtAvg = 1 / 60; return; }
+  BLOOM.probe = { frames: 0, dtOn: BLOOM.dtAvg, dtOff: BLOOM.dtAvg, q };
+}
+function bloomProbeStep(dt) {
+  const p = BLOOM.probe;
+  p.dtOff += (dt - p.dtOff) * .1;
+  if (++p.frames < 60) return;
+  BLOOM.probe = null; BLOOM.dtAvg = 1 / 60;
+  if (p.dtOn - p.dtOff < .12 * p.dtOn) bloomLock();
+  else BLOOM.tier = p.q === 'high' && BLOOM.tier < 1 ? 1 : BLOOM.tier + 1;
+}
+// Bloom isn't what makes frames slow: keep it, at Low, and stop stepping down.
+function bloomLock() { BLOOM.locked = true; BLOOM.tier = 1; }
+// 90% of 180 frames within 2 ms of 1/30 s is a device frame cap, not a struggling renderer.
+function bloomCapCheck(dt) {
+  const c = BLOOM.cap;
+  c.n++;
+  if (Math.abs(dt - 1 / 30) < .002) c.hits++;
+  if (c.n < 180) return;
+  if (c.hits >= 162 && !BLOOM.locked) bloomLock();
+  c.n = c.hits = 0;
 }
 
 on('boot', () => {

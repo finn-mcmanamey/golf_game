@@ -64,14 +64,16 @@ don't read, edit or follow rules from `/home/user/golf_game`. `v1-reference.html
 | `76-campaign.js`, `77-challenges.js`, `98-campaign-ui.js` | campaign (v3) | the trial engine, Mythic Quest (24 nodes, realm bosses, skill tree), 31 challenges; world map, dialogue and lists (CSS `styles/98-campaign.css`) |
 | `75-cosmetics.js` | ui | hats, colour palettes, progression (coins, unlocks, achievements, stats) |
 | `78-outfits.js`, `78-pets.js` | cosmetics (v3) | outfits (cloth), weapon skins, K.O. effects, taunts + victory poses; helper pets |
-| `79-mutators.js`, `79-progress.js` | cosmetics (v3) | match mutators + party mini-games; 100-level track, quests, secrets/cheat codes, codex stats, presets |
-| `98-ui-progress.js` | cosmetics (v3) | Look tab, presets, Fighter Creator, Track & Quests, Codex, arena mutators, results XP (CSS `styles/98-progress.css`) |
+| `79-lore.js`, `79-mutators.js`, `79-progress.js` | cosmetics (v3) | the Codex's hand-written lore (`LORE_LINES`, by registry key); match mutators + party mini-games; 100-level track, quests, secrets/cheat codes (`cheatKey`, `cheatEnter`), codex stats, presets |
+| `98-ui-progress.js` | cosmetics (v3) | Look tab, presets, Fighter Creator, Track & Quests, Codex (with the Secrets tab's code box), arena mutators, results XP (CSS `styles/98-progress.css`, `styles/98-codex.css`) |
 | `80-audio.js`, `81-music.js` | juice | sound effects (WebAudio synth, buses, panning) and the procedural synthwave music |
 | `87-juice.js` | juice | game feel: punch zoom, K.O. chroma/vignette, landing dust, speed streaks, heartbeat, hit colours, extra settings |
 | `85-render.js` | core, juice extends | camera, world drawing, fighters, HUD, banners |
 | `88-killcam.js` | juice | K.O. instant replay (ring-buffer snapshots, slow-motion playback, letterbox) |
 | `82-announcer.js`, `83-crowd.js` | juice (v3) | synth announcer callouts (speechSynthesis or formant synth); procedural crowd bed + reactions |
 | `84-postfx.js`, `86-photo.js`, `89-replays.js` | juice (v3) | bloom (WebGL, 2D fallback), dynamic lights, impacts, juice level; photo mode; highlight clips + WebM export (CSS `styles/84-fx.css`) |
+| `84-quality.js`, `89-gif.js` | juice (v3.1) | Performance settings (quality presets) and GIF export of highlight clips: see each slice's header comment |
+| `92-device.js` | input (v3.1) | the device layer: touch mode Auto/On/Off (`inputSeen`), the rotate card, fullscreen + landscape lock, viewport changes (CSS `styles/92-device.css`); see the slice header |
 | `90-input.js` | core, juice extends | keyboard + rebinding, gamepads, touch |
 | `91-touch.js`, `92-access.js`, `93-pads.js`, `94-savecode.js` | input (v3) | touch stick/gestures/button arc; accessibility; pad remap + join lobby; save codes (CSS `styles/92-access.css`) |
 | `95-ui.js`, `96-ui-loadout.js`, `97-ui-pages.js` | ui | menu framework + title/modes/arenas; loadout with live previews; settings, controls, help, shop, trophies, pause, results (CSS in `src/styles/95-ui.css`) |
@@ -251,9 +253,19 @@ sound for a real player under 30 % health. `hitColor(B)` gives hit sparks their 
 camera's minimum zoom `VIEW.zMin` keeps it inside the arena), and the HUD is scaled by `VIEW.hudK` (from CSS pixels, so
 15px HUD text stays ~11px on a phone) and laid out within `VIEW.hudW` arena units; mode HUDs should keep their content
 centred within that width. Floating labels that overlap while drifting are nudged apart each step (`floatSeparate`).
+HUD band (v3.1): on a landscape screen taller than 16:9 (4:3 iPads) the letterbox strip above the viewport is
+`VIEW.band`; `hudLayout()` (from `resize` and every `roundStart`, since the card rows depend on the roster) measures the
+HUD block (`VIEW.hudH = hudBlockPx()`, the same row maths as `drawHUD`) and puts it in the band (`VIEW.hudY =
+max(0, vy − hudH)`); whatever doesn't fit still overlaps the top of the viewport by `VIEW.hudOver` px (0 on a 12.9"
+iPad, ~45 on an 11", the whole block on 16:9). The `MUTED (M)` note sits at the viewport's bottom corner.
 `ctx` is the 2D context; its backing store is capped at ~2.3 megapixels (`MAX_CANVAS_PIXELS`) and CSS scales it up,
 because the frame cost grows with pixels while the arena is a fixed 1280x720 drawing. The camera (`CAM`) follows living fighters with a gentle zoom (≤1.24) and never shows outside
-the arena; it is drawing-only. `focusCamera(x, y, secs)`, `banner(text, subText, seconds, color)`,
+the arena; it is drawing-only. One exception (v3.1): the strip of the viewport under the HUD (`VIEW.hudOver`, `topPad`
+in arena units) is not usable height, so `updateCamera` zooms as if the viewport were that much shorter and, when
+fighters are near the arena's top, lets the view rise above y = 0 by at most `topPad` so they sit under the HUD instead
+of behind it. The viewport is first filled with `mapSkyTop(MAP)` (`skyTopLive` recorded by `mapSky`, else the map's
+`skyTop`, else `palette.sky1`), and `mapSky` / `drawStdBackground` paint a whole screen above the arena, so nothing
+black shows there. `SC.view = { VIEW, CAM }` is the test hook. `focusCamera(x, y, secs)`, `banner(text, subText, seconds, color)`,
 `drawStdBackground(ctx, map, t)`, `drawGridFloor(ctx, floorY, fill, gridColor, edgeColor)`, `glowLine(...)`,
 `HAZARD_DRAW[kind](ctx, hz, t)` (built-in kinds: `lava`, `acid`, `spikes`, `electric`, `default`).
 Fighters launched out of view get an arrow at the screen edge. Name tags and status icons sit above the hat:
@@ -393,6 +405,9 @@ API: `BINDS[slot][action]`, `setBind(slot, action, code)`, `resetBinds()`, `keyL
 - `PROFILE` (saved as `profile`): coins, owned hats/colour packs, lifetime stats, trophies. Hats take `price` (0 = free).
   `defAchievement(key, { name, desc, icon, coins, need, progress(stats) })`, `unlockAchievement(key)`, `addCoins(n)`.
   Only matches with a real (non-autopilot) human count; `mode.practice: true` (and `training`) earns nothing.
+  A match played at a slowed practice speed (92-access) pays `accessRewardMul()` of its coins and XP (× .4 at 25 %):
+  `settleMatch` sets `reward.mul` and `progSettle` sets `PROG_MATCH.mul`, and both results boxes say
+  "× 0.4 at practice speed".
   A mode's `results()` may add `won` (boolean), `tournament: true` or `waves: n`; otherwise the score and
   `G_STATE.info.run` (`cleared` waves, tournament `won` count) decide the coin reward.
 
@@ -426,8 +441,12 @@ API: `BINDS[slot][action]`, `setBind(slot, action, code)`, `resetBinds()`, `keyL
 - **Progression** (store `prog`): `addXp(n)` grants every `TRACK[level]` reward reached (looks, shop hats, coins);
   `lookOwned(kind, key)`, `lookGrant(kind, key)`. Match XP is settled once (`progSettle`, on `matchOver`/results) for
   real players only. Quests (store `tasks`): 3 daily + 3 weekly from `TASKS`, seeded by the local date, one daily
-  reroll per day, `taskBump(key, n)`. Secrets: `SECRETS` (codes typed on the title screen via `cheatKey`, or feats),
-  `secretUnlock(key)`. Codex stats: `codexRow(kind, key)` = [uses, wins, K.O.s]. Presets (store `presets`):
+  reroll per day, `taskBump(key, n)`. Secrets: `SECRETS` (codes typed on the title screen via `cheatKey`, typed into
+  the Codex's Secrets tab via `cheatEnter(text)` (letters and ↑↓←→, returns the matched key), or feats),
+  `secretUnlock(key)`. Codex stats: `codexRow(kind, key)` = [uses, wins, K.O.s]. Codex lore: `codexLore(kind, key,
+  name, cat)` returns the hand-written `LORE_LINES[kind][key]` (79-lore: kinds w s c m b r p x, two sentences each,
+  bosses by campaign node id, realms by `CAMP_REALMS[i].key`; `SC.lore` in tests) and falls back to its generator for
+  entries without one. Presets (store `presets`):
   `presetSave/presetApply/presetDelete`.
 - Tests: `node tools/smoke-progress.cjs` (also run by `tools/smoke.cjs`).
 
@@ -446,7 +465,8 @@ see "Hooks for modes" below.
   .65 s, a projectile is reflected (`o.proj`). Blasts (`o.blast`) can't be parried. Stamina at 0 = **guard break**
   (1.1 s stun). `o.unblockable` skips the guard (grab throws use it).
 - **Grab:** `inp.grab`, or `inp.attack` while blocking. `tryGrab(A)` takes the nearest grabbable foe within
-  `GRAB.reach` (not mounted, ragdolled, in an ultimate, a summon or much bigger). The holder carries the foe
+  `GRAB.reach` (not mounted, ragdolled, in an ultimate, a summon or much bigger; a foe in reach whose only problem is
+  its size, `scale > 1.3×` yours, floats "TOO BIG" instead, so bosses stay ungrabbable but not silently). The holder carries the foe
   (`carryHeld`) and throws on attack/grab (or after `GRAB.hold` s): 9 damage (kind skill, unblockable), the foe flies
   and gets the `ragdoll` status (limp, can't act). The held fighter breaks free after `GRAB.mash` presses
   (`inp.mash` or any action key; left/right taps count too).
@@ -522,7 +542,8 @@ kill-cam event (`KC_FX.shatter`), and the kill-cam snapshot keeps `blocking`, `e
 ### CPUs (`66-ai-moves.js`)
 
 Per-level knobs merged into `AI_LEVELS`: `guard`, `block`, `parry`, `grab`, `mash`, `hold`, `throw`, `super`, `wall`,
-`loot`. `aiReach(f)` / `aiStyle(f)` include weapon levels and the mount's own attack. Measured per round (2 CPUs):
+`loot`, `vine` (v3.1: chance per leap over the Jungle Temple's pit to catch a vine, `jungleCpuVines` in 63-maps-v3,
+run from the map's think frame; the CPU pumps toward its goal and lets go on the forward swing; event `vine(f)`). `aiReach(f)` / `aiStyle(f)` include weapon levels and the mount's own attack. Measured per round (2 CPUs):
 
 | level | parries | grabs | throwables | ultimates | wall jumps | disarms | guard blocks |
 |---|---|---|---|---|---|---|---|
@@ -690,6 +711,14 @@ v3 map fields (all optional; `58-world.js` reads them):
 - `dark` (0..1, set it in `onStep`) shades the arena: lights cut holes, fighters glow. `lights(t)` returns
   `[{ x, y, r, a }]` lamps for that shade (night weather adds lanterns to arenas without `lights`).
 - `collide(p, friction)` extra collision shapes, called from `collidePoint` for every point (the asteroid's planets).
+- `groundBelow(x, y)` (v3.1) answers `groundBelow` (10-physics) first for curved ground: return the surface height, `null`
+  over a drop, or `undefined` to fall back to the flat rules (the asteroid returns its planets' tops, except while
+  `astroFrame` holds the brain's flat floor at 1e5), so blinks, crates, mines, mount landings and the blade ultimate's
+  dash find real ground.
+- `skyTop` (v3.1): the colour above the arena's top edge, shown when the camera rises under the HUD (`mapSkyTop`,
+  85-render). Maps that paint their sky with `mapSky` need nothing: it records `MAP.skyTopLive` every frame (so the
+  Eruption's hot sky still matches); the others (Neon City, Haunted Mansion, Giant's Kitchen) name one; `palette.sky1`
+  is the last resort.
 - `frame(f, phase, enter)` called around each fighter's brain (`'think'`) and drive (`'drive'`): `enter` before, then
   after. Use it to adjust CPU inputs after the brain (tunnel shelter, dart hops, planet hopping) or to re-orient a
   fighter (the asteroid turns the world about the fighter's hip so "down" points at its planet, then turns it back).
@@ -940,4 +969,9 @@ Tip: to stop the real-time loop interfering while you script a test, set `SC.G.s
 - the real UI: menu → Fight → keyboard (both key sets in 1P, block/grab/throw/super keys) → pause/resume → results →
   menu → controls panel, double-tap dash, a mocked gamepad (incl. LT block), and touch buttons (incl. block, super,
   throwable, grab) on a phone-sized touch screen.
+- v3.1 (`tools/smoke-world.cjs`, also alone): the HUD band and camera on iPad Pro 11" and 12.9" layouts (fighters on the
+  Kitchen shelf stay under the HUD; `tmp/smoke/ipad-hud-*.png`), the sky fill above the arena (no letterbox pixels in
+  the viewport with both fighters on the Asteroid's top planet), the Codex's code box, practice-speed rewards (× .4 at
+  25 %), the lore table (every key, all lines unique), the asteroid's `groundBelow` + Phase Step, CPU vines and the
+  "TOO BIG" label. `tools/smoke-ipad.cjs` (touch mode, fullscreen, performance) runs when present.
 It prints a table and exits non-zero on any failure. Screenshots: `tmp/smoke/`.

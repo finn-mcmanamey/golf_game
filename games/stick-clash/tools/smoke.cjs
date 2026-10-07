@@ -297,9 +297,10 @@ async function testV3Registry(page) {
   await page.evaluate(V3_HELPERS);
   const res = await page.evaluate(secs => {
     const out = [];
-    // Classes: a full CPU fight with each (random weapons); the class must apply its numbers.
+    // Classes: a full CPU fight with each (random weapons); the class must apply its numbers. On the flat Dojo: a
+    // random arena can end a round by a pit or hazard with no damage credited, which says nothing about the class.
     for (const k of Object.keys(SC.reg.CLASSES)) {
-      const r = __T.run({ mode: 'watch', classes: [k, k], weapons: ['random', 'random'] }, secs);
+      const r = __T.run({ mode: 'watch', map: 'dojo', classes: [k, k], weapons: ['random', 'random'] }, secs);
       const f = SC.F[0], c = SC.reg.CLASSES[k];
       const ok = !r.errors.length && !r.nan && r.dmg > 0 && f.clsKey === k && f.maxHp === Math.max(1, Math.round(100 * c.hp)) && f.maxStamina === Math.round(100 * c.stamina);
       out.push({ kind: 'class', key: k, ok, rounds: r.rounds, avgT: r.avgT, hits: r.hits, dmg: r.dmg, upright: r.upright, note: `hp ${f.maxHp} stamina ${f.maxStamina}`, errors: r.errors });
@@ -810,6 +811,8 @@ function summary(r) {
     await require('./smoke-fixes.cjs').run(null, browser, { check, rows });   // review3 fixes: remap, Juggernaut, Mech Suit, HUD plate, flows, save shapes
     await require('./smoke-fx.cjs').run(browser, { check, rows, SHOTS });
     await require('./smoke-access.cjs').run(browser, { check, rows, SHOTS });   // touch stick, pads, accessibility, save codes   // announcer, crowd, music, bloom, photo mode, highlights
+    if (fs.existsSync(path.join(__dirname, 'smoke-ipad.cjs'))) await require('./smoke-ipad.cjs').run(browser, { check, rows, SHOTS });   // iPad layout, touch mode, fullscreen, performance
+    await require('./smoke-world.cjs').run(browser, { check, rows, SHOTS });   // HUD band + camera, sky fill, codex code entry, practice rewards, lore, asteroid ground, vines, TOO BIG
   } catch (e) {
     failures.push('smoke crashed: ' + (e.stack || e.message));
   } finally {

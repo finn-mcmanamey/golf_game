@@ -130,23 +130,33 @@ function drawGuard(f) {
 }
 
 // ---------- grab & throw ----------
-function canBeGrabbed(A, B) {
+// Everything that keeps B out of A's hands except its size (a boss is "TOO BIG" rather than silently ungrabbable).
+function canBeHeld(A, B) {
   return B.alive && B !== A && B.team !== A.team && !B.heldBy && !B.holding && !(B.inv > 0) && !B.mount && !B.ult && !B.status.ragdoll &&
-    !B.summon && B.scale <= A.scale * 1.3;
+    !B.summon;
 }
+function canBeGrabbed(A, B) { return canBeHeld(A, B) && B.scale <= A.scale * 1.3; }
 
 // Grabs the nearest grabbable foe in reach. Grabs go through a guard (that is what they are for).
 function tryGrab(A) {
   if (A.grabCd > 0 || A.mount || A.holding) return false;
   const c = chest(A);
-  let best = null, bd = Infinity;
+  let best = null, bd = Infinity, big = null;
   for (const B of F) {
-    if (!canBeGrabbed(A, B)) continue;
-    const cb = chest(B), d = Math.hypot(cb.x - c.x, (cb.y - c.y) * 1.4);
-    if (d < (GRAB.reach * A.scale + 18 * B.scale) && d < bd) { bd = d; best = B; }
+    if (!canBeHeld(A, B)) continue;
+    const cb = chest(B), d = Math.hypot(cb.x - c.x, (cb.y - c.y) * 1.4), reach = GRAB.reach * A.scale + 18 * B.scale;
+    if (B.scale > A.scale * 1.3) {   // too big to lift: say so when its chest or hip is in reach (a giant's chest is high)
+      const hb = B.P[2], dh = Math.hypot(hb.x - c.x, (hb.y - c.y) * 1.4);
+      if (!big && Math.min(d, dh) < reach) big = B;
+      continue;
+    }
+    if (d < reach && d < bd) { bd = d; best = B; }
   }
   A.grabCd = best ? GRAB.cd : .35;   // a whiffed grab also has a short recovery
-  if (!best) return false;
+  if (!best) {
+    if (big) float(c.x, c.y - 60, 'TOO BIG', '#ffd84a', 16);   // say why the grab did nothing (silent in sim and demo)
+    return false;
+  }
   A.holding = best; best.heldBy = A; A.grabT = G_STATE.t; best.escape = 0;
   best.blocking = false; best.blockEnd = G_STATE.t;
   A.stats.grabs++;

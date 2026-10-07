@@ -3,16 +3,23 @@
 //   each HUD card (and a health-bar pattern) and above each head, so nobody relies on colour alone.
 // - SETTINGS.reduceFlash (default: the OS reduce-motion preference): flashes x.35, shake x.25, no strobing arenas
 //   (60-61, 63-64 read it); 84-postfx and 87-juice also tone down bloom, K.O. flashes and chroma.
-// - SETTINGS.oneButton ('off' | 'p1' | 'p2' | 'both'): walks to the nearest foe and hops by itself; the one button
-//   (attack or jump) attacks, hold = block, double-tap = super if full, else a skill, else a throwable.
+// - SETTINGS.oneButtonSlots (seats 0-7; the v3.0 SETTINGS.oneButton 'p1' | 'p2' | 'both' still counts): walks to the
+//   nearest foe and hops by itself; the one button (attack or jump) attacks, hold = block, double-tap = super if
+//   full, else a skill, else a throwable. Toggled per seat in Settings or on the lobby cards (93-pads).
 // - SETTINGS.practiceSpeed (.25..1): slows solo play (one human), never Ranked.
 
-const ACCESS_DEFAULTS = { cbPalette: 'off', oneButton: 'off', practiceSpeed: 1, rumble: .8, haptics: true,
+const ACCESS_DEFAULTS = { cbPalette: 'off', oneButton: 'off', oneButtonSlots: [], practiceSpeed: 1, rumble: .8, haptics: true,
   reduceFlash: typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches };
 for (const k in ACCESS_DEFAULTS) {
   if (!(k in SETTING_DEFAULTS)) SETTING_DEFAULTS[k] = ACCESS_DEFAULTS[k];
   if (!(k in SETTINGS)) SETTINGS[k] = ACCESS_DEFAULTS[k];
 }
+// cleanSettings (75) only checks the kind of value: the seat list must also hold whole numbers 0-7, nothing else.
+function accessCleanSlots() {
+  const v = SETTINGS.oneButtonSlots;
+  SETTINGS.oneButtonSlots = Array.isArray(v) ? [...new Set(v.filter(n => Number.isInteger(n) && n >= 0 && n < MAX_FIGHTERS))].sort((a, b) => a - b) : [];
+}
+accessCleanSlots();
 
 // ---------- colour-blind palettes and markers ----------
 // Eight colours each, bright enough for the dark arenas. Deutan/protan avoid red-green pairs (Okabe-Ito based);
@@ -100,19 +107,42 @@ applySettings = function () {
 };
 
 // ---------- practice speed ----------
+// The slowest speed used during this match: coins and XP scale by it (accessRewardMul, read by 75/79).
+const ACCESS_MATCH = { minSpeed: 1 };
+on('matchStart', () => { ACCESS_MATCH.minSpeed = 1; });
 // Read by advance() (99-main) on top of the menu's game speed. Solo play only (one human), never Ranked or the demo.
 function accessSpeedMul() {
   const g = G_STATE, s = +SETTINGS.practiceSpeed || 1;
   if (s >= 1 || g.demo || !g.mode || g.mode.key === 'ranked' || humanCount() !== 1) return 1;
-  return clamp(s, .25, 1);
+  const m = clamp(s, .25, 1);
+  if (m < ACCESS_MATCH.minSpeed) ACCESS_MATCH.minSpeed = m;
+  return m;
 }
+// A slowed-down match still earns something: 20% at quarter speed, the full reward at normal speed.
+function accessRewardMul() { return .2 + .8 * clamp(ACCESS_MATCH.minSpeed, 0, 1); }
 
 // ---------- one-button mode ----------
 const ONE = Array.from({ length: MAX_FIGHTERS }, () => ({ held: false, downAt: 0, upAt: 0, taps: 0, jumpUntil: 0, stuck: 0 }));
 const ONE_HOLD_MS = 230, ONE_DOUBLE_MS = 300;
 function oneButtonOn(slot) {
-  const v = SETTINGS.oneButton;
+  const list = SETTINGS.oneButtonSlots;
+  if (Array.isArray(list) && list.includes(slot)) return true;
+  const v = SETTINGS.oneButton;        // the v3.0 setting, still honoured
   return v === 'both' ? slot <= 1 : v === 'p1' ? slot === 0 : v === 'p2' ? slot === 1 : false;
+}
+// Flips one-button mode for one seat; the v3.0 'p1' / 'p2' / 'both' value is first turned into seats.
+function accessToggleSlot(slot) {
+  const legacy = { p1: [0], p2: [1], both: [0, 1] }[SETTINGS.oneButton] || [];
+  const list = new Set([...(Array.isArray(SETTINGS.oneButtonSlots) ? SETTINGS.oneButtonSlots : []), ...legacy]);
+  if (list.has(slot)) list.delete(slot); else list.add(slot);
+  if (SETTINGS.oneButton !== 'off') setSetting('oneButton', 'off');
+  setSetting('oneButtonSlots', [...list].sort((a, b) => a - b));
+  if (typeof touchLayout === 'function') touchLayout();
+}
+function accessClearSlots() {
+  if (SETTINGS.oneButton !== 'off') setSetting('oneButton', 'off');
+  setSetting('oneButtonSlots', []);
+  if (typeof touchLayout === 'function') touchLayout();
 }
 // Runs after readHuman read the real buttons: turns them into the one button and drives everything else.
 function oneButtonDrive(f, now = performance.now()) {
@@ -167,6 +197,16 @@ function accessRange(label, value, min, max, onset, hint) {
 }
 const accessSet = k => v => { setSetting(k, v); if (typeof touchLayout === 'function') touchLayout(); };
 
+// One-button mode as a chip per seat (any mix of P1..P8) plus Off.
+function accessOneButtonField() {
+  const seats = Array.from({ length: MAX_FIGHTERS }, (_, i) => i), any = seats.some(oneButtonOn);
+  const chip = (key, on, text, act) => el('button', { 'aria-pressed': String(on), 'data-key': key, onclick: () => { act(); uiSfx('click'); refreshScreen(); } }, text);
+  return el('div', { class: 'field' }, el('span', { class: 'lbl', text: 'One-button mode' }),
+    el('div', { class: 'seg', role: 'group', 'aria-label': 'One-button mode' },
+      chip('onebtn-off', !any, 'Off', accessClearSlots),
+      seats.map(i => chip('onebtn-' + i, oneButtonOn(i), 'P' + (i + 1), () => accessToggleSlot(i)))));
+}
+
 function accessSettingsGroups() {
   const S = SETTINGS, set = accessSet;
   return [
@@ -174,8 +214,8 @@ function accessSettingsGroups() {
       segField('Colour-blind palette', [['off', 'Off'], ['deutan', 'Deutan'], ['protan', 'Protan'], ['tritan', 'Tritan']], S.cbPalette, set('cbPalette')),
       el('small', { class: 'hint', text: 'Safe team and fighter colours, plus a shape marker on every HUD card and above each fighter. From the next match.' }),
       toggleField('Reduce flashing', !!S.reduceFlash, set('reduceFlash'), 'Softer flashes, little shake, no strobing lightning or flickering lights.'),
-      segField('One-button mode', [['off', 'Off'], ['p1', 'P1'], ['p2', 'P2'], ['both', 'Both']], S.oneButton, set('oneButton')),
-      el('small', { class: 'hint', text: 'Walks and jumps for you. Press = attack, hold = block, double-tap = super or skill.' }),
+      accessOneButtonField(),
+      el('small', { class: 'hint', text: 'Per player: walks and jumps for you. Press = attack, hold = block, double-tap = super or skill. Also on the lobby cards.' }),
       accessRange('Practice speed', S.practiceSpeed, 25, 100, set('practiceSpeed'), 'Slows the game in solo modes and Training. Never in Ranked.')),
     el('section', { class: 'set-group', 'data-group': 'devices' }, el('h3', { text: 'Touch, pads & progress' }),
       sliderField('Rumble & haptics', S.rumble, set('rumble')),
@@ -200,6 +240,7 @@ function accessPauseExtras(card) {
 }
 
 on('boot', () => {
+  accessCleanSlots();
   if (typeof SCREENS === 'undefined' || typeof SCREENS.settings !== 'function') return;
   const build = SCREENS.settings;
   SCREENS.settings = () => {

@@ -5,7 +5,8 @@
 
 const SAVE_CODE_V = 1, SAVE_KEY_PREFIX = 'stickclash';
 const SAVE_NAMES = { settings: 'Settings', profile: 'Coins, unlocks & stats', prog: 'Progress track', tasks: 'Quests', presets: 'Fighter presets',
-  binds: 'Keys', padmap: 'Gamepad buttons', ranked: 'Ranked', quest: 'Campaign', challenges: 'Challenges', menu: 'Menu choices', highlights: 'Highlights' };
+  binds: 'Keys', padmap: 'Gamepad buttons', ranked: 'Ranked', quest: 'Campaign', challenges: 'Challenges', menu: 'Menu choices', highlights: 'Highlights',
+  bench: 'Performance test' };
 const XFER = { code: '', preview: null, msg: '', input: '' };
 
 const fnv1a = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0; return h.toString(16).padStart(8, '0'); };
@@ -27,7 +28,7 @@ async function makeSaveCode() {
 // numbers that must be finite inside the profile. A hand-edited code with the wrong shapes is refused, not imported.
 const SAVE_SHAPES = { settings: 'o', profile: 'o', prog: 'o', tasks: 'o', presets: 'a', binds: 'a', padmap: 'a', ranked: 'o', quest: 'o',
   challenges: 'o', menu: 'o', highlights: 'a', wins: 'o', muted: 'b', camera: 'b', weather: 's', tourneyBest: 'n', survivalBest: 'n',
-  bossBest: 'n', zombieBest: 'n' };
+  bossBest: 'n', zombieBest: 'n', bench: 'o' };
 function saveShapeCheck(key, value) {
   const short = key.replace(/^stickclash\.(v\d+\.)?/, ''), want = SAVE_SHAPES[short];
   if (!want) return;

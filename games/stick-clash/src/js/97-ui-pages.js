@@ -262,6 +262,7 @@ function rewardBox() {
   const unlocked = MATCH_TRACK.unlocked.map(k => ACHIEVEMENTS[k]).filter(Boolean);
   return el('div', { class: 'reward' },
     el('div', { class: 'reward-total' }, el('span', { class: 'coin-big', 'aria-hidden': 'true' }), el('b', { text: `+${rw.coins}` }), ' coins', coinBadge()),
+    rw.mul < 1 ? el('p', { class: 'reward-mul', text: `× ${rw.mul} at practice speed` }) : null,   // slowed solo play pays less (75, 92-access)
     el('ul', {}, rw.lines.map(([why, n]) => el('li', {}, why, el('span', { text: `+${n}` }))),
       unlocked.map(a => el('li', { class: 'ach' }, `${a.icon} Trophy: ${a.name}`, el('span', { text: `+${a.coins}` })))));
 }

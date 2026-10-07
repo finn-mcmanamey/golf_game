@@ -1,0 +1,12 @@
+/* 98-codex.css: the Codex's secret-code entry row (98-ui-progress) and the practice-speed reward note on the
+   results card (97-ui-pages, 98-ui-progress). */
+.cx-entry { gap: 10px; }
+.cx-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cx-input { font: 700 18px var(--body); letter-spacing: .12em; text-transform: uppercase; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--line); background: rgba(0, 0, 0, .3); color: inherit; min-width: 0; flex: 1 1 150px; }
+.cx-input::placeholder { color: var(--faint); letter-spacing: .08em; }
+.cx-arrows { display: flex; gap: 4px; }
+.cx-arrows button { min-width: 40px; padding: 7px 0; font-size: 16px; }
+.cx-row > .go { flex: 0 0 auto; }
+.cx-status:empty { display: none; }
+.reward-mul { color: var(--faint); font-size: 13px; margin: -4px 0 6px; }

@@ -39,7 +39,9 @@ function kcSnapFighter(f) {
   // v3 drawing state that isn't a plain number: guard, fused element, mount and running ultimate (copied as they were).
   const v3 = { blocking: !!f.blocking, element: f.element || null, mount: f.mount ? Object.assign({}, f.mount) : null,
     ult: f.ult ? Object.assign({}, f.ult) : null };
-  return { ref: f, pts, nums: kcNums(f), status, alive: f.alive, grounded: f.grounded, v3 };
+  // The weapon rigs as they were: a disarm on the K.O. blow swaps the live fighter's rig, whose point indexes
+  // then no longer match this snapshot (that crashed the replay's weapon drawing).
+  return { ref: f, pts, nums: kcNums(f), status, alive: f.alive, grounded: f.grounded, v3, main: f.main, off: f.off || null };
 }
 
 function kcSnapshot() {
@@ -191,6 +193,7 @@ function kcGhostFighter(sa, sb, k, gdt) {
   Object.assign(g, sa.nums);
   g.status = sa.status; g.alive = sa.alive; g.grounded = sa.grounded;
   if (sa.v3) Object.assign(g, sa.v3);
+  if (sa.main) { g.main = sa.main; g.off = sa.off; g.rigCache = null; }   // draw with the recorded rigs, not the live ones
   const n = sa.pts.length / 2, useB = sb && sb.pts.length === sa.pts.length;
   if (g.P.length !== n) g.P = Array.from({ length: n }, () => ({ x: 0, y: 0, ox: 0, oy: 0, fresh: true }));
   for (let j = 0; j < n; j++) {

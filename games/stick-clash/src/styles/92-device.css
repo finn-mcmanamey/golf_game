@@ -1,0 +1,7 @@
+/* 92-device.css: the device layer (92-device.js): the "turn sound on" strip shown when a gamepad started the match
+   without a tap or key (browsers only unlock audio on a real gesture), and the fullscreen button on the title screen. */
+#soundbar { position: fixed; top: 0; left: 0; right: 0; z-index: 55; margin: 0; border: 0; border-radius: 0; border-bottom: 1px solid var(--gold);
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px; background: rgba(12, 14, 30, .96); color: var(--gold);
+  font: 600 15px var(--body); text-align: center; cursor: pointer; animation: fade-in .2s ease-out; }
+#soundbar::before { content: '🔇 '; }
+.title-foot .fs-btn { margin-left: auto; padding: 6px 10px; font-size: 13px; white-space: nowrap; }

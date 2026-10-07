@@ -10,7 +10,7 @@ for (const k in ANN_DEFAULTS) {
   if (!(k in SETTINGS)) SETTINGS[k] = ANN_DEFAULTS[k];
 }
 
-const ANN = { log: [], last: 0, lastPrio: 0, synthAt: 0, waitFight: false, voice: undefined, bus: null };
+const ANN = { log: [], last: 0, lastPrio: 0, synthAt: 0, waitFight: false, voice: undefined, bus: null, warmed: false };
 const ANN_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
 // How the synth voice pronounces a line (rough phonetics: one vowel group = one syllable).
 const ANN_SAY = { 'K.O.!': 'kay oh', 'Double K.O.!': 'dub bul kay oh', 'Fight!': 'faait', 'Perfect!': 'per fect',
@@ -124,6 +124,16 @@ function annClick(bus, t, hiss) {
   s.connect(fl).connect(g).connect(bus); s.start(t, Math.random()); s.stop(t + .1);
   audioVoice(s);
 }
+
+// Safari only starts speech from inside a user gesture: the first real tap or key speaks a silent utterance once,
+// so "Round one" (called from a timer later) is allowed. 80-audio emits 'gesture' from its activation listeners.
+function annWarm() {
+  if (ANN.warmed || SETTINGS.announcer !== 'voice') return;
+  if (typeof speechSynthesis === 'undefined' || typeof SpeechSynthesisUtterance === 'undefined') return;
+  ANN.warmed = true;
+  try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) { /* no speech */ }
+}
+on('gesture', annWarm);
 
 // ---------- when it speaks ----------
 const annWord = n => ANN_WORDS[n] || String(n);

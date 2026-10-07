@@ -717,6 +717,9 @@ function settleMatch() {
   if (Number.isFinite(run.won) && /tourn/i.test(key)) give(run.won * 12 * diffMul, `${run.won} challenger${run.won === 1 ? '' : 's'} beaten`);
   if (won && (res.tournament || /tourn/i.test(key))) { bumpStat('tourneys'); give(100, 'Tournament cleared'); }
   if (endless) { maxStat('bestWave', waves); give(waves * 6 * diffMul, `Survived ${waves} wave${waves === 1 ? '' : 's'}`); }
+  // A match played at a slowed practice speed pays less (accessRewardMul, 92-access); the results card says so.
+  const pm = typeof accessRewardMul === 'function' ? accessRewardMul() : 1;
+  if (pm < 1) { reward.mul = pm; reward.coins = Math.round(reward.coins * pm); }
   MATCH_TRACK.reward = reward;
   addCoins(reward.coins);
   checkAchievements();

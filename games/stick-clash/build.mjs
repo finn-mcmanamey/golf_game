@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { iconTags } from './tools/icon.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.join(ROOT, 'src');
@@ -102,9 +103,10 @@ slices.forEach(checkSlice);
 checkTopLevelNames(slices);
 const script = joinScript(slices);
 let html = fs.readFileSync(path.join(SRC, 'index.html'), 'utf8');
-for (const marker of ['<!--STYLE-->', '<!--SCRIPT-->']) if (!html.includes(marker)) fail(`src/index.html is missing ${marker}`);
+for (const marker of ['<!--STYLE-->', '<!--SCRIPT-->', '<!--ICONS-->']) if (!html.includes(marker)) fail(`src/index.html is missing ${marker}`);
 // Function replacers: a plain string would treat "$&" etc. inside the code as replacement patterns.
 html = html.replace('<!--STYLE-->', () => '<style>\n' + readStyles() + '\n</style>');
+html = html.replace('<!--ICONS-->', () => iconTags());   // home-screen icon + favicon, drawn in code (tools/icon.mjs)
 html = html.replace('<!--SCRIPT-->', () => '<script>\n' + script + '</script>');
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, html);

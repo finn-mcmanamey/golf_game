@@ -1,4 +1,5 @@
-// 91-touch.js: touch movement, gestures and the button layout for 90-input's on-screen controls (P1 only).
+// 91-touch.js: touch movement, gestures and the button layout for 90-input's on-screen controls. They drive the
+// touch player (TOUCH_SLOT in 90-input: P1, or the seat that joined with touch in the lobby).
 // - Floating stick (left zone): appears where the thumb lands. Its x drives P1's mx (analog, through TOUCH_AXIS);
 //   pushing up presses jump (flick up again in the air for a double jump); pulling down holds SETTINGS.touchDown.
 // - Gestures (right zone, outside the buttons): tap = attack, swipe up = jump, sideways = dash that way, down = grab.
@@ -18,7 +19,7 @@ const STICK_DEAD = .16, STICK_UP = -.55, STICK_DOWN = .6, STICK_GAIN = 1.35;   /
 const STICK_EL = TOUCH_EL && TOUCH_EL.querySelector('.tstick');
 
 function stickDown(e) {
-  if (STICK.id !== null || oneButtonOn(0)) return;
+  if (STICK.id !== null || oneButtonOn(TOUCH_SLOT)) return;
   e.preventDefault();
   initAudio();
   STICK.id = e.pointerId; STICK.x0 = e.clientX; STICK.y0 = e.clientY;
@@ -66,7 +67,7 @@ const SWIPE_MIN = 34, TAP_MAX = 22, TAP_MS = 320;
 function swipeDown(e) {
   e.preventDefault();
   initAudio();
-  if (oneButtonOn(0)) { touchHold('attack'); SWIPE.set(e.pointerId, { one: true }); return; }
+  if (oneButtonOn(TOUCH_SLOT)) { touchHold('attack'); SWIPE.set(e.pointerId, { one: true }); return; }
   SWIPE.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now(), done: false });
 }
 // A swipe acts the moment it is long enough, not when the finger lifts.
@@ -76,7 +77,7 @@ function swipeMove(e) {
   const dx = e.clientX - s.x, dy = e.clientY - s.y;
   if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_MIN) return;
   s.done = true;
-  if (Math.abs(dy) > Math.abs(dx)) pressAction(0, dy < 0 ? 'jump' : 'grab');
+  if (Math.abs(dy) > Math.abs(dx)) pressAction(TOUCH_SLOT, dy < 0 ? 'jump' : 'grab');
   else touchDash(Math.sign(dx));
   nativeHaptic('selection');
 }
@@ -86,11 +87,11 @@ function swipeUp(e) {
   if (!s) return;
   if (s.one) { touchRelease('attack'); return; }
   const tap = !s.done && Math.hypot(e.clientX - s.x, e.clientY - s.y) < TAP_MAX && performance.now() - s.t < TAP_MS;
-  if (tap && e.type === 'pointerup') pressAction(0, 'attack');
+  if (tap && e.type === 'pointerup') pressAction(TOUCH_SLOT, 'attack');
 }
 function touchDash(dir) {
   if (G_STATE.state !== 'play') return;
-  for (const f of humansIn(0)) f.inp.dash = dir || f.face;
+  for (const f of humansIn(TOUCH_SLOT)) f.inp.dash = dir || f.face;
 }
 
 function bindTouchZones() {
@@ -112,9 +113,10 @@ const TOUCH_ARC = [['jump', 1, 182], ['skill1', 1, 146], ['skill2', 1, 115], ['d
 
 function touchLayout() {
   if (!TOUCH_EL || TOUCH_EL.hidden) return;
-  const k = clamp(+SETTINGS.touchSize || 1, .7, 1.4), one = oneButtonOn(0);
+  const k = clamp(+SETTINGS.touchSize || 1, .7, 1.4), one = oneButtonOn(TOUCH_SLOT);
   const tall = innerHeight > innerWidth;                 // portrait: a little smaller so the arc clears the stick
-  const big = clamp(Math.min(innerWidth, innerHeight) * .2, 58, 92) * k * (tall ? .88 : 1), pad = Math.max(14, big * .2);
+  const lim = Math.min(innerWidth, innerHeight) >= 760 ? 104 : 92;   // tablets: thumbs sit further from the corner
+  const big = clamp(Math.min(innerWidth, innerHeight) * .2, 58, lim) * k * (tall ? .88 : 1), pad = Math.max(14, big * .2);
   const size = { big, mid: big * .74, small: big * .56 }, rings = { 1: big * 1.45, 2: big * 2.45 };
   const cx = pad + big / 2;                               // Attack's centre, from the bottom-right corner
   TOUCH_EL.classList.toggle('one', one);

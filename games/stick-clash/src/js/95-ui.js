@@ -337,8 +337,10 @@ function moveFocus(dir) {
   uiSfx('nav');
 }
 
+// Typing in a text field (the creator's name, a save code) must not move focus or go back.
+const typingIn = el => !!el && (el.isContentEditable || el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(range|checkbox|radio|button)$/.test(el.type)));
 addEventListener('keydown', e => {
-  if (KEY_CAPTURE || e.defaultPrevented || !menusActive() || e.altKey || e.ctrlKey || e.metaKey) return;
+  if (KEY_CAPTURE || e.defaultPrevented || !menusActive() || e.altKey || e.ctrlKey || e.metaKey || typingIn(e.target)) return;
   const dir = NAV_DIRS[e.code];
   if (dir) {
     if (e.target && e.target.type === 'range' && dir[0]) return;   // left/right adjust sliders

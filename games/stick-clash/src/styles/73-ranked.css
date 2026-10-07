@@ -1,7 +1,8 @@
 /* 73-modes-ranked: the rank badge on the title screen and the rank-up glow on the results card. */
 .rank-badge { --rk: var(--gold); display: inline-flex; align-items: center; gap: 10px; padding: 6px 14px 6px 8px; border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--rk) 60%, transparent); background: rgba(14, 16, 32, .78); color: var(--rk); text-align: left; }
-.rank-badge:hover, .rank-badge:focus-visible { background: rgba(30, 32, 64, .9); }
+.rank-badge:focus-visible { background: rgba(30, 32, 64, .9); }
+@media (hover: hover) { .rank-badge:hover { background: rgba(30, 32, 64, .9); } }
 .rank-badge .rk-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; font-size: 16px;
   background: color-mix(in srgb, var(--rk) 22%, transparent); box-shadow: 0 0 14px color-mix(in srgb, var(--rk) 50%, transparent); }
 .rank-badge .rk-text { display: grid; line-height: 1.15; }

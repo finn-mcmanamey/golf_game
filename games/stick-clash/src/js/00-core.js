@@ -2,7 +2,7 @@
 // Everything here is plain data and functions; no DOM access at load time.
 
 const W = 1280, H = 720, DT = 1 / 120;      // logical arena size and fixed physics step
-const VERSION = '3.0.0';
+const VERSION = '3.1.0';
 const TAU = Math.PI * 2;
 // One neon colour per fighter slot (up to MAX_FIGHTERS); the first four are the classic player colours.
 const DEFAULT_COLORS = ['#2ee6ff', '#ff8a2e', '#9dff5a', '#ff5ad1', '#ffd84a', '#b98cff', '#7dffcf', '#ff4a6a'];

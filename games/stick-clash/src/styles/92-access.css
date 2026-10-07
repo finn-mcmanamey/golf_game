@@ -7,7 +7,8 @@
 @media (orientation: portrait) { #touch .tzone-l { width: 40%; } #touch .tzone-r { width: 60%; } }
 #touch .tstick { position: absolute; left: 0; top: 0; width: calc(var(--sr, 56px) * 2); height: calc(var(--sr, 56px) * 2); border-radius: 50%;
   border: 2px solid rgba(170, 180, 255, .35); background: rgba(20, 22, 44, .22); pointer-events: none; opacity: calc(var(--to, .8) * .45);
-  transform: translate(max(28px, env(safe-area-inset-left)), calc(100vh - var(--sr, 56px) * 2 - 40px)); }
+  transform: translate(max(28px, env(safe-area-inset-left)), calc(100vh - var(--sr, 56px) * 2 - 40px));
+  transform: translate(max(28px, env(safe-area-inset-left)), calc(100dvh - var(--sr, 56px) * 2 - 40px)); }   /* iOS: below the toolbar, not under it */
 #touch .tstick.live { opacity: var(--to, .8); }
 #touch .tstick i { position: absolute; left: 50%; top: 50%; width: 46%; height: 46%; margin: -23% 0 0 -23%; border-radius: 50%;
   background: rgba(94, 242, 255, .5); border: 2px solid rgba(94, 242, 255, .85); box-shadow: 0 0 14px rgba(94, 242, 255, .5); }
@@ -23,6 +24,9 @@
 .join-card b { font: 400 26px var(--display); color: var(--jc); }
 .join-card span { font-size: 13px; color: var(--fg); }
 .join-card.empty { --jc: rgba(160, 170, 255, .25); border-style: dashed; box-shadow: none; }
+/* One-button mode per seat (92-access), toggled from the lobby card. */
+.join-card .join-one { font: 600 11px var(--body); letter-spacing: .06em; text-transform: uppercase; padding: 3px 9px; border-radius: 99px; color: var(--dim); }
+.join-card .join-one[aria-pressed="true"] { background: var(--gold); color: #1a1400; border-color: var(--gold); }
 .join-card.empty span { color: var(--dim); animation: join-pulse 1.6s ease-in-out infinite; }
 @keyframes join-pulse { 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { .join-card.empty span { animation: none; } }

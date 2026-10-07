@@ -364,9 +364,9 @@ the arena so only lamps, fighters and glowing weapons light it.
   out a reward (looks, hats, coins, titles).
 - **Quests:** three daily and one weekly task ("land 3 parries", "win on Candy Land"...) for bonus XP. You can re-roll
   one a day.
-- **Codex:** every weapon, boss, realm and arena with a line of lore and your own stats with it.
-- **Secrets:** a few hidden things unlock by typing codes on the title screen or by doing something unusual. The
-  Codex gives hints.
+- **Codex:** every weapon, skill, class, arena, boss, realm and pet with two lines of its own lore and your stats with it.
+- **Secrets:** a few hidden things unlock by typing codes on the title screen (or into the box on the Codex's Secrets
+  tab) or by doing something unusual. The Codex gives hints, and found secrets get their lore too.
 - **Coins and Shop:** coins come from every match (more for wins, harder CPUs, tournament runs and survival waves;
   Training earns nothing) and buy 34 hats and colour packs.
 - **Trophies & Stats:** 28 trophies to unlock, plus your lifetime stats.
@@ -388,12 +388,18 @@ the arena so only lamps, fighters and glowing weapons light it.
 Settings → Accessibility: **colour-blind palettes** (deutan, protan, tritan) with a shape marker on every fighter and
 health card, **reduce flashing** (softer flashes, little shake, no strobing lightning; on by default when your system
 asks for reduced motion), **one-button mode** for P1, P2 or both, a **practice game speed** slider (25–100%, solo play,
-never Ranked), and gamepad rumble and phone haptics strength.
+never Ranked), and gamepad rumble and phone haptics strength. A match played at a slowed practice speed still earns
+coins and XP, scaled by the slowest speed used (× 0.4 at 25%, the full reward at 100%); the results card says so.
 
-## On a phone
+## On a phone or iPad
 
-Open the HTML file in the phone's browser and play with the touch controls (landscape works best). The `mobile/`
-folder holds an Expo app that wraps the game for iOS (see `mobile/README.md`).
+Open the HTML file in the browser and play with the touch controls (landscape works best; on an iPad the health
+cards sit in the band above the arena, and the camera keeps fighters out from under them). Settings → Controls has a
+**touch mode** (Auto shows the on-screen controls whenever you last touched the screen, On and Off force them), and the
+title and pause menus offer a **fullscreen** button where the browser allows it. **Performance** settings pick a quality
+preset for older devices. Highlights can be **shared** or exported as a **GIF** as well as a WebM. Secret codes can be
+typed into the **Codex's Secrets tab** (with arrow buttons), since a phone has no keyboard on the title screen. The
+`mobile/` folder holds an Expo app that wraps the game for iOS (see `mobile/README.md`).
 
 ## Tips
 

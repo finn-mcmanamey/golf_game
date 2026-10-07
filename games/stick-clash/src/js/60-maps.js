@@ -19,11 +19,14 @@ function mapPark(o) { o.x = MAP_PARK; o.y = -MAP_PARK; o.w = 1; o.h = 1; }
 const mapParked = o => o.x === MAP_PARK;
 const mapStoodOn = s => F.some(f => f.alive && (f.P[8].gs === s || f.P[10].gs === s));
 
-// Vertical sky gradient over the arena down to `bottom` (a little oversized so screen shake never shows an edge).
-function mapSky(ctx, bottom, colors) {
-  const g = ctx.createLinearGradient(0, 0, 0, bottom);
+// Vertical sky gradient over the arena down to `bottom`, a whole screen above it (the camera may rise past the arena
+// top under a tall HUD) and a little past the sides (screen shake). When it paints the live arena it also records the
+// top colour, which the renderer's void fill uses (mapSkyTop in 85-render).
+function mapSky(c2, bottom, colors) {
+  const g = c2.createLinearGradient(0, 0, 0, bottom);
   colors.forEach((c, i) => g.addColorStop(i / (colors.length - 1), c));
-  ctx.fillStyle = g; ctx.fillRect(-40, -40, W + 80, bottom + 40);
+  c2.fillStyle = g; c2.fillRect(-40, -H, W + 80, bottom + H);
+  if (MAP && c2 === ctx) MAP.skyTopLive = colors[0];
 }
 
 // A soft radial glow (sun, moon, lamp).
@@ -244,7 +247,7 @@ on('boot', () => {
 // ====================================================================================================================
 defMap('neon', {
   name: 'Neon City', desc: 'The classic rooftop arena. Three ledges, lots of room, no tricks.', order: 10,
-  floor: 650,
+  floor: 650, skyTop: '#0a0b1d',   // what shows above the arena (drawBg paints its own sky, not with mapSky)
   solids: [{ x: 150, y: 470, w: 250 }, { x: 880, y: 470, w: 250 }, { x: 515, y: 315, w: 250 }],
   spawns: [[330, 650], [950, 650], [275, 470], [1005, 470]],
   skyline: Array.from({ length: 34 }, (_, k) => ({ x: k * 40 - 20, w: rnd(30, 60), h: rnd(40, 170), seed: Math.random() * 1000 })),

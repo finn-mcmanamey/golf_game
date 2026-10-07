@@ -101,8 +101,10 @@ function solidAt(x, y, oneWayToo = false) {
   return null;
 }
 
-// Height of the first surface at or below (x, y), or null over a bottomless gap.
+// Height of the first surface at or below (x, y), or null over a bottomless gap. A map with curved ground (the
+// asteroid's planets) answers first through MAP.groundBelow(x, y); undefined from it means "use the flat rules".
 function groundBelow(x, y) {
+  if (MAP && MAP.groundBelow) { const g = MAP.groundBelow(x, y); if (g !== undefined) return g; }
   let best = MAP && MAP.floor != null ? MAP.floor : null;
   if (!MAP) return best;
   for (const s of MAP.solids) if (x >= s.x && x <= s.x + s.w && s.y >= y - 2 && (best == null || s.y < best)) best = s.y;

@@ -350,6 +350,7 @@ function jungleCatch(f, vines) {
     f.mem.vine = { v, L: clamp(dist(v, n), 110, v.len), t: 0 };
     v.holder = f; f.inp.grab = false;
     sfx('arVine');
+    emit('vine', f);
     return;
   }
 }
@@ -380,11 +381,43 @@ function jungleLetGo(f, jumped) {
   f.airJumps = Math.max(f.airJumps, 1);
 }
 
-// CPUs hop a dart lane they are standing in just before it fires.
+// CPUs hop a dart lane they are standing in just before it fires, and may swing on the vines (jungleCpuVines).
 function jungleBrain(m, f) {
+  jungleCpuVines(m, f);
   const w = m.hazards.find(h => h.trap === 'dart' && h.role === 'warn' && h.st === 'warn');
   if (!w || w.tt > .55 || !f.grounded) return;
   if ([0, 2, 8].some(j => inRect(f.P[j].x, f.P[j].y, w, 6))) f.inp.jump = true;
+}
+
+// ---------- CPU vines ----------
+// A CPU leaping the spike pit (aiLeapHazard, 65) may catch a free vine on the way: the chance is its level's `vine`
+// knob (66-ai-moves), rolled once per leap. It then pumps toward its goal and lets go on the forward swing. The
+// leap already clears the pit on its own, so a missed vine costs nothing. Runs after the brain (the think frame),
+// so it can override the brain's presses; the catch happens here and not through inp.grab, because a press made in
+// think would be spent on a whiffed grab in drive before the vines (onStep) ever saw it.
+const JUNGLE_PIT_SPAN = [440, 840];   // where a flying CPU looks for a rope
+function jungleCpuVines(m, f) {
+  const st = f.mem.vineAi || (f.mem.vineAi = { leap: false, want: false });
+  if (f.mem.vine) { jungleCpuSwing(f); return; }
+  const leaping = aiLeaping(f) && !f.grounded;
+  if (leaping && !st.leap) st.want = chance((f.ai.L && f.ai.L.vine) || 0);
+  st.leap = leaping;
+  if (!leaping || !st.want || f.heldBy || f.holding || f.mount) return;
+  const n = f.P[1];
+  if (n.x < JUNGLE_PIT_SPAN[0] || n.x > JUNGLE_PIT_SPAN[1]) return;
+  const vines = jungleVines(m);
+  if (!vines.some(v => !v.holder && Math.abs(jungleTip(v).x - n.x) < 70 && n.y > v.y + 40)) return;
+  jungleCatch(f, vines);
+  if (f.mem.vine) st.want = false;
+}
+
+// Hanging: pump toward the goal and let go on the forward swing (or after 2 s) with the same kick a jump gives.
+function jungleCpuSwing(f) {
+  const hang = f.mem.vine, v = hang.v, inp = f.inp, n = f.P[1];
+  const dir = Math.sign((f.ai.tx ?? n.x) - n.x) || f.face;
+  inp.mx = dir; inp.jump = false; inp.dash = 0; inp.grab = false;   // the brain's fall-recovery presses would drop the rope
+  const forward = Math.sign(vx(n)) === dir && v.a * dir > .45;
+  if (forward || hang.t > 2) jungleLetGo(f, true);
 }
 
 function jungleDrawVines(ctx, m, t) {

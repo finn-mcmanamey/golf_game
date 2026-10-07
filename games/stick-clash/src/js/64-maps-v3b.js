@@ -154,10 +154,28 @@ defMap('asteroid', {
   spawns: [[560, 356], [720, 356], [205, 245], [1075, 245], [640, 335], [640, 57], [160, 258], [1120, 258]],
   collide(p, friction) { for (const pl of ASTRO_PLANETS) astroCollide(p, pl, friction); },
   frame(f, phase, enter) { astroFrame(this, f, phase, enter); },
+  // Real ground for blinks, supply crates, mines, mount landings and the blade ultimate's dash: the top of the planet
+  // under (x, y) instead of the thin core inside it. The brain thinks with the flat floor at 1e5 (astroFrame: its pit
+  // rules would misread curved ground), and that still wins while it is set.
+  groundBelow(x, y) { return this.floor == null ? astroGroundBelow(x, y) : undefined; },
   onStep(dt) { astroPullShots(dt); },
   drawBg(ctx, t) { astroDrawBg(ctx, t); },
   drawSolid() {},
 });
+
+// Height of the nearest planet's top surface straight under (x, y), or null over deep space. Curved ground rises
+// ahead of a walker, so a surface up to ASTRO_STEP px above the query still counts (flat platforms allow 2 px).
+const ASTRO_STEP = 30;
+function astroGroundBelow(x, y) {
+  let best = null;
+  for (const pl of ASTRO_PLANETS) {
+    const dx = x - pl.x;
+    if (Math.abs(dx) >= pl.r) continue;
+    const top = pl.y - Math.sqrt(pl.r * pl.r - dx * dx);
+    if (top >= y - ASTRO_STEP && (best == null || top < best)) best = top;
+  }
+  return best;
+}
 
 const astroPlanetOf = pt => ASTRO_PLANETS.reduce((a, b) => Math.hypot(pt.x - b.x, pt.y - b.y) - b.r < Math.hypot(pt.x - a.x, pt.y - a.y) - a.r ? b : a);
 
@@ -280,7 +298,7 @@ const HAUNT_CANDLES = [[200, 300], [640, 170], [1080, 300]];
 
 defMap('mansion', {
   name: 'Haunted Mansion', desc: 'The lights flicker and die every few seconds: fighters and blades glow in the dark. Ghosts drift through the hall and chill anyone they touch.', order: 260,
-  floor: 650, gravity: 2200, weather: ['fog'],
+  floor: 650, gravity: 2200, weather: ['fog'], skyTop: '#1a1024',   // the wallpaper colour continues above the arena
   palette: { sky1: '#0a0612', sky2: '#24143a', ground: '#1a1020', line: '#b89aff', accent: '#9affd8', solid: '#3a2a3a' },
   solids: [
     { x: 60, y: 430, w: 320, restsOn: 'mp1' }, { x: 900, y: 430, w: 320, restsOn: 'mp2' },
@@ -382,7 +400,7 @@ const KITCHEN_LANE = { x0: 330, x1: 975 };
 
 defMap('kitchen', {
   name: "Giant's Kitchen", desc: 'Tiny fighters on a giant countertop. The toaster pops you skyward, the blender whirls when its light turns red, and runaway fruit rolls across.', order: 270,
-  floor: 650, gravity: 2200, weather: ['night'],
+  floor: 650, gravity: 2200, weather: ['night'], skyTop: '#b8a68a',   // the wall tiles continue above the arena
   palette: { sky1: '#f0e0c8', sky2: '#d8c0a0', ground: '#e8e4dc', line: '#ff8a5a', accent: '#5ab0ff', solid: '#c89a6a' },
   solids: [
     { x: 100, y: 520, w: 220, h: 144, oneWay: false, toaster: true },

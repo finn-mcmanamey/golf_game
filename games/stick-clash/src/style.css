@@ -9,20 +9,23 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-html, body { height: 100%; }
+html, body { height: 100%; overscroll-behavior: none; }   /* no rubber-band scroll or pull-to-refresh under the arena */
 [hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--body); overflow: hidden;
-  -webkit-tap-highlight-color: transparent; user-select: none; }
+  -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+/* Text fields keep selection so a name or a save code can still be edited and copied on a touch screen. */
+input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; }
 canvas { position: fixed; inset: 0; display: block; touch-action: none; }
 
 /* ---------- overlays and cards ---------- */
-.overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(4, 5, 12, .5);
+.overlay { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(4, 5, 12, .5);
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   animation: fade-in .18s ease-out; }
 .overlay.clear { background: transparent; pointer-events: none; }
 .overlay.clear > * { pointer-events: auto; }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes pop-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
-.card { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: var(--panel);
+.card { width: min(560px, 100%); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow: auto; background: var(--panel);
   border: 1px solid var(--line); border-radius: 16px; padding: 22px 24px; display: grid; gap: 14px;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, .03), 0 24px 60px rgba(0, 0, 0, .55), 0 0 40px rgba(110, 90, 255, .12);
   animation: pop-in .22s ease-out; }
@@ -39,7 +42,7 @@ p { margin: 0; }
 /* ---------- controls ---------- */
 button { font: 600 15px var(--body); color: var(--fg); background: transparent; border: 1px solid var(--line);
   border-radius: 9px; padding: 9px 14px; cursor: pointer; transition: border-color .12s, background .12s, transform .06s; }
-button:hover { border-color: var(--dim); background: rgba(255, 255, 255, .03); }
+@media (hover: hover) { button:hover { border-color: var(--dim); background: rgba(255, 255, 255, .03); } }   /* touch screens: no sticky hover */
 button:active { transform: translateY(1px); }
 button:focus-visible, select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 button:disabled { opacity: .45; cursor: default; }
@@ -47,7 +50,7 @@ button:disabled { opacity: .45; cursor: default; }
 .seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .go { font: 400 22px var(--display); background: var(--gold); color: #1a1400; border: 0; padding: 14px; letter-spacing: .04em;
   box-shadow: 0 0 24px rgba(255, 216, 74, .25); }
-.go:hover { background: var(--gold); filter: brightness(1.08); }
+@media (hover: hover) { .go:hover { background: var(--gold); filter: brightness(1.08); } }
 .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 label, .lbl { display: grid; gap: 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); }
 select { font: 15px var(--body); color: var(--fg); background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;

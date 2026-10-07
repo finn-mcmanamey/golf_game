@@ -12,6 +12,14 @@ const SFX = {};
 const SFX_LAST = {};
 let AC = null, NOISE = null, MASTER = null, MUTED = store.getBool('muted');
 let AUDIO_FAILED = false;          // WebAudio missing or blocked: stop trying on every key press
+let AUDIO_NEED_GESTURE = true;     // no running AudioContext yet: sound waits for a tap or key (92-device shows a hint for pad-only starts)
+// iOS mutes WebAudio while the ringer switch is on silent unless the page asks for a 'playback' audio session.
+const AUDIO_DEFAULTS = { silentSwitch: 'play' };
+for (const k in AUDIO_DEFAULTS) {
+  if (!(k in SETTING_DEFAULTS)) SETTING_DEFAULTS[k] = AUDIO_DEFAULTS[k];
+  if (!(k in SETTINGS)) SETTINGS[k] = AUDIO_DEFAULTS[k];
+}
+SETTING_CHOICES.silentSwitch = ['play', 'respect'];
 // Volume mix from the Settings screen (0..1 each). Sound effects go through SFX_BUS; music should use MUSIC_BUS.
 const AUDIO_MIX = { master: 1, sfx: 1, music: .6 };
 let SFX_BUS = null, MUSIC_BUS = null;
@@ -31,9 +39,11 @@ function applyAudioMix() {
 
 function defSfx(name, fn) { SFX[name] = fn; }
 
-function initAudio() {
+// Also the listener for every activation event, so resume() runs synchronously inside the gesture (iOS insists).
+function initAudio(e) {
+  if (e && e.isTrusted) emit('gesture', e);   // a real tap or key: the announcer (82) and the sound hint (92-device) listen
   if (AUDIO_FAILED) return;
-  if (AC) { if (AC.state === 'suspended' && AC.resume) AC.resume().catch(() => {}); return; }
+  if (AC) { audioResume(); return; }
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) { AUDIO_FAILED = true; return; }
@@ -47,12 +57,34 @@ function initAudio() {
     NOISE = AC.createBuffer(1, AC.sampleRate * 1.5, AC.sampleRate);
     const d = NOISE.getChannelData(0);
     for (let k = 0; k < d.length; k++) d[k] = Math.random() * 2 - 1;
+    AC.addEventListener('statechange', audioStateChanged);
+    audioStateChanged();
+    audioApplySession();
     applyAudioMix();
     emit('audioReady');
   } catch (e) { AC = null; AUDIO_FAILED = true; }
 }
-addEventListener('keydown', initAudio);
-addEventListener('pointerdown', initAudio);
+// Safari reports 'interrupted' (a call, Siri, another app's audio) as well as 'suspended': resume from any state.
+function audioResume() {
+  if (!AC || AC.state === 'running' || typeof AC.resume !== 'function') return;
+  try { const p = AC.resume(); if (p && p.catch) p.catch(() => {}); } catch (err) { /* not allowed yet */ }
+}
+function audioStateChanged() {
+  AUDIO_NEED_GESTURE = !AC || AC.state !== 'running';
+  emit('audioState', AC ? AC.state : 'none');
+}
+// SETTINGS.silentSwitch 'play': sound even with the iPhone/iPad ringer switch on silent (an explicit 'playback'
+// session). A looping silent <audio> element is the old trick for this; it is not used because it hijacks the audio
+// session (ducking other apps' music, taking the lock-screen controls) for the whole visit.
+function audioApplySession() {
+  const s = navigator.audioSession;
+  if (!s || typeof s.type !== 'string') return;
+  try { s.type = SETTINGS.silentSwitch === 'respect' ? 'auto' : 'playback'; } catch (err) { /* unsupported value */ }
+}
+// iOS counts touchend and click as user activation (pointerdown alone is not enough there); capture runs first.
+for (const ev of ['keydown', 'pointerdown', 'pointerup', 'touchend', 'click']) addEventListener(ev, initAudio, { passive: true, capture: true });
+// Coming back to the tab (or from a call) leaves Safari's context suspended: wake it up again.
+document.addEventListener('visibilitychange', () => { if (!document.hidden) initAudio(); });
 
 // Counts a playing source so a burst of sounds can't pile up hundreds of nodes.
 function audioVoice(src) {

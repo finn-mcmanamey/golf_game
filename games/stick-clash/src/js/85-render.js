@@ -7,7 +7,10 @@ const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 // "screen" of overlays and banners sits (centred in the viewport); hv = viewport height in arena units; zMin = the
 // least camera zoom that keeps the view inside the arena; hudK = extra HUD scale so its text stays readable; hudY = top
 // of the HUD (canvas px). On a landscape screen the viewport is the letterboxed 16:9 arena (hv = H, zMin = 1).
-const VIEW = { s: 1, ox: 0, oy: 0, dpr: 1, vx: 0, vy: 0, vw: W, vh: H, cx: W / 2, cy: H / 2, hv: H, top: 0, zMin: 1, hudK: 1, hudW: W, hudY: 0 };
+// band = the letterbox strip above the viewport (canvas px, 0 in portrait); hudH = the HUD block's height; hudOver =
+// how much of it still overlaps the top of the viewport (0 when the band is tall enough, as on a 12.9" iPad).
+const VIEW = { s: 1, ox: 0, oy: 0, dpr: 1, vx: 0, vy: 0, vw: W, vh: H, cx: W / 2, cy: H / 2, hv: H, top: 0, zMin: 1, hudK: 1, hudW: W, hudY: 0,
+  band: 0, hudH: 0, hudOver: 0 };
 const VIEW_HUD_CSS = .72;      // smallest on-screen (CSS px) scale for HUD text: 15px HUD text stays ~11px
 const CAM = { x: W / 2, y: H / 2, z: 1, fx: 0, fy: 0, focusT: 0, follow: store.getBool('camera', true), maxZoom: 1.24,
   punch: 0 };   // punch: brief extra zoom on heavy hits (set by 87-juice, decays here)
@@ -31,9 +34,27 @@ function resize() {
   VIEW.ox = VIEW.vx; VIEW.oy = VIEW.cy - H * s / 2;
   VIEW.hv = vh / s; VIEW.top = (VIEW.vy - VIEW.oy) / s; VIEW.zMin = Math.max(1, VIEW.hv / H);
   VIEW.hudK = clamp(VIEW_HUD_CSS / (s / dpr), 1, 2.2); VIEW.hudW = W / VIEW.hudK;   // HUD layout width (centred)
-  VIEW.hudY = portrait ? Math.round(cv.height * .075) : VIEW.oy;
+  hudLayout();
 }
 addEventListener('resize', resize);
+
+// Height of the HUD block in canvas px (the card rows plus the round label), with the row maths drawHUD uses.
+function hudBlockPx() {
+  const n = Math.max(2, F.filter(f => !f.summon).length), Wh = VIEW.hudW, two = n === 2, compact = n > 4;
+  const perRow = two ? 2 : compact ? clamp(Math.floor((Wh - 44) / 200), 2, 4) : clamp(Math.floor((Wh - 44) / 256), 1, n);
+  const rows = two ? 1 : Math.ceil(n / perRow), rowH = compact ? 46 : 84;
+  return (rows * rowH + 36) * VIEW.s * VIEW.hudK;
+}
+// Where the HUD sits: in the letterbox band above the arena when there is one (4:3 iPads), else overlapping the top
+// of the viewport by hudOver px (16:9 screens), where the camera keeps fighters below it (updateCamera).
+function hudLayout() {
+  const portrait = cv.height > cv.width;
+  VIEW.band = portrait ? 0 : VIEW.vy;
+  VIEW.hudH = hudBlockPx();
+  VIEW.hudY = portrait ? Math.round(cv.height * .075) : Math.max(0, VIEW.vy - VIEW.hudH);
+  VIEW.hudOver = portrait ? 0 : Math.max(0, VIEW.hudH - VIEW.vy);
+}
+on('roundStart', hudLayout);   // the number of cards (and so the block height) can change between matches
 resize();
 
 // ---------- camera ----------
@@ -42,7 +63,7 @@ function focusCamera(x, y, seconds = 1.1) { CAM.fx = x; CAM.fy = y; CAM.focusT =
 // Frames every living fighter, zooming in gently when they are close together.
 function updateCamera(dt) {
   if (photoCamera()) return;   // photo mode's free camera (86)
-  let tx = W / 2, ty = H / 2, tz = 1;
+  let tx = W / 2, ty = H / 2, tz = 1, boxTop = null;
   const live = F.filter(f => f.alive);
   if (CAM.follow && live.length) {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -51,8 +72,10 @@ function updateCamera(dt) {
       x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y);
     }
     x0 -= 240; x1 += 240; y0 -= 200; y1 += 110;
-    tz = clamp(Math.min(W / (x1 - x0), VIEW.hv / (y1 - y0)), VIEW.zMin, Math.max(CAM.maxZoom, VIEW.zMin * 1.12));
+    // The strip of the viewport under the HUD (hudOver) is not usable height.
+    tz = clamp(Math.min(W / (x1 - x0), (VIEW.hv - VIEW.hudOver / VIEW.s) / (y1 - y0)), VIEW.zMin, Math.max(CAM.maxZoom, VIEW.zMin * 1.12));
     tx = (x0 + x1) / 2; ty = (y0 + y1) / 2;
+    boxTop = y0;
   }
   if (CAM.focusT > 0 && CAM.follow) { CAM.focusT -= dt; tz = Math.max(tz, 1.3 * VIEW.zMin); tx = CAM.fx; ty = CAM.fy; }
   tz = Math.max(tz, VIEW.zMin);
@@ -60,8 +83,12 @@ function updateCamera(dt) {
   CAM.z += (tz - CAM.z) * kz; CAM.x += (tx - CAM.x) * k; CAM.y += (ty - CAM.y) * k;
   CAM.z = Math.max(CAM.z, VIEW.zMin);
   CAM.punch *= Math.exp(-dt * 9);
-  const hw = W / (2 * CAM.z), hh = VIEW.hv / (2 * CAM.z);   // never show outside the arena
-  CAM.x = clamp(CAM.x, hw, W - hw); CAM.y = clamp(CAM.y, hh, H - hh);
+  const hw = W / (2 * CAM.z), hh = VIEW.hv / (2 * CAM.z);   // never show outside the arena...
+  // ...except above it, as far as the physics ceiling plus the strip the HUD covers (topPad), and only as high as
+  // the fighters need: they then sit under the HUD instead of behind it (the Asteroid's top planet, the Kitchen shelf).
+  const topPad = VIEW.hudOver / (VIEW.s * CAM.z);
+  const minY = boxTop == null ? hh : clamp(boxTop + hh - topPad, hh - topPad + CEILING, hh);
+  CAM.x = clamp(CAM.x, hw, W - hw); CAM.y = clamp(CAM.y, minY, H - hh);
 }
 
 function setWorldTransform(sx = 0, sy = 0) {
@@ -94,7 +121,7 @@ function drawGridFloor(c2, floor, fill, grid, edge) {
 function drawStdBackground(c2, m, t) {
   const p = m.palette, bottom = m.floor ?? H, sky = c2.createLinearGradient(0, 0, 0, bottom);
   sky.addColorStop(0, p.sky1); sky.addColorStop(1, p.sky2);
-  c2.fillStyle = sky; c2.fillRect(0, 0, W, H);
+  c2.fillStyle = sky; c2.fillRect(0, -H, W, 2 * H);   // a screen above the arena too: the camera may rise past its top
   c2.fillStyle = 'rgba(255,255,255,.5)';
   for (let k = 0; k < 40; k++) {
     const x = (k * 233) % W, y = (k * 97) % (bottom * .6);
@@ -293,7 +320,7 @@ function drawFighter(f) {
   outfitDraw(ctx, f, look, 'front', G_STATE.t);
   circle(ctx, P[0].x + f.face * 6 * sc * hm, P[0].y - 2 * sc * hm, (f.alive ? 3 : 1.5) * sc * hm, '#0b0c18');   // eye
   drawHat(f);
-  for (const rig of rigsOf(f)) skinDrawWeapon(ctx, f, rig, weaponView(f, rig), look);
+  for (const rig of rigsOf(f)) if (f.P[rig.hand] && f.P[rig.tip]) skinDrawWeapon(ctx, f, rig, weaponView(f, rig), look);   // a rig can outlive its points (replay ghosts)
   drawStatusOverlays(f);
   for (const key of f.skills) if (key && SKILLS[key] && SKILLS[key].draw) hook(SKILLS[key], 'draw', ctx, f);
   drawFighterOver(f);                              // v3: guard arc, element glow, Lv3 trail, mech/jetpack, ultimates
@@ -610,13 +637,14 @@ function drawHUD() {
     ctx.font = `22px ${FONT_DISPLAY}`; ctx.fillStyle = left < 4 ? '#ff4a6a' : '#ffd84a';
     ctx.fillText(Math.ceil(left), centre, cy + 26);
   }
-  if (MUTED) {
-    ctx.font = `600 12px ${FONT_BODY}`; ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = 'rgba(200,205,240,.55)';
-    ctx.fillText('MUTED (M)', L + Wh - 14, H - 12);
-  }
   ctx.translate(0, (rows - 1) * rowH + (compact ? rowH - 84 : 8) + (two && !midGap ? 54 : 0));   // mode HUDs sit below the (taller) card block
   hook(G_STATE.mode, 'hud', ctx);
   miniDraw(ctx);                 // party mini-game scoreboard (79)
+  if (MUTED) {                   // at the viewport's bottom corner, wherever the HUD block went
+    setArenaTransform();
+    ctx.font = `600 12px ${FONT_BODY}`; ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = 'rgba(200,205,240,.55)';
+    ctx.fillText('MUTED (M)', W - 14, H - 12);
+  }
 }
 
 // ---------- banners ----------
@@ -640,6 +668,11 @@ function drawBanner(dt) {
   glow(ctx, ctx.fillStyle, 26, () => ctx.fillText(txt, 0, 0));
   ctx.restore();
 }
+
+// The colour of the sky at the arena's top edge: what shows above y = 0 when the camera rises past it. Maps that draw
+// with mapSky (60) record their live top colour; the others name a skyTop; the palette is the fallback.
+const mapSkyTop = m => (m && (m.skyTopLive || m.skyTop || (m.palette && m.palette.sky1))) || '#05060c';
+on('boot', () => { if (window.SC) SC.view = { VIEW, CAM }; });   // layout + camera for the smoke tests
 
 // ---------- frame ----------
 let VIGNETTE = null;
@@ -667,6 +700,7 @@ function render(dt) {
   FX.shake = FX.shake > .2 ? FX.shake * Math.pow(.86, dt * 60) : 0;
   ctx.save();
   ctx.beginPath(); ctx.rect(VIEW.vx, VIEW.vy, VIEW.vw, VIEW.vh); ctx.clip();
+  ctx.fillStyle = mapSkyTop(MAP); ctx.fillRect(VIEW.vx, VIEW.vy, VIEW.vw, VIEW.vh);   // sky above the arena when the camera rises past it
   setWorldTransform((Math.random() - .5) * sh, (Math.random() - .5) * sh);
   if (typeof MAP.drawBg === 'function') hook(MAP, 'drawBg', ctx, t); else drawStdBackground(ctx, MAP, t);
   for (const hz of MAP.hazards) drawHazard(ctx, hz, MAP, t);

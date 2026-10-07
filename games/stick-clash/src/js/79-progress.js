@@ -79,9 +79,9 @@ function trackGive(l) {
 }
 
 // ---------- match XP and codex stats ----------
-const PROG_MATCH = { xp: 0, lines: [], ups: [], kos: 0, taunts: 0 };
+const PROG_MATCH = { xp: 0, lines: [], ups: [], kos: 0, taunts: 0, mul: 1 };   // mul < 1: paid at a slowed practice speed
 const progReal = () => typeof statsOn === 'function' && statsOn();
-on('matchStart', () => Object.assign(PROG_MATCH, { xp: 0, lines: [], ups: [], kos: 0, taunts: 0, done: false }));
+on('matchStart', () => Object.assign(PROG_MATCH, { xp: 0, lines: [], ups: [], kos: 0, taunts: 0, mul: 1, done: false }));
 on('ko', (V, K) => { if (progReal() && isRealPlayer(K) && V !== K && !V.summon) { PROG_MATCH.kos++; codexKo(K); } });
 on('tauntDone', f => { if (progReal() && isRealPlayer(f)) PROG_MATCH.taunts++; });
 on('roundEnd', winner => { if (progReal()) for (const f of F.filter(isRealPlayer)) codexRound(f, f.team === winner); });
@@ -97,6 +97,8 @@ function progSettle() {
   add(Math.min(60, hs.reduce((s, t) => s + (G_STATE.score[t] || 0), 0) * 10), 'Rounds won');
   add(Math.min(50, PROG_MATCH.kos * 5), 'K.O.s');
   if (mode.quest) add(40, mode.key === 'campaign' ? 'Quest battle' : 'Challenge');
+  const pm = typeof accessRewardMul === 'function' ? accessRewardMul() : 1;   // a slowed practice speed pays less (92-access)
+  if (pm < 1) { PROG_MATCH.mul = pm; PROG_MATCH.xp = Math.round(PROG_MATCH.xp * pm); }
   PROG_MATCH.ups = addXp(PROG_MATCH.xp, 'match');
   codexBoss(rw.won);
   secretFeats(rw.won);
@@ -242,6 +244,15 @@ function cheatKey(code) {
   for (const k in SECRETS) if (SECRETS[k].code && CHEAT.buf.endsWith(SECRETS[k].code)) { CHEAT.buf = ''; return secretUnlock(k) ? k : null; }
   return null;
 }
+// Typed code entry (the Codex's Secrets tab, for phones with no keyboard on the title screen): feeds letters and
+// arrows through the same buffer and returns the key of the code it completed (unlocking it), or null.
+function cheatEnter(text) {
+  const typed = [...String(text || '').toUpperCase()].filter(ch => /[A-Z↑↓←→]/.test(ch)).join('');
+  if (!typed) return null;
+  CHEAT.buf = (CHEAT.buf + typed).slice(-16);
+  for (const k in SECRETS) if (SECRETS[k].code && CHEAT.buf.endsWith(SECRETS[k].code)) { CHEAT.buf = ''; secretUnlock(k); return k; }
+  return null;
+}
 
 // The secret weapon and hat (hidden until their codes are typed).
 defWeapon('rubber-chicken', {
@@ -299,7 +310,10 @@ const LORE_CAT = {
   exotic: ['Nobody has a manual for the {n}. Nobody wants one.', 'The {n} is what happens when a blacksmith gets curious.'],
   shield: ['The {n} has never lost an argument, only gained dents.', 'Behind the {n}, even a rookie feels like a wall.'],
 };
+// The hand-written lines in 79-lore.js come first; the generator below covers anything added without a line.
 function codexLore(kind, key, name, cat) {
+  const t = typeof LORE_LINES === 'object' && LORE_LINES[kind] && LORE_LINES[kind][key];
+  if (t) return t;
   const rng = taskRng(kind + key), pickR = a => a[Math.floor(rng() * a.length)];
   const pool = kind === 'w' && LORE_CAT[cat] && rng() < .7 ? LORE_CAT[cat] : LORE[kind] || LORE.w;
   const line1 = pickR(pool).replace(/\{(\w+)\}/g, (_, k) => (k === 'n' ? name : pickR(LORE_FILL[k])));
