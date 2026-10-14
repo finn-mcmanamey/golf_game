@@ -136,7 +136,7 @@ let GRAVE_FOG = null;      // offscreen canvas for the darkness layer (made on f
 
 defMap('graveyard', {
   name: 'Haunted Graveyard', desc: 'Dark and foggy: you only see what is near. Ghosts drift through and chill whoever they touch.', order: 130,
-  floor: 650,
+  floor: 650, style: 'chalk',
   palette: { sky1: '#05040e', sky2: '#1a1030', ground: '#120e1a', line: '#9a7dff', accent: '#8dffc8', solid: '#221a30' },
   solids: [{ x: 120, y: 450, w: 200 }, { x: 960, y: 430, w: 200 }, { x: 520, y: 470, w: 240, oneWay: true }, { x: 575, y: 300, w: 130 }],
   hazards: GRAVE_GHOSTS.map(() => ({ kind: 'ghost', x: MAP_PARK, y: -MAP_PARK, w: 44, h: 54, dps: 0, tick: .4, status: ['slow', 1.2, 1], draw: graveDrawGhost })),
@@ -152,7 +152,30 @@ defMap('graveyard', {
       mapPlace(hz, { x, y, w: 44, h: 54 });
     });
   },
+  // Chalk: a hatched moon, the crypt, stones and bare trees; the bats still flit.
+  art: { top: '#1e2729',
+    bg(g, m) {
+      const fl = m.floor, ch = '#e6ece4', moon = '#f4f0d8', r = artRng(3);
+      chalkBoard(g, '#1e2729', 8);
+      g.fillStyle = artGrain(ch, 'stroke');
+      for (let k = 0; k < 46; k++) { const s = 1 + r() * 1.6; g.fillRect(r() * W - s, r() * 300 - s, s * 2, s * 2); }   // stars
+      g.save(); g.beginPath(); g.arc(980, 150, 64, 0, TAU); g.clip(); chalkHatch(g, 916, 86, 128, 128, moon, .55, 7); g.restore();
+      chalkLine(g, artArc(980, 150, 64, 0, TAU, 28), moon, 3, 1, true);
+      const chalk = artProxy(g, STYLES.chalk);
+      m.drawTree(chalk, 160, fl, 1.1); m.drawTree(chalk, 1150, fl, .9);
+      chalkHatch(g, 520, 482, 240, fl - 482, ch, .22, 12);
+      chalkLine(g, [[520, fl], [520, 482], [500, 482], [640, 400], [780, 482], [760, 482], [760, fl]], ch, 2.5, 6);   // the crypt
+      chalkLine(g, [[606, fl], [606, 560], ...artArc(640, 560, 34, Math.PI, TAU, 10), [674, fl]], ch, 2.5, 7);
+      chalkLine(g, [[640, 420], [640, 454]], '#9dffd0', 3, 8); chalkLine(g, [[627, 433], [653, 433]], '#9dffd0', 3, 9);
+      for (let k = 0; k < 12; k++) {                       // gravestones
+        const x = 60 + k * 106 + (k % 3) * 12, y = fl - 18 - (k * 17) % 26;
+        chalkLine(g, [[x - 14, fl], [x - 14, y], ...artArc(x, y, 14, Math.PI, TAU, 8), [x + 14, fl]], 'rgba(214,206,240,.8)', 2, k);
+      }
+      chalkLine(g, [[-40, fl], [W + 40, fl + 2]], ch, 3, 5);
+    },
+    live(c, m, t) { m.drawBats(c, t); } },
   drawBg(ctx, t) {
+    if (artBg(ctx, this, t)) return;
     const fl = this.floor;
     mapSky(ctx, fl, ['#04030a', '#120a24', '#24163a']);
     mapStars(ctx, t, 50, 300, 90);
@@ -220,7 +243,7 @@ function graveDarkness(ctx, t) {
   if (!GRAVE_FOG) { GRAVE_FOG = document.createElement('canvas'); GRAVE_FOG.width = 320; GRAVE_FOG.height = 180; }
   const fc = GRAVE_FOG.getContext('2d'), k = 320 / W;
   fc.setTransform(1, 0, 0, 1, 0, 0); fc.globalCompositeOperation = 'source-over'; fc.clearRect(0, 0, 320, 180);
-  fc.fillStyle = 'rgba(6,3,16,.8)'; fc.fillRect(0, 0, 320, 180);
+  fc.fillStyle = artIs('chalk') ? 'rgba(14,20,20,.8)' : 'rgba(6,3,16,.8)'; fc.fillRect(0, 0, 320, 180);   // chalk: slate dark
   fc.globalCompositeOperation = 'destination-out';
   const hole = (x, y, r, a) => {
     const g = fc.createRadialGradient(x * k, y * k, 0, x * k, y * k, r * k);

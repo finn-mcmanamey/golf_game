@@ -4,6 +4,7 @@
 /* The zones keep 24 px (or the safe area, if wider) clear of the left edge and the bottom: a thumb starting there
    would pull Safari's swipe-back or the Dock instead of moving the fighter. The stick's idle ring waits inside. */
 #touch { --tz-left: max(24px, env(safe-area-inset-left)); --tz-bottom: max(24px, env(safe-area-inset-bottom)); }
+#touch .tset { position: absolute; inset: 0; }   /* one per touch seat (91-touch) */
 #touch .tzone { position: absolute; top: 14%; bottom: var(--tz-bottom); pointer-events: auto; touch-action: none; }
 #touch .tzone-l { left: var(--tz-left); width: calc(44% - var(--tz-left)); }
 #touch .tzone-r { right: 0; width: 56%; }
@@ -19,9 +20,9 @@
   background: rgba(94, 242, 255, .5); border: 2px solid rgba(94, 242, 255, .85); box-shadow: 0 0 14px rgba(94, 242, 255, .5); }
 #touch .tarc { position: absolute; right: env(safe-area-inset-right); bottom: env(safe-area-inset-bottom); width: 0; height: 0; }
 #touch .tarc button { position: absolute; opacity: var(--to, .8); }
-#touch.one .tzone-l, #touch.one .tstick, #touch.one .tarc button:not([data-act="attack"]) { display: none; }
-#touch.one .tzone-r { top: 0; left: var(--tz-left); right: 0; width: auto; }   /* one-button mode: the whole screen (inside the insets) is the button */
-#touch.one .tarc button[data-act="attack"] { pointer-events: none; }
+#touch .one .tzone-l, #touch .one .tstick, #touch .one .tarc button:not([data-act="attack"]) { display: none; }
+#touch .one .tzone-r { top: 0; left: var(--tz-left); right: 0; width: auto; }   /* one-button mode: the whole set (inside the insets) is the button */
+#touch .one .tarc button[data-act="attack"] { pointer-events: none; }
 
 .join-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 12px; outline: none; }
 .join-card { --jc: var(--p1); display: grid; gap: 6px; justify-items: start; padding: 14px; border-radius: 12px; min-height: 104px;

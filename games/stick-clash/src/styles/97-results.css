@@ -1,0 +1,7 @@
+/* 97-results.css: a results card taller than the screen scrolls, its buttons pinned to its bottom edge (sticky
+   offsets count from inside the padding, hence the negative bottom and margins). */
+.results-card > .row:last-child { position: sticky; bottom: -22px; z-index: 1; margin: 0 -24px -22px; padding: 0 24px 22px;
+  background: var(--panel2); box-shadow: 0 -10px 12px -8px var(--panel2); }
+@media (max-width: 560px), (max-height: 500px) {
+  .results-card > .row:last-child { bottom: -16px; margin: 0 -16px -16px; padding: 0 16px 16px; }
+}

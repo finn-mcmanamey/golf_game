@@ -24,7 +24,7 @@ on('ko', (victim, killer, o) => {
   if (k && k.ult) { score += 25; tags.push('Ultimate'); }
   if (k && k.combo >= 3) { score += k.combo * 4; tags.push(k.combo + '-hit combo'); }
   if (k && k.alive && k.hp / k.maxHp < .25) { score += 20; tags.push('Comeback'); }
-  if (aliveTeams().length <= 1) { score += 10; tags.push('Deciding blow'); }
+  if (koDecides(victim)) { score += 10; tags.push('Deciding blow'); }
   if (blow >= 20) tags.push(blow + ' damage');
   HL.pending.push({ ko: { t: G_STATE.t, victim, killer: k, x: c.x, y: c.y, ringout }, score: Math.round(score), tags,
     map: MAP.name || MAP.key, weapon: k ? weaponLabel(k) : '' });

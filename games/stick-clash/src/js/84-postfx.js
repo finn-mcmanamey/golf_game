@@ -62,8 +62,9 @@ function postfxImpact(x, y, nx, ny, amt, color, id) {
     PFX.sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life, t0: G_STATE.t, c: k % 3 ? color : '#ffffff' });
   }
   if (PFX.sparks.length > 260) PFX.sparks.splice(0, PFX.sparks.length - 260);
-  PFX.flashes.push({ x, y, r: (16 + amt * 2.2) * (j.chaos ? 1.3 : 1), color, life: j.chaos ? .14 : .1, t0: G_STATE.t, a: base });
-  if (amt >= 14) PFX.waves.push({ x, y, r: 40 + amt * 3.2, color, life: .32, t0: G_STATE.t });
+  const keep = artNow().fxLife;   // ink splats, chalk dust and paper stars linger (59-styles)
+  PFX.flashes.push({ x, y, r: (16 + amt * 2.2) * (j.chaos ? 1.3 : 1), color, life: (j.chaos ? .14 : .1) * keep, t0: G_STATE.t, a: base });
+  if (amt >= 14) PFX.waves.push({ x, y, r: 40 + amt * 3.2, color, life: .32 * Math.min(keep, 2), t0: G_STATE.t });
   if (id != null) PFX.squash.set(id, { t0: G_STATE.t, nx, ny, k: clamp(amt / 70, .06, .22) * (j.chaos ? 1.4 : 1) });
   postfxLight(x, y, 60 + amt * 4, color, .12, .9);
   if (j.chaos && amt >= 20 && typeof JUICE !== 'undefined') JUICE.chroma = Math.max(JUICE.chroma, .35 * fxFlashMul());
@@ -102,16 +103,22 @@ function postfxSquash(c2, f) {
 }
 
 // ---------- drawing (world space, after the weather/darkness layer) ----------
+// Additive light suits neon and pixel; ink, paper and chalk draw their own impacts, unlit (59-styles).
 function postfxDrawWorld(c2) {
   PFX.impactsThisFrame = 0;
   FX.flashA = Math.min(FX.flashA, .9 * fxFlashMul());       // calm / reduced flashing: cap full-screen flashes
+  const st = artNow();
   c2.save();
-  c2.globalCompositeOperation = 'lighter';
-  if (SETTINGS.lights !== false) postfxDrawLights(c2);
-  postfxDrawWaves(c2);
-  postfxDrawSparks(c2);
-  postfxDrawFlashes(c2);
+  if (st.flash) artImpact(artRaw(c2), PFX);
+  else {
+    c2.globalCompositeOperation = 'lighter';
+    if (SETTINGS.lights !== false && st.lights) postfxDrawLights(c2);
+    postfxDrawWaves(c2);
+    postfxDrawSparks(c2);
+    postfxDrawFlashes(c2);
+  }
   c2.restore();
+  for (const k of ['lights', 'waves', 'sparks', 'flashes']) fxCompactBy(PFX[k], e => postfxAge(e) < e.life && postfxAge(e) > -1);
 }
 
 // A soft round light sprite per colour (white-hot centre fading out), drawn scaled.
@@ -136,7 +143,6 @@ function postfxGlow(c2, x, y, r, color, a) {
 function postfxDrawLights(c2) {
   const t = G_STATE.t, flick = k => .85 + .15 * Math.sin(t * 23 + k * 7.1) * Math.sin(t * 9 + k);
   for (const l of PFX.lights) { const e = postfxAge(l); if (e >= 0 && e < l.life) postfxGlow(c2, l.x, l.y, l.r * (1 + e / l.life * .3), l.color, l.a * .55 * (1 - e / l.life)); }
-  fxCompactBy(PFX.lights, l => postfxAge(l) < l.life && postfxAge(l) > -1);
   let n = 0;
   for (const p of PROJ) {
     if (p.zone || !(p.r > 0) || !p.color || ++n > 30) continue;
@@ -171,19 +177,24 @@ function postfxDrawWaves(c2) {
     c2.globalAlpha = (1 - k) * .45;
     circle(c2, w.x, w.y, r * .82, null, '#ffffff', 2);
   }
-  fxCompactBy(PFX.waves, w => postfxAge(w) < w.life && postfxAge(w) > -1);
 }
 
+// Where a spark is e seconds after the hit: it slows down and falls.
+const PFX_AT = { x: 0, y: 0 };
+function postfxSparkAt(s, e) {
+  const slow = 1 - e / s.life * .6;
+  PFX_AT.x = s.x + s.vx * e * slow; PFX_AT.y = s.y + s.vy * e * slow + 900 * e * e;
+  return PFX_AT;
+}
 function postfxDrawSparks(c2) {
   c2.lineCap = 'round';
   for (const s of PFX.sparks) {
     const e = postfxAge(s);
     if (e < 0 || e > s.life) continue;
-    const slow = 1 - e / s.life * .6, x = s.x + s.vx * e * slow, y = s.y + s.vy * e * slow + 900 * e * e;
+    const { x, y } = postfxSparkAt(s, e);
     c2.globalAlpha = 1 - e / s.life;
     lineXY(c2, x, y, x - s.vx * .025, y - s.vy * .025, s.c, 2.2);
   }
-  fxCompactBy(PFX.sparks, s => postfxAge(s) < s.life && postfxAge(s) > -1);
 }
 
 function postfxDrawFlashes(c2) {
@@ -199,7 +210,6 @@ function postfxDrawFlashes(c2) {
       lineXY(c2, f.x, f.y, f.x + Math.cos(ang) * L, f.y + Math.sin(ang) * L, '#ffffff', 3 * (1 - k) + 1);
     }
   }
-  fxCompactBy(PFX.flashes, f => postfxAge(f) < f.life && postfxAge(f) > -1);
 }
 
 // Keeps the entries that pass `keep`, in place.
@@ -363,7 +373,7 @@ function bloomRender2D(q) {
 // Called by render() once the arena is drawn, before the HUD (so the HUD never glows).
 function postfxFrame(dt) {
   if (typeof document === 'undefined') return;
-  const t0 = performance.now(), q = bloomWanted();
+  const t0 = performance.now(), q = artNow().bloom ? bloomWanted() : 'off';   // bloom is neon's (59-styles)
   bloomGovern(dt, q);
   let shown = false;
   BLOOM.frame++;

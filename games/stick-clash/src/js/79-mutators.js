@@ -14,6 +14,12 @@ let MUT_ON = [];          // the defs active in the current match
 
 function mutActive(key) { return MUT_ON.some(m => m.key === key); }
 function mutRun(name, ...args) { for (const m of MUT_ON) if (m[name]) hook(m, name, ...args); }
+// Fighter hooks once per fighter, also mid-round (71); refreshed first: Juggernaut crowns inside onRoundStart.
+function mutFighter(f) {
+  if (f.summon || f.mutDone) return;
+  f.mutDone = true; mutRefresh();
+  mutRun('fighter', f);
+}
 
 defMutator('bigheads', { name: 'Big Heads', icon: '🎃', desc: 'Huge heads. Purely for the giggles.', secret: 'konami',
   fighter(f) { f.headMul = 1.9; } });
@@ -52,7 +58,7 @@ on('roundStart', () => {
   mutRefresh();
   if (!MUT_ON.length) return;
   mutRun('round');
-  for (const f of F) if (!f.summon) mutRun('fighter', f);
+  for (const f of F) mutFighter(f);
 });
 on('mapStep', dt => { if (MUT_ON.length) mutRun('step', dt); });
 on('ko', (V, K) => { if (MUT_ON.length && !V.summon) mutRun('ko', V, K); });

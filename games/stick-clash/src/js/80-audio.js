@@ -5,8 +5,8 @@
 // Signal path: tone()/noise() -> [per-sound panner] -> SFX_BUS -> MASTER -> compressor -> speakers.
 // Music (81-music.js) goes MUSIC_BUS -> MASTER, so the Settings sliders (AUDIO_MIX) control each bus.
 //
-// Weapon hits get a layer by weapon category on top of the generic body 'hit' (see AUDIO_HIT_LAYER below);
-// a weapon may name its own with `hitSfx: 'my-sound'`.
+// Every weapon has its own swing/shot and hit sound over the generic body 'hit' (80b; `hitSfx` still overrides).
+// sfx('family:arg') plays SFX.family(vol, arg), so a weapon key or a voice pitch replays as a plain (name, vol) pair.
 
 const SFX = {};
 const SFX_LAST = {};
@@ -27,6 +27,7 @@ let SFX_OUT = null;                // where tone()/noise() connect right now (SF
 let AUDIO_PITCH = 1;               // < 1 pitches every sound down (the kill-cam replay sets it)
 let AUDIO_VOICES = 0;              // sources currently playing; new ones are dropped above AUDIO_MAX_VOICES
 const AUDIO_MAX_VOICES = 90;
+const AUDIO_MUSIC_ROOM = 24;       // voices effects leave free, so a brawl can't cut the music out (music uses audioBusy(0))
 let SFX_RECORD = null;             // the kill-cam sets this to hear every sfx(name, vol) call
 
 function applyAudioMix() {
@@ -96,7 +97,9 @@ function audioVoice(src) {
   AUDIO_VOICES++;
   src.onended = () => { AUDIO_VOICES--; };
 }
-const audioBusy = () => !AC || AUDIO_VOICES >= AUDIO_MAX_VOICES;
+// A suspended or 'interrupted' context would queue every voice to burst out on resume: every voice asks audioBusy.
+const audioLive = () => !!AC && AC.state === 'running';
+const audioBusy = (room = AUDIO_MUSIC_ROOM) => !audioLive() || AUDIO_VOICES >= AUDIO_MAX_VOICES - room;
 const audioOut = () => SFX_OUT || SFX_BUS || MASTER;
 
 // A pitch sweep from f0 to f1 Hz with a tiny attack (no clicks).
@@ -142,19 +145,20 @@ function thump(f0, f1, dur, vol, delay = 0) { tone(f0, f1, dur, 'sine', vol, del
 // always: play even behind the menu (UI clicks).
 function sfx(name, vol = 1, always = false) {
   if (SFX_RECORD && !always) SFX_RECORD(name, vol);
-  if (!AC || MUTED || G_STATE.sim || (G_STATE.state === 'menu' && !always)) return;
-  const fn = SFX[name];
+  if (!audioLive() || MUTED || G_STATE.sim || (G_STATE.state === 'menu' && !always)) return;
+  const cut = name.indexOf(':'), fn = SFX[name] || (cut > 0 && SFX[name.slice(0, cut)]);
   if (!fn) return;
-  const now = AC.currentTime;
+  const now = AC.currentTime, pitch = AUDIO_PITCH;
   if (SFX_LAST[name] && now - SFX_LAST[name] < .03) return;   // identical sounds in the same instant just get louder
   SFX_LAST[name] = now;
-  try { fn(clamp(vol, 0, 2)); } catch (e) { report(e, 'sfx ' + name); }
+  if (FX.hitstop > 0) AUDIO_PITCH *= 1 - Math.min(FX.hitstop, .2) * .5;   // a frozen hit sounds a touch lower and heavier
+  try { fn(clamp(vol, 0, 2), name.slice(cut + 1)); } catch (e) { report(e, 'sfx ' + name); } finally { AUDIO_PITCH = pitch; }
 }
 const uiSfx = name => sfx(name, 1, true);
 
 // Like sfx, panned left/right by where x (arena units) is on screen.
 function sfxAt(name, x, vol = 1) {
-  if (!AC || MUTED || G_STATE.sim || G_STATE.state === 'menu' || !AC.createStereoPanner) { sfx(name, vol); return; }
+  if (!audioLive() || MUTED || G_STATE.sim || G_STATE.state === 'menu' || !AC.createStereoPanner) { sfx(name, vol); return; }
   const camX = typeof CAM !== 'undefined' ? CAM.x : W / 2;
   const pan = AC.createStereoPanner();
   pan.pan.value = clamp((x - camX) / (W / 2), -1, 1) * .7;
@@ -167,8 +171,39 @@ function sfxAt(name, x, vol = 1) {
 function setMuted(m) { MUTED = !!m; store.set('muted', MUTED); applyAudioMix(); emit('mute', MUTED); }
 function toggleMute() { setMuted(!MUTED); }
 
+// A drone held while re-triggered (chainsaw motor, flamethrower roar), so it always stops with the action.
+const AUDIO_HELD = {};
+function audioHold(id, secs, wave, freq, vol) {
+  if (!audioLive()) return;
+  const now = AC.currentTime, h = AUDIO_HELD[id], noisy = wave === 'noise';
+  if (h || audioBusy()) { if (h) h.end = now + secs; return; }
+  const src = noisy ? AC.createBufferSource() : AC.createOscillator(), fl = AC.createBiquadFilter(), g = AC.createGain();
+  if (noisy) { src.buffer = NOISE; src.loop = true; } else { src.type = wave; src.frequency.value = freq * AUDIO_PITCH; }
+  fl.type = 'lowpass'; fl.frequency.value = noisy ? freq : freq * 9;
+  g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(vol, now + .04);
+  src.connect(fl).connect(g).connect(audioOut()); src.start(now);
+  audioVoice(src);
+  AUDIO_HELD[id] = { end: now + secs, g, src };
+}
+function audioHoldTick() {
+  for (const id in AUDIO_HELD) {
+    const h = AUDIO_HELD[id], now = AC.currentTime;
+    if (now < h.end && !MUTED) continue;
+    h.g.gain.setTargetAtTime(0, now, .04); h.src.stop(now + .25);
+    delete AUDIO_HELD[id];
+  }
+}
+setInterval(() => { if (AC) try { audioHoldTick(); } catch (e) { report(e, 'audio hold'); } }, 50);
+
 // ---------- core sounds ----------
-defSfx('hit', v => { thump(190, 48, .2, .5 * v); noise(.12, 1100, .38 * v); });
+// A body hit (v = damage / 22): light hits stay soft; heavy ones add a crack, a deeper thump and a music duck.
+defSfx('hit', v => {
+  const heavy = clamp((v - .55) / .7, 0, 1);
+  thump(190 - 90 * heavy, 48 - 18 * heavy, .16 + .24 * heavy, (.42 + .3 * heavy) * v);
+  noise(.1, 1100 - 500 * heavy, .32 * v);
+  if (heavy > 0) { noise(.015, 6000, .55 * heavy, 'highpass'); tone(2400, 400, .025, 'square', .08 * heavy); }
+  if (heavy > .35) musicDuck(heavy);
+});
 defSfx('clash', () => { metal(1450, .45, .07); noiseSweep(.16, 7000, 2500, .22, 'highpass'); tone(3200, 2400, .08, 'square', .03); });
 defSfx('ko', () => {
   thump(140, 30, .9, .7); tone(330, 55, .9, 'sawtooth', .12); noise(.6, 380, .45, 'lowpass');
@@ -208,40 +243,5 @@ defSfx('cheer', v => {
 });
 defSfx('replay', () => { noiseSweep(.45, 300, 4000, .16, 'bandpass', 0, 3); tone(200, 1200, .4, 'sawtooth', .04); tone(1200, 600, .2, 'square', .03, .4); });
 
-// ---------- weapon-category hit layers ----------
-defSfx('hit-slash', v => { noiseSweep(.14, 6500, 2200, .3 * v, 'highpass'); tone(2900, 2300, .1, 'triangle', .035 * v); });
-defSfx('hit-thud', v => { thump(110, 34, .28, .65 * v); noise(.18, 260, .5 * v, 'lowpass'); });
-defSfx('hit-stab', v => { noise(.06, 2400, .35 * v); thump(240, 90, .08, .3 * v); });
-defSfx('hit-whip', v => { noise(.04, 7000, .4 * v, 'highpass'); tone(3000, 900, .05, 'square', .04 * v); });
-defSfx('hit-punch', v => { thump(170, 55, .12, .55 * v); noise(.08, 600, .4 * v, 'lowpass'); });
-defSfx('hit-clang', v => { metal(620, .4, .08 * v); thump(140, 60, .1, .3 * v); });
-defSfx('hit-bullet', v => { noise(.05, 3000, .3 * v); tone(1800, 500, .05, 'square', .03 * v); });
-defSfx('hit-magic', v => { tone(1700, 300, .22, 'sawtooth', .05 * v); noiseSweep(.2, 6000, 1500, .14 * v, 'bandpass', 0, 3); tone(880, 1760, .12, 'sine', .05 * v, .03); });
-defSfx('hit-weird', v => { tone(300, 1400, .12, 'triangle', .08 * v); tone(1400, 200, .14, 'square', .03 * v, .06); });
-defSfx('swing-blade', () => tone(3600, 3300, .16, 'sine', .018));
-defSfx('swing-chain', () => { for (let k = 0; k < 3; k++) noise(.03, 5200, .07, 'highpass', k * .05); });
-
-const AUDIO_HIT_LAYER = { blade: 'hit-slash', heavy: 'hit-thud', polearm: 'hit-stab', chain: 'hit-whip', fist: 'hit-punch',
-  shield: 'hit-clang', ranged: 'hit-thud', magic: 'hit-magic', exotic: 'hit-weird' };
-
-// Which category layer a direct hit gets: the weapon's own hitSfx, else by weapon category and damage kind.
-function audioHitLayer(o) {
-  const w = o.weapon || (o.src && o.src.w);
-  if (w && w.hitSfx) return w.hitSfx;
-  if (o.kind === 'proj') return w && w.cat === 'magic' ? 'hit-magic' : 'hit-bullet';
-  if (o.kind === 'melee' && w) return AUDIO_HIT_LAYER[w.cat] || null;
-  return null;
-}
-
-on('damage', (B, amt, o) => {
-  if (!AC || !o || o.small) return;
-  const layer = audioHitLayer(o);
-  if (layer) sfxAt(layer, o.x ?? B.P[1].x, clamp(amt / 16, .5, 1.3));
-});
-on('attack', f => {
-  if (!AC || f.w.ranged || typeof f.w.attack === 'function') return;
-  if (f.w.cat === 'blade') sfx('swing-blade');
-  else if (f.w.chain) sfx('swing-chain');
-});
 // The crowd roars for every K.O., loudest for the one that ends the round.
-on('ko', victim => { if (!victim.summon && SETTINGS.crowd !== false) sfx('cheer', aliveTeams().length <= 1 ? 1 : .55); });   // crowd: 83
+on('ko', victim => { if (!victim.summon && SETTINGS.crowd !== false) sfx('cheer', koDecides(victim) ? 1 : .55); });   // crowd: 83

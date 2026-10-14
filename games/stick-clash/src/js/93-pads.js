@@ -3,8 +3,9 @@
 //   never share a button (they swap). Saved as store 'padmap' (only the changes from PAD_BUTTONS); Reset per player.
 // - Join lobby (SCREENS.join, from the arena screen of modes with a Fighters stepper): A joins a pad, B leaves,
 //   Start (or Fight!) begins; a key of either keyboard set joins that set; on a touch screen one seat can join with
-//   touch (it becomes TOUCH_SLOT, the player the on-screen controls drive). Players are P1..P8 in join order, and
-//   the match's CPU seats become those humans (filling the team with the fewest humans first).
+//   touch (it becomes TOUCH_SLOT, the player the on-screen controls drive), two in table mode (the second gets the
+//   turned set, 91-touch). Players are P1..P8 in join order, and the match's CPU seats become those humans (filling
+//   the team with the fewest humans first).
 // - Every mode's setup is wrapped at boot to apply the lobby (cfg.joined) and the colour-blind palette (92).
 
 const PAD_NAMES = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'Back', 'Start', 'L3', 'R3', 'D-pad ↑', 'D-pad ↓', 'D-pad ←', 'D-pad →', 'Home'];
@@ -72,12 +73,22 @@ function padmapScreen() {
 const LOBBY = { list: [], prev: new Map(), keyed: false };   // list: [{ pad: index, label } | { keys: 0 | 1 }]
 const lobbyOpen = () => UI.screen === 'join' && PANELS.join && !PANELS.join.hidden;
 const lobbyHas = pad => LOBBY.list.findIndex(j => j.pad === pad);
+// Touch seats left: one, or two in table mode (both players on one iPad).
+const lobbyTouchFull = () => LOBBY.list.filter(j => j.touch).length >= (tableOn() ? 2 : 1);
 
 function lobbyJoin(entry) {
-  if (LOBBY.list.length >= MAX_FIGHTERS || (entry.touch && LOBBY.list.some(j => j.touch))) { uiSfx('deny'); return; }   // one touch seat
+  if (LOBBY.list.length >= MAX_FIGHTERS || (entry.touch && lobbyTouchFull())) { uiSfx('deny'); return; }
   LOBBY.list.push(entry); uiSfx('unlock'); refreshScreen();
 }
 function lobbyLeave(k) { LOBBY.list.splice(k, 1); uiSfx('back'); refreshScreen(); }
+// Table mode off (94's tableSet): a second touch seat would drive nobody, so it leaves the lobby, with a toast.
+function lobbyTouchTrim() {
+  for (const j of LOBBY.list.filter(x => x.touch).slice(tableOn() ? 2 : 1)) {
+    const i = LOBBY.list.indexOf(j);
+    LOBBY.list.splice(i, 1);
+    toast(`Player ${i + 1} needs a keyboard or pad`, 'Table mode is off, so the touch screen has one seat.', '👆', '#ff8a2e');
+  }
+}
 
 // Pads: A joins, B leaves (or goes back if that pad hasn't joined), Start begins. Polled every frame while open.
 function lobbyPoll() {
@@ -94,7 +105,7 @@ function lobbyPoll() {
 // Keyboards: any key of a set joins it (Esc still goes back through the menus).
 addEventListener('keydown', e => {
   if (!lobbyOpen() || e.repeat) return;
-  const set = BINDS.findIndex(b => BIND_ACTIONS.some(a => b[a] === e.code));
+  const set = keySets().findIndex(b => BIND_ACTIONS.some(a => b[a] === e.code));
   if (set < 0 || LOBBY.list.some(j => j.keys === set)) return;
   e.preventDefault(); e.stopPropagation();
   lobbyJoin({ keys: set });
@@ -106,9 +117,9 @@ function lobbyOneChip(i) {
     onclick: () => { accessToggleSlot(i); uiSfx('click'); refreshScreen(); } }, '1-button');
 }
 function lobbyCard(i) {
-  const j = LOBBY.list[i], color = DEFAULT_COLORS[i % DEFAULT_COLORS.length];
+  const j = LOBBY.list[i], color = DEFAULT_COLORS[i % DEFAULT_COLORS.length], keys = j && keySets()[j.keys];
   if (!j) return el('div', { class: 'join-card empty' }, el('b', { text: 'P' + (i + 1) }), el('span', { text: 'Press A to join' }), lobbyOneChip(i));
-  const how = j.keys != null ? `Keyboard (${keyLabel(BINDS[j.keys].left)} ${keyLabel(BINDS[j.keys].right)} …)` : j.label;
+  const how = keys ? `Keyboard (${keyLabel(keys.left)} ${keyLabel(keys.right)} …)` : j.label;
   return el('div', { class: 'join-card', style: { '--jc': color } }, el('b', { text: 'P' + (i + 1) }), el('span', { text: how }),
     el('div', { class: 'row' }, uiButton('Leave', () => lobbyLeave(i), 'join-leave', { 'data-key': 'join-leave-' + i }), lobbyOneChip(i)));
 }
@@ -118,10 +129,10 @@ function joinScreen() {
   const grid = el('div', { class: 'join-grid', tabindex: '0', 'data-autofocus': '' }, Array.from({ length: MAX_FIGHTERS }, (_, i) => lobbyCard(i)));
   const touchDev = typeof DEVICE !== 'undefined' && DEVICE.touch;
   const hint = el('p', { class: 'hint', text: `${mode.name || 'Party'}: every pad presses A to join (B leaves, Start begins). A key from either keyboard set joins too. ` +
-    (touchDev ? 'One seat can play on the touch screen. ' : '') + 'Empty seats are filled by CPUs.' });
-  // Touch screens: the on-screen controls take one seat (the stick and buttons then drive that player).
-  const touchBtn = touchDev ? uiButton('👆 Join with touch', () => lobbyJoin({ touch: true, label: 'Touch screen' }), null,
-    { 'data-key': 'join-touch', disabled: LOBBY.list.some(j => j.touch) || null }) : null;
+    (touchDev ? (tableOn() ? 'Two seats can share the touch screen (table mode). ' : 'One seat can play on the touch screen. ') : '') + 'Empty seats are filled by CPUs.' });
+  // Touch screens: the on-screen controls take one seat, two in table mode (the stick and buttons drive that player).
+  const touchBtn = touchDev ? uiButton('👆 Join with touch', () => lobbyJoin({ touch: true, label: LOBBY.list.some(j => j.touch) ? 'Touch screen (top, table mode)' : 'Touch screen' }), null,
+    { 'data-key': 'join-touch', disabled: lobbyTouchFull() || null }) : null;
   // Say why Fight! is dimmed: nobody has taken a seat yet.
   const status = el('p', { class: 'join-status' + (n ? ' ok' : ''), role: 'status', text: n
     ? `${n} player${n > 1 ? 's' : ''} in. Press Fight! (or Start on a pad). The other seats are filled by CPUs.`
@@ -169,9 +180,14 @@ function padsWrapModes() {
 }
 on('matchStart', cfg => {
   JOINED = joinActive(cfg, G_STATE.mode) ? cfg.joined : null;
-  TOUCH_SLOT = JOINED ? JOINED.findIndex(j => j.touch) : 0;   // the touch screen drives its lobby seat, or nobody (-1)
-  if (typeof updateTouchUI === 'function') updateTouchUI();   // the 'state' event ran before JOINED was known
+  touchSeatsUpdate();
 });
+// The touch screen drives its lobby seat (or nobody), else P1; in table mode a second touch seat (or P2) gets set 1.
+function touchSeatsUpdate() {
+  const seats = JOINED ? JOINED.map((j, i) => j.touch ? i : -1).filter(i => i >= 0) : [0, humanCount() > 1 ? 1 : -1];
+  touchSeats(seats.length ? seats[0] : -1, tableOn() && seats.length > 1 ? seats[1] : -1);
+  if (typeof updateTouchUI === 'function') updateTouchUI();   // the 'state' event ran before JOINED was known
+}
 
 // ---------- wiring into the menus ----------
 function padsPoll() {

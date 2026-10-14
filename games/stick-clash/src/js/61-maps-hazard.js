@@ -78,7 +78,7 @@ const FACTORY_HEAD_UP = 120;    // y of a retracted crusher head's bottom
 
 defMap('factory', {
   name: 'Robo Factory', desc: 'Conveyor belts drag you toward the crushers by the walls. Lights flash before they slam.', order: 70,
-  floor: 650,
+  floor: 650, style: 'pixel',
   palette: { sky1: '#0b0f14', sky2: '#1c2630', ground: '#20262e', line: '#ffd84a', accent: '#ff8a2e', solid: '#2a323c' },
   solids: [
     { x: 200, y: 460, w: 180 }, { x: 900, y: 460, w: 180 },
@@ -182,7 +182,7 @@ function factoryDrawHead(ctx, x, w, bottom, warn, t) {
 // ---------- Spike Pit ----------
 defMap('spikepit', {
   name: 'Spike Pit', desc: 'A bed of spikes fills the middle of the arena. A hovering bridge crosses it.', order: 80,
-  floor: 650,
+  floor: 650, style: 'chalk',
   palette: { sky1: '#0e0610', sky2: '#2a0c1a', ground: '#1a1016', line: '#ff3d5a', accent: '#ffd84a', solid: '#2a1a22' },
   solids: [
     { x: 130, y: 460, w: 220 }, { x: 930, y: 460, w: 220 },
@@ -191,7 +191,25 @@ defMap('spikepit', {
   ],
   hazards: [{ kind: 'spikes', x: 470, y: 620, w: 340, h: 32, dps: 30, tick: .35, launch: 1250, color: '#ff3d5a', draw: spikeDraw }],
   spawns: [[260, 650], [1020, 650], [240, 460], [1040, 460]],
+  // Chalk: the colosseum sketched on slate, the crowd in coloured chalk, the pit hatched red; the torches still flicker.
+  art: { top: '#27312e',
+    bg(g, m) {
+      const fl = m.floor, ch = '#e6ece4', r = artRng(2);
+      chalkBoard(g, '#27312e', 5);
+      chalkLine(g, [[-40, 122], [W + 40, 118]], ch, 2.5, 1); chalkLine(g, [[-40, 350], [W + 40, 353]], ch, 2.5, 2);
+      for (let k = 0; k < 14; k++) { const x = 20 + k * 92; chalkLine(g, [[x, 350], ...artArc(x + 34, 220, 34, Math.PI, TAU, 10), [x + 68, 350]], 'rgba(230,236,228,.5)', 2, k); }
+      for (let k = 0; k < 60; k++) {                       // the crowd
+        const x = k * 22 + 4, y = 108 + r() * 6, col = ['#ffb8c8', '#b8e2ff', '#fff2a6', '#c6f2b0'][k % 4];
+        chalkLine(g, artArc(x, y, 7, 0, TAU, 8), col, 1.6, k, true); chalkLine(g, artArc(x, y + 20, 10, Math.PI, TAU, 6), col, 1.6, k + 70);
+      }
+      for (const x of [90, 400, 880, 1190]) chalkLine(g, [[x, 424], [x, 460]], '#d9a273', 5, x);
+      g.fillStyle = 'rgba(8,12,11,.4)'; g.fillRect(470, fl - 30, 340, H - fl + 70);
+      chalkHatch(g, 470, fl - 30, 340, H - fl + 70, '#ff8f8f', .85, 9);
+      chalkLine(g, [[-40, fl], [470, fl], [470, H + 20]], ch, 3.5, 3); chalkLine(g, [[W + 40, fl], [810, fl], [810, H + 20]], ch, 3.5, 4);
+    },
+    live(c, m, t) { for (const x of [90, 400, 880, 1190]) m.drawTorch(c, x, 420, t); } },
   drawBg(ctx, t) {
+    if (artBg(ctx, this, t)) return;
     const fl = this.floor;
     mapSky(ctx, fl, ['#08040a', '#1e0814', '#3a0e1e']);
     // Colosseum arches with a cheering crowd silhouette.

@@ -2,7 +2,7 @@
 // Everything here is plain data and functions; no DOM access at load time.
 
 const W = 1280, H = 720, DT = 1 / 120;      // logical arena size and fixed physics step
-const VERSION = '3.2.0';
+const VERSION = '4.0.0';
 const TAU = Math.PI * 2;
 // One neon colour per fighter slot (up to MAX_FIGHTERS); the first four are the classic player colours.
 const DEFAULT_COLORS = ['#2ee6ff', '#ff8a2e', '#9dff5a', '#ff5ad1', '#ffd84a', '#b98cff', '#7dffcf', '#ff4a6a'];
@@ -31,11 +31,28 @@ const TUNE = {
   headMul: 1.5,
   kbMul: .5, kbMax: 720, // knockback from hit speed
   staggerPerDmg: .014, staggerMax: .38,
-  hitstopMin: 10,      // damage that triggers a hit-stop freeze (longer for bigger hits)
+  hitstopMin: 9,       // damage that triggers a hit-stop freeze; lighter hits and chip don't stop the action
+  hitstopLow: .035, hitstopMax: .12,   // freeze (s) for a hitstopMin hit, growing to hitstopMax at maxHit damage
+  hitstopKO: .19,      // the blow that K.O.s holds longest (the round-deciding one a little longer still)
+  kbHeavyFrom: 12,     // hits of this much damage and more knock harder: up to +kbHeavy × knockback at maxHit,
+  kbHeavy: .3, kbLaunch: 240,   // plus up to kbLaunch px/s of extra pop-up (heavy hits launch; light ones push)
   roundLimit: 60,      // seconds before a round is decided on remaining health
   koDelay: 2.4,        // seconds between the deciding KO and the next round
   startLock: 1.1,      // seconds of "ROUND N / FIGHT!" before anyone can act
 };
+// v4 "silly" body profile: floppier, funnier fighters. TUNE starts with TUNE_SILLY; TUNE_CLASSIC holds the v3 numbers
+// (Object.assign(TUNE, TUNE_CLASSIC) brings the old feel back; tools/smoke-feel.cjs compares the two).
+// headLift/neckLift/hipLift: × gravity holding the body up; headSpring: pull of the head over the hip; spineK: stiffness
+// of the head-hip link (low = a bobbling neck). armFlail: a free back arm windmills on fast moves; armTrail: share of
+// the weapon arm's hold lost while tumbling; legScramble: legs keep running in the air when launched. tumbleMin: hits
+// of this much damage spin the body (tumbleSpin) and loosen its balance (to tumbleLift) for up to tumbleTime s; getUp:
+// × lift for a body lying on the ground, so it pops back up like a punching bag instead of lying around.
+// koSpin/koPop/koBounce: how wildly the K.O.'s neon pieces spin, fly and bounce (36-shatter).
+const TUNE_SILLY = { headLift: 3.25, neckLift: 2.15, hipLift: 1.2, headSpring: 80, spineK: .06, armFlail: 1, armTrail: .55,
+  legScramble: 1, tumbleMin: 13, tumbleSpin: 1, tumbleLift: .3, tumbleTime: .42, getUp: 2.2, koSpin: 1.8, koPop: 1.3, koBounce: .62 };
+const TUNE_CLASSIC = { headLift: 3.4, neckLift: 2.2, hipLift: 1.2, headSpring: 120, spineK: 1, armFlail: 0, armTrail: 0,
+  legScramble: 0, tumbleMin: 999, tumbleSpin: 0, tumbleLift: 1, tumbleTime: 0, getUp: 1, koSpin: 1, koPop: 1, koBounce: .35 };
+Object.assign(TUNE, TUNE_SILLY);
 
 // ---------- maths ----------
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;

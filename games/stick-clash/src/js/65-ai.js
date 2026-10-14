@@ -21,8 +21,8 @@
 // gunArmor: extra toughness for a CPU holding a ranged weapon. The dash/jump tactics Hard and Insane unlock only help
 // melee, so without it an Insane gunner lost to a Hard CPU (46%) while an Insane swordsman won 74%.
 const AI_LEVELS = {
-  easy: { react: .42, attack: .35, skill: .22, dodge: .08, orb: .30, aimErr: .09, lead: 0, spacing: 60, wide: 70, idle: .30, punish: 0,
-    edge: 0, jump: .05, pick: 0, moves: 'g', walk: .75, armor: 1.3 },
+  easy: { react: .42, attack: .35, skill: .22, dodge: .08, orb: .30, aimErr: .09, lead: 0, spacing: 60, wide: 70, idle: .24, punish: 0,
+    edge: 0, jump: .05, pick: 0, moves: 'g', walk: .75, armor: 1.21 },   // v4: idle .3, armor 1.3 (its slips now do part of that job)
   normal: { react: .24, attack: .6, skill: .48, dodge: .28, orb: .45, aimErr: .035, lead: .4, spacing: 30, wide: 35, idle: .12, punish: .3,
     edge: .3, jump: .07, pick: .25, moves: 'g', walk: .9, armor: 1.08 },
   hard: { react: .14, attack: .85, skill: .78, dodge: .58, orb: .60, aimErr: .015, lead: .8, spacing: 14, wide: 14, idle: .03, punish: .7,
@@ -31,6 +31,18 @@ const AI_LEVELS = {
     edge: 1, jump: .08, pick: .3, moves: 'gjd', walk: 1, armor: .82, gunArmor: .72, brawl: 1 },
 };
 const AI_ORDER = ['easy', 'normal', 'hard', 'insane'];
+// v4 human-like slips, merged into AI_LEVELS (chances per decision unless noted): whiff: swing at a foe still out of
+// reach; mistime: a planned guard comes up late or drops early (66); wrongDash: a dash goes the wrong way; badJump: hop
+// up right in front of a foe about to swing; hesitate: freeze for a moment; jitter: ± share of the reaction time;
+// parryErr: s of timing error on parries (66). Every slip counts in f.ai.slips and emits 'aiSlip' (f, kind).
+const AI_SLIPS = {   // tuned to ~18 / 9 / 3.5 / 1.4 slips a minute of fighting (faster levels decide more often)
+  easy: { whiff: .4, mistime: .5, wrongDash: .3, badJump: .15, hesitate: .09, jitter: .5, parryErr: .12 },
+  normal: { whiff: .1, mistime: .16, wrongDash: .065, badJump: .03, hesitate: .017, jitter: .4, parryErr: .08 },
+  hard: { whiff: .04, mistime: .05, wrongDash: .012, badJump: .008, hesitate: .004, jitter: .3, parryErr: .05 },
+  insane: { whiff: .006, mistime: .012, wrongDash: .003, badJump: .003, hesitate: .001, jitter: .2, parryErr: .03 },
+};
+for (const k in AI_SLIPS) Object.assign(AI_LEVELS[k], AI_SLIPS[k]);
+function aiSlip(f, kind) { f.ai.slips = (f.ai.slips || 0) + 1; emit('aiSlip', f, kind); }
 const aiBrain = f => !!f && (f.ctrl === 'cpu' || f.autopilot);
 // Level toughness (armor, gunArmor) only applies between two CPU brains: it separates the bot ladder, but a human
 // always fights a CPU with exactly the health bar they see. Read live, so a weapon swap (Roulette) updates it.
@@ -60,10 +72,14 @@ function think(f, dt) {
   a.t = (a.t || 0) - dt;
   if (a.t <= 0) {
     a.L = aiTuned(f);                        // persona, adaptive difficulty and habit reads can change between decisions
-    a.t = a.L.react * rnd(.6, 1.4);
+    const j = a.L.jitter ?? .4;
+    a.t = a.L.react * rnd(1 - j, 1 + j);
     aiDecide(f, a.L);
   }
   const L = a.L;
+  const frozen = a.freeze > G_STATE.t;        // a hesitation (AI_SLIPS): hands off the controls for a moment
+  if (frozen) { f.inp.mx = 0; f.inp.attackHeld = false; f.inp.blockHeld = false; }
+  if (frozen || aiFlourish(f)) { if (MAP) aiSafety(f); return; }   // ...or showing off after a K.O. (67)
   aiMicro(f, L, dt);
   aiMovesStep(f, L, dt);                     // v3 moves: guard, grab/throw, mash, walls, flying mounts (66-ai-moves)
   if (MAP) aiSafety(f);
@@ -87,6 +103,7 @@ function aiDecide(f, L) {
   if (!aiUpright(f) && aiGetUp(f, L, c)) return;
   const zoneMode = !!(G_STATE.mode && G_STATE.mode.aiGoal);    // an objective to hold: no idle dithering
   if (G_STATE.lock <= 0 && !zoneMode && chance(L.idle)) { inp.mx = chance(.5) ? 0 : -c.dir; return; }   // easier bots hesitate
+  if (G_STATE.lock <= 0 && !zoneMode && c.d < 420 && chance(L.hesitate)) { a.freeze = G_STATE.t + rnd(.15, .4); aiSlip(f, 'hesitate'); return; }
   const goal = aiObjective(f, L, c);
   a.zonePush = !!(goal && goal.zone);
   if (goal) {
@@ -102,6 +119,16 @@ function aiDecide(f, L) {
   aiDecideMoves(f, L, c);                    // v3: ultimate, throwable, grab, guard, looting (66-ai-moves)
   aiPersonaAct(f, L, c);                     // the rival's signature style (67)
   aiHabitAct(f, L, c);                       // counters to a human's habits (68)
+  aiSlips(f, L, c);
+}
+
+// Human mistakes (AI_SLIPS): a swing that can't reach, a dash the wrong way, a hop right into the foe's swing.
+function aiSlips(f, L, c) {
+  const inp = f.inp, foe = f.ai.foe;
+  if (G_STATE.lock > 0 || !canAct(f) || f.holding) return;
+  if (c.style === 'melee' && !inp.attack && f.atkCd <= 0 && c.d > c.range + 30 && c.d < c.range * 2.2 && chance(L.whiff)) { inp.attack = true; aiSlip(f, 'whiff'); }
+  if (inp.dash && chance(L.wrongDash)) { inp.dash = -inp.dash; aiSlip(f, 'wrongDash'); }
+  if (f.grounded && c.d < c.foeRange + 20 && foe.atkCd < .1 && aiStyle(foe) === 'melee' && chance(L.badJump)) { inp.jump = true; aiSlip(f, 'badJump'); }
 }
 
 // What we know about the fight: horizontal gap d, direction, height difference of the feet, our reach.
@@ -481,8 +508,8 @@ function aiShoot(f, L, foe) {
   if (a.fire && lined && f.atkCd <= 0 && f.reload <= 0) inp.attack = true;
 }
 
-// The core aims at the nearest visible enemy with smoothing (aim += diff × .18 per step). Adding a bias b each step
-// settles that smoothing on core + b × .82 / .18, so we pick b to make it settle on the angle we want.
+// The core aims at the nearest visible enemy with smoothing (aim += diff × AIM_SMOOTH per step). Adding a bias b each
+// step settles that smoothing on core + b × (1 - AIM_SMOOTH) / AIM_SMOOTH, so we pick b to settle on the angle we want.
 function aiAim(f, L, foe, r) {
   const neck = f.P[1], tc = chest(foe), spd = r.speed || 1400;
   const t = Math.min(1.2, dist(neck, tc) / spd), lead = L.lead * t;
@@ -490,7 +517,7 @@ function aiAim(f, L, foe, r) {
   const g = ((r.proj && r.proj.grav) || 0) * PHYS.gravity;
   const want = Math.atan2(y - .5 * g * t * t * Math.min(1, L.lead + .3) - neck.y, x - neck.x) + (f.ai.aimErr || 0);
   const core = nearestEnemy(f, true), coreAng = core ? angleTo(neck, chest(core)) : f.aim;
-  if (!f.status.stun && !f.status.freeze) f.aim += aiWrap(want - coreAng) * .18 / .82;
+  if (!f.status.stun && !f.status.freeze) f.aim += aiWrap(want - coreAng) * AIM_SMOOTH / (1 - AIM_SMOOTH);
   return aiWrap(want - f.aim);
 }
 

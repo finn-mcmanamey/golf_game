@@ -35,15 +35,35 @@ function meleeAim(f) {
 }
 
 // A straight stab (rapier, spear, halberd, punches): level the weapon on the aim line, then drive arm and body along it.
-function meleeThrust(f, power = 1, rig = f.main) {
+// lunge (px/s): the whole body steps in behind the stab (the rapier's long lunge).
+function meleeThrust(f, power = 1, rig = f.main, lunge = 0) {
   const P = f.P, u = meleeAim(f), hand = P[rig.hand], tip = P[rig.tip], len = dist(hand, tip), sp = 1150 * power;
   kick(tip, (hand.x + u.x * len - tip.x) * 14 + u.x * sp, (hand.y + u.y * len - tip.y) * 14 + u.y * sp);
   for (const j of rig.pts.slice(1, -1)) kick(P[j], u.x * sp, u.y * sp);
   kick(hand, u.x * sp * .85, u.y * sp * .85);
   kick(P[rig.elbow], u.x * sp * .5, u.y * sp * .5);
   for (const j of [0, 1, 2]) kick(P[j], u.x * 300 * power, 0);
+  if (lunge) for (let j = 0; j < 11; j++) kick(P[j], u.x * lunge, 0);
   f.swingT = .22;
   sfx('swing', .6);
+}
+
+// Timed follow-ups inside one attack (a flurry's next stab, the cleave after its wind-up): fn(f) runs after `secs`
+// unless the fighter changed weapons or can't act. Weapons that use it call meleeLaterStep from their onStep.
+function meleeLater(f, secs, fn) { (f.mem.later = f.mem.later || []).push({ t: secs, key: f.wkey, fn }); }
+function meleeLaterStep(f, dt) {
+  const list = f.mem.later;
+  if (!list || !list.length) return;
+  f.mem.later = list.filter(a => (a.t -= dt) > 0);
+  for (const a of list) if (a.t <= 0 && a.key === f.wkey && canAct(f)) a.fn(f);
+}
+
+// Hits landing in a row on the same foe, each within `secs` of the last (the Blade's finisher, Rimefang's chill).
+function meleeStreak(A, B, key, secs) {
+  const c = A.mem[key] || (A.mem[key] = { foe: null, n: 0, t: -9 });
+  c.n = c.foe === B && G_STATE.t - c.t < secs ? c.n + 1 : 1;
+  c.foe = B; c.t = G_STATE.t;
+  return c.n;
 }
 
 // Pulls the target toward the attacker (scythe, kusarigama hooks).
@@ -60,7 +80,7 @@ function meleeTouching(f, rig, pad) {
     if (!B.alive || B.inv > 0) continue;
     for (const T of HIT_SHAPES) {
       const r = segSeg(a.x, a.y, b.x, b.y, B.P[T.a].x, B.P[T.a].y, B.P[T.b].x, B.P[T.b].y);
-      if (r.d < T.r * B.scale + pad) return { B, x: r.qx, y: r.qy };
+      if (r.d < hurtR(B, T) + pad) return { B, x: r.qx, y: r.qy };
     }
   }
   return null;
@@ -147,11 +167,22 @@ function meleeTipAt(s, d, o) {
 
 // ---------- blades ----------
 
+// v4: every blade has its own reach, swing speed, arc and signature move (arc/sig: for the Codex and tools; the
+// table is in tmp/balance.md). Reach (px a swing hurts at): Guardian 60, Blade/Emberbrand 80, Twin Fangs/Katana 90
+// (draw cut 140), Broadsword/Saber 100, Rimefang 130, Rapier 160, Greatsword 190, Tempest Fan's gust 260.
 defWeapon('blade', {
   power: 1.1,   // balance: × damage dealt with it (see tmp/balance.md)
-  name: 'Blade', cat: 'blade', desc: 'Balanced sword. Quick swings, reliable reach. The yardstick.', order: 1,
-  len: 78, mass: 1, dmg: 1.14, width: 5,
-  ai: { range: 130, style: 'melee' },
+  name: 'Blade', cat: 'blade', desc: 'Balanced sword, the yardstick. Land two hits in a row and the third swing is a heavy finisher.', order: 1,
+  len: 80, mass: 1, dmg: 1.14, width: 5, cd: .5, arc: 'overhead chop', sig: 'third hit in a row: heavy finisher',
+  ai: { range: 132, style: 'melee' },
+  onHit(A, B) { if (B.alive) meleeStreak(A, B, 'bladeRun', 1.3); },
+  attack(f) {
+    const run = f.mem.bladeRun, fin = run && run.n >= 2 && G_STATE.t - run.t < 1.3;
+    spinAttack(f, fin ? 1.35 : 1);
+    if (!fin) return;
+    run.n = 0;
+    float(f.P[0].x, f.P[0].y - 44, 'FINISHER!', '#ffffff', 18);
+  },
   draw(ctx, f, s) {
     meleeHandle(ctx, s, 12, '#3a3046', 6);
     meleeGuard(ctx, s, 0, 11, '#c9b37a', 5);
@@ -162,12 +193,13 @@ defWeapon('blade', {
 defWeapon('katana', {
   power: 1.12,   // balance: × damage dealt with it (see tmp/balance.md)
   name: 'Katana', cat: 'blade', order: 2,
-  desc: 'Long, light, curved. Wait a moment between swings and the next one is a lightning-fast draw cut.',
-  len: 90, mass: .8, dmg: 1.05, width: 4,
-  ai: { range: 145, style: 'melee' },
+  desc: 'Long, light, curved. Rest it a second and the next swing is a lunging quick-draw cut that crosses the gap.',
+  len: 100, mass: .8, dmg: 1.0, width: 4, cd: .56, arc: 'fast slash; lunging draw cut', sig: 'rested 1 s: quick-draw lunge cut',
+  ai: { range: 150, style: 'melee' },
   onStep(f, dt) { f.mem.katanaSheath = f.swingT > 0 ? 0 : (f.mem.katanaSheath || 0) + dt; },
   attack(f) {
-    const ready = f.mem.katanaSheath > 1.2;   // a rested blade swings harder
+    const ready = f.mem.katanaSheath > 1;   // a rested blade is drawn in one lunging cut
+    if (ready) for (let j = 0; j < 11; j++) kick(f.P[j], f.face * 520, j < 3 ? -40 : 0);
     spinAttack(f, ready ? 1.4 : 1);
     if (ready) { ring(f.P[f.tip].x, f.P[f.tip].y, 30, '#ffffff', .2, 3); float(f.P[0].x, f.P[0].y - 44, 'IAI!', '#ffffff', 18); }
     f.mem.katanaSheath = 0;
@@ -183,9 +215,9 @@ defWeapon('katana', {
 
 defWeapon('broadsword', {
   name: 'Broadsword', cat: 'blade', order: 3,
-  desc: 'Wide, heavy blade. Hits harder than the Blade and its flat can parry incoming shots.',
-  len: 88, mass: 1.35, dmg: 1.15, width: 7, block: .2, kb: 1.1,
-  ai: { range: 140, style: 'melee' },
+  desc: 'Wide, heavy, slow chops. Its broad flat makes a superb guard: blocking with it lets half the chip through and costs half the stamina.',
+  len: 94, mass: 1.45, dmg: 1.3, width: 7, block: .2, kb: 1.15, cd: .8, guard: .5, arc: 'heavy chop', sig: 'strong guard: ½ chip and stamina, wider parry',
+  ai: { range: 148, style: 'melee' },
   draw(ctx, f, s) {
     meleeHandle(ctx, s, 16, '#4a3628', 7);
     circle(ctx, s.at(-17 * s.k).x, s.at(-17 * s.k).y, 4 * s.k, '#c9b37a');   // pommel
@@ -196,11 +228,18 @@ defWeapon('broadsword', {
 });
 
 defWeapon('greatsword', {
-  power: 1.06,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 1,   // balance: × damage dealt with it (see tmp/balance.md; v4 1.06 -> 1)
   name: 'Greatsword', cat: 'blade', twoHanded: true, order: 4,
-  desc: 'Two-handed slab of steel. Slow to swing and to run with, but huge reach and crushing hits. Armour soaks 10%.',
-  len: 118, mass: 2.2, dmg: .95, width: 8, kb: 1.25, speed: .88, armor: .92,
-  ai: { range: 170, style: 'melee' },
+  desc: 'Two-handed slab of steel. A slow wind-up, then a huge cleave; you barely flinch while it swings. Armour soaks 8%.',
+  len: 122, mass: 2.3, dmg: 1.05, width: 8, kb: 1.3, speed: .88, armor: .92, cd: 1, swingArmor: .3,
+  arc: 'wind-up overhead cleave', sig: 'armoured swing: knockback ×0.3, no tumbles',
+  ai: { range: 178, style: 'melee' },
+  attack(f) {
+    for (const j of f.main.pts.slice(1)) kick(f.P[j], -f.face * 140, -180);   // heave the blade back over the head
+    f.swingT = .62;
+    meleeLater(f, .11, g => { spinAttack(g, 1.4); g.swingT = .5; });
+  },
+  onStep(f, dt) { meleeLaterStep(f, dt); },
   draw(ctx, f, s) {
     meleeHandle(ctx, s, 26, '#3b2b22', 7);
     meleeGuard(ctx, s, 0, 20, '#9aa1b8', 7);
@@ -223,17 +262,27 @@ function meleeDaggerDraw(ctx, s) {
   line(ctx, s.at(4 * s.k), s.at(s.L * .6), rgba('#8dff4a', .7), 1.5 * s.k);   // venom groove
 }
 defWeapon('twin-daggers', {
+  power: .87,   // balance: × damage dealt with it (see tmp/balance.md; v4 1 -> .87)
   name: 'Twin Fangs', cat: 'blade', offhand: 'dagger-left', order: 5,
-  desc: 'A venom-coated dagger in each hand. Short and relentless; hits may poison.',
-  len: 44, mass: .5, dmg: .78, width: 4, cd: .36, speed: 1.06,
+  desc: 'A venom-coated dagger in each hand. Every attack is a flurry: one stab, then the other a blink later. Hits may poison.',
+  len: 44, mass: .5, dmg: .74, width: 4, cd: .34, speed: 1.08, arc: 'twin-stab flurry', sig: 'each attack stabs with both daggers',
   ai: { range: 92, style: 'melee' },
-  onHit(A, B) { meleeProc(B, .35, 'poison', 2, .7, A); },
+  attack(f) { meleeThrust(f, .9, f.main); if (f.off) meleeLater(f, .08, g => meleeThrust(g, .9, g.off || g.main)); },
+  onStep(f, dt) { meleeLaterStep(f, dt); },
+  onHit(A, B) { meleeProc(B, .3, 'poison', 2, .7, A); },
   draw(ctx, f, s) { meleeDaggerDraw(ctx, s); },
 });
 
 defWeapon('kite-shield', {
   name: 'Kite Shield', cat: 'shield', hidden: true, desc: 'Off-hand shield.',
   len: 34, mass: 1, dmg: .3, width: 11, block: .5, armor: .9, lift: 1.4,
+  // Guardian's shield bash: a landed bash staggers the foe and holds back its next swing.
+  onHit(A, B) {
+    if (!B.alive) return;
+    B.stagger = Math.max(B.stagger, .35); B.atkCd = Math.max(B.atkCd, .3);
+    for (const p of B.P) kick(p, A.face * 240, -110);
+    float(B.P[0].x, B.P[0].y - 40, 'BASH!', '#c9b37a', 18);
+  },
   draw(ctx, f, s) {
     const k = s.k, m = s.L * .5;
     const pts = [s.at(-6 * k, -13 * k), s.at(-6 * k, 13 * k), s.at(m, 15 * k), s.at(s.L + 8 * k, 0), s.at(m, -15 * k)];
@@ -243,10 +292,11 @@ defWeapon('kite-shield', {
   },
 });
 defWeapon('sword-shield', {
+  power: 1.08,   // balance: × damage dealt with it (see tmp/balance.md; v4 1 -> 1.08)
   name: 'Guardian', cat: 'blade', offhand: 'kite-shield', order: 6,
-  desc: 'Arming sword and kite shield. The shield often deflects projectiles and the guard soaks damage.',
-  len: 70, mass: .95, dmg: .84, width: 5, speed: .95,
-  ai: { range: 120, style: 'melee' },
+  desc: 'Arming sword and kite shield. Each attack leads with a shield bash that staggers; the shield turns some shots and soaks damage.',
+  len: 70, mass: .95, dmg: .9, width: 5, speed: .95, cd: .7, arc: 'shield bash, then a short cut', sig: 'shield bash: staggers, delays their next swing',
+  ai: { range: 112, style: 'melee' },
   draw(ctx, f, s) {
     meleeHandle(ctx, s, 11, '#3a3046', 6);
     meleeGuard(ctx, s, 0, 10, '#c9b37a', 5);
@@ -255,12 +305,12 @@ defWeapon('sword-shield', {
 });
 
 defWeapon('rapier', {
-  power: 0.94,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 1.02,   // balance: × damage dealt with it (see tmp/balance.md; v4 .94 -> 1.02)
   name: 'Rapier', cat: 'blade', order: 7,
-  desc: 'Needle-thin duelling blade. Every attack is a fast lunge straight at the foe.',
-  len: 92, mass: .55, dmg: .8, width: 3, cd: .44,
-  ai: { range: 150, style: 'melee' },
-  attack(f) { meleeThrust(f, 1.08); },
+  desc: 'Needle-thin duelling blade. Every attack is a fast, long lunge straight at the foe.',
+  len: 100, mass: .55, dmg: .76, width: 3, cd: .4, arc: 'straight lunge', sig: 'long lunge: the whole body steps in',
+  ai: { range: 175, style: 'melee' },
+  attack(f) { meleeThrust(f, 1.08, f.main, f.grounded ? 220 : 90); },
   draw(ctx, f, s) {
     const k = s.k;
     meleeHandle(ctx, s, 11, '#3a2b20', 5);
@@ -274,11 +324,12 @@ defWeapon('rapier', {
 });
 
 defWeapon('saber', {
-  power: 1.22,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 1.18,   // balance: × damage dealt with it (see tmp/balance.md; v4 1.22 -> 1.18)
   name: 'Energy Saber', cat: 'blade', color: '#b26bff', order: 8,
-  desc: 'Light, fast plasma blade. Hits hard for its weight and can bat away shots.',
-  len: 82, mass: .6, dmg: .96, width: 6, block: .22,
-  ai: { range: 140, style: 'melee' },
+  desc: 'Light, very fast plasma blade. Swing it into a shot and the shot flies straight back at whoever fired it.',
+  len: 80, mass: .6, dmg: .9, width: 6, cd: .42, deflect: true, arc: 'quick forearm flick', sig: 'mid-swing deflect: shots fly back at the shooter',
+  ai: { range: 138, style: 'melee' },
+  attack(f) { spinAttack(f, 1.1, 5); },
   draw(ctx, f, s) {
     meleeHandle(ctx, s, 13, '#2b2b36', 7);
     meleeGuard(ctx, s, -4, 2, '#8e96c4', 8);
@@ -288,12 +339,18 @@ defWeapon('saber', {
 });
 
 defWeapon('frost-blade', {
-  power: 1.08,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 1.14,   // balance: × damage dealt with it (see tmp/balance.md; v4 1.08 -> 1.14)
   name: 'Rimefang', cat: 'blade', color: '#9fe8ff', order: 9,
-  desc: 'An ice-crystal sword. Each hit has a chance to freeze the foe solid for a moment.',
-  len: 80, mass: .95, dmg: 1.06, width: 6,
-  ai: { range: 132, style: 'melee' },
-  onHit(A, B) { if (meleeProc(B, .2, 'freeze', .75, 1, A, 'FROZEN', '#9fe8ff')) sfx('shatter', .6); },
+  desc: 'An ice-crystal sword swung in wide, low sweeps. Every hit chills (slows); the third in a row freezes the foe solid.',
+  len: 86, mass: 1.05, dmg: 1.1, width: 6, cd: .68, arc: 'wide low sweep', sig: 'chill: third hit in a row freezes',
+  ai: { range: 138, style: 'melee' },
+  attack(f) { spinAttack(f, 1, 2); },
+  onHit(A, B) {
+    if (!B.alive) return;
+    if (meleeStreak(A, B, 'rimeRun', 2.5) < 3) { addStatus(B, 'slow', .9, 1, A); return; }
+    A.mem.rimeRun.n = 0;
+    if (addStatus(B, 'freeze', .8, 1, A)) { float(B.P[0].x, B.P[0].y - 40, 'FROZEN', '#9fe8ff', 20); sfx('shatter', .6); }
+  },
   draw(ctx, f, s) {
     const k = s.k;
     meleeHandle(ctx, s, 12, '#28405a', 6);
@@ -307,10 +364,10 @@ defWeapon('frost-blade', {
 defWeapon('flame-sword', {
   power: 1.1,   // balance: × damage dealt with it (see tmp/balance.md)
   name: 'Emberbrand', cat: 'blade', color: '#ff7a2e', order: 10,
-  desc: 'A sword wreathed in fire. Every hit sets the target burning.',
-  len: 78, mass: 1, dmg: .86, width: 6,
-  ai: { range: 130, style: 'melee' },
-  onHit(A, B) { addStatus(B, 'burn', 1.5, .6, A); },
+  desc: 'A sword wreathed in fire. Every hit sets the target burning, and each hit on a burning foe stokes the flames higher.',
+  len: 78, mass: 1, dmg: .86, width: 6, cd: .6, arc: 'flaming chop', sig: 'stoked burn: grows with every hit',
+  ai: { range: 128, style: 'melee' },
+  onHit(A, B) { const b = B.status.burn; addStatus(B, 'burn', b ? Math.min(4, b.t + 1) : 1.5, b ? Math.min(1.1, b.power + .15) : .6, A); },
   onStep(f) { if (chance(.12)) { const p = f.P[f.tip]; burst(p.x, p.y, chance(.5) ? '#ffb02e' : '#ff4a1a', 1, 60, { grav: -600 }); } },
   draw(ctx, f, s) {
     const k = s.k, t = G_STATE.t * 18;
@@ -328,10 +385,10 @@ defWeapon('flame-sword', {
 });
 
 defWeapon('war-fan', {
-  power: 1.15,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 1.24,   // balance: × damage dealt with it (see tmp/balance.md; v4 1.15 -> 1.24)
   name: 'Tempest Fan', cat: 'blade', color: '#c9f3ff', order: 11,
   desc: 'Steel folding fan. Each swing also throws a short gust that shoves the foe away.',
-  len: 50, mass: .6, dmg: .9, width: 7, cd: .5,
+  len: 50, mass: .6, dmg: .9, width: 7, cd: .5, arc: 'fan slash + gust', sig: 'gust: every swing shoves at range',
   ai: { range: 150, style: 'melee' },
   attack(f) {
     spinAttack(f, .95);
@@ -423,7 +480,7 @@ defWeapon('double-axe', {
 });
 
 defWeapon('mace', {
-  power: 1.16,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 1.2,   // balance: × damage dealt with it (see tmp/balance.md; v4 1.16 -> 1.2)
   name: 'Spiked Mace', cat: 'heavy', order: 23,
   desc: 'Flanged iron club. Solid blows may leave the foe stunned.',
   len: 64, mass: 1.7, dmg: 1.18, width: 8, kb: 1.1,
@@ -530,7 +587,7 @@ defWeapon('lollipop', {
 // ---------- polearms ----------
 
 defWeapon('spear', {
-  power: 1.06,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 1.12,   // balance: × damage dealt with it (see tmp/balance.md; v4 1.06 -> 1.12)
   name: 'Spear', cat: 'polearm', twoHanded: true, order: 30,
   desc: 'Longest reach. Lunging pokes from safety; weaker up close.',
   len: 120, mass: .8, dmg: .74, width: 4,
@@ -545,7 +602,7 @@ defWeapon('spear', {
 });
 
 defWeapon('halberd', {
-  power: 1.06,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 1.12,   // balance: × damage dealt with it (see tmp/balance.md; v4 1.06 -> 1.12)
   name: 'Halberd', cat: 'polearm', twoHanded: true, order: 31,
   desc: 'Axe blade, spike and hook on a long haft. Attacks alternate between a lunge and a sweeping chop.',
   len: 112, mass: 1.5, dmg: .85, width: 6, kb: 1.15, speed: .95,
@@ -561,7 +618,7 @@ defWeapon('halberd', {
 });
 
 defWeapon('trident', {
-  power: 1.06,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 1.11,   // balance: × damage dealt with it (see tmp/balance.md; v4 1.06 -> 1.11)
   name: 'Tidecaller', cat: 'polearm', twoHanded: true, color: '#3fd0ff', order: 32,
   desc: 'Three-pronged trident. Wide tip that is hard to dodge; hits drag the foe down with a slow.',
   len: 108, mass: 1.1, dmg: .95, width: 7,
@@ -580,7 +637,7 @@ defWeapon('trident', {
 });
 
 defWeapon('scythe', {
-  power: 1.16,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 1.21,   // balance: × damage dealt with it (see tmp/balance.md; v4 1.16 -> 1.21)
   name: 'Reaper Scythe', cat: 'polearm', twoHanded: true, color: '#b98cff', order: 33,
   desc: 'Long hooked blade. Hits reel the victim in toward you for the follow-up.',
   len: 104, mass: 1.35, dmg: 1.04, width: 6, kb: .65,
@@ -610,6 +667,7 @@ function meleeBoDraw(ctx, s) {
   meleeGuard(ctx, s, 6 * s.k, 3.5, '#2a2a3a', 4);
 }
 defWeapon('bo-staff', {
+  power: 1.1,   // balance: × damage dealt with it (see tmp/balance.md; v4 1 -> 1.1)
   name: 'Bo Staff', cat: 'polearm', twoHanded: true, offhand: 'bo-end', order: 34,
   desc: 'Long wooden staff held in the middle. Both ends strike, so spins hit in front and behind.',
   len: 62, mass: .7, dmg: .72, width: 5, cd: .46, speed: 1.04,
@@ -640,6 +698,7 @@ defWeapon('plasma-end', {
   draw: meleePlasmaDraw,
 });
 defWeapon('plasma-staff', {
+  power: 1.08,   // balance: × damage dealt with it (see tmp/balance.md; v4 1 -> 1.08)
   name: 'Twin Plasma Staff', cat: 'magic', twoHanded: true, offhand: 'plasma-end', color: '#5ef2ff', order: 35,
   desc: 'Double-ended energy staff. Both ends burn; every third hit releases a static blast.',
   len: 66, mass: .65, dmg: .44, width: 6, cd: .46,
@@ -652,7 +711,7 @@ defWeapon('plasma-staff', {
 // ---------- chains ----------
 
 defWeapon('flail', {
-  power: 1.1,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 1.18,   // balance: × damage dealt with it (see tmp/balance.md; v4 1.1 -> 1.18)
   name: 'Morning Star', cat: 'chain', order: 40,
   desc: 'Spiked ball on a chain. Wild, heavy, hard to block.',
   len: 90, mass: 1.5, dmg: .9, width: 8, chain: 3,   // wide hitbox matches the spiked ball
@@ -688,7 +747,7 @@ defWeapon('nunchaku', {
 });
 
 defWeapon('whip', {
-  power: 1.2,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 1.33,   // balance: × damage dealt with it (see tmp/balance.md; v4 1.2 -> 1.33)
   name: 'Viper Whip', cat: 'chain', color: '#ffd84a', order: 42,
   desc: 'Very long leather whip. Low damage but huge reach; a full-speed crack slows the target.',
   len: 150, mass: .35, dmg: .6, width: 4, chain: 4, cd: .48, kb: .7,
@@ -714,6 +773,7 @@ defWeapon('whip', {
 });
 
 defWeapon('kusarigama', {
+  power: 1.16,   // balance: × damage dealt with it (see tmp/balance.md; v4 1 -> 1.16)
   name: 'Kusarigama', cat: 'chain', order: 43,
   desc: 'Sickle on a long chain. Hooks the target, makes it bleed and drags it closer.',
   len: 118, mass: .9, dmg: .64, width: 6, chain: 4,

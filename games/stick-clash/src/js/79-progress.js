@@ -1,7 +1,7 @@
-// 79-progress.js: the free 100-level progression track (XP from matches, campaign, challenges and quests), look
-// ownership (outfits, skins, K.O. effects, pets, poses, titles), daily/weekly quests, secrets + cheat codes, the
-// codex stats and the fighter-creator presets. Saved via store: 'prog' (xp, owned looks, title, secrets, codex
-// stats), 'tasks' (quests) and 'presets'. Only real (non-autopilot, non-demo, non-practice) matches count.
+// 79-progress.js: titles, the look registries in one place, secrets + cheat codes, the codex stats and lore, and the
+// fighter-creator presets. v4: every look and title is free from the start (no track, XP or quests); the secret ones
+// stay hidden until their code or feat is found. Saved via store: 'prog' (title, found secrets, codex stats) and
+// 'presets'. Only real (non-autopilot, non-demo, non-practice) matches count toward the codex.
 
 const TITLES = {};
 [['rookie', 'Rookie'], ['brawler', 'Brawler'], ['wobbler', 'Wobble Lord'], ['neon-ninja', 'Neon Ninja'], ['pet-whisperer', 'Pet Whisperer'],
@@ -10,101 +10,32 @@ const TITLES = {};
   .forEach(([k, name, hidden]) => defLook(TITLES, k, { name, icon: '🏷', hidden: !!hidden }));
 
 const LOOKS = { outfit: OUTFITS, skin: WSKINS, ko: KOFX, pet: PETS, pose: POSES, title: TITLES };
-const LOOK_NAMES = { outfit: 'Outfit', skin: 'Weapon skin', ko: 'K.O. effect', pet: 'Pet', pose: 'Victory pose', title: 'Title', hat: 'Hat', coins: 'Coins' };
-const LOOK_FREE = { outfit: ['none', 'scarf'], skin: ['none'], ko: ['none', 'confetti'], pet: ['none'], pose: ['cheer', 'wave'], title: ['rookie'] };
+// A look can be worn when it exists and isn't a secret still waiting to be found.
+const lookUsable = (kind, key) => { const d = LOOKS[kind] && LOOKS[kind][key]; return !!d && !d.hidden; };
 
 const PROG = (() => {
   const p = store.getObj('prog'), obj = v => v && typeof v === 'object' && !Array.isArray(v) ? v : {};
-  return { xp: numOr(p.xp), own: obj(p.own), title: typeof p.title === 'string' ? p.title : 'rookie', secrets: obj(p.secrets), codex: obj(p.codex), seen: numOr(p.seen, 1) || 1 };
+  return { title: typeof p.title === 'string' ? p.title : 'rookie', secrets: obj(p.secrets), codex: obj(p.codex) };
 })();
 let progDirty = false;   // codex K.O. counters are bumped mid-round and saved at the round's end (or by flushSaves)
 function progSave() { progDirty = false; store.set('prog', PROG); }
 onFlush(() => { if (progDirty) progSave(); });
-const lookOwned = (kind, key) => (LOOK_FREE[kind] || []).includes(key) || ((PROG.own[kind] || []).includes(key));
-function lookGrant(kind, key) {
-  if (kind === 'hat') { if (ownsHat(key)) return false; PROFILE.hats.push(key); saveProfile(); return true; }
-  if (lookOwned(kind, key)) return false;
-  (PROG.own[kind] = PROG.own[kind] || []).push(key);
-  progSave();
-  return true;
-}
 
-// ---------- the track: 100 levels, a reward on each ----------
-const TRACK_ITEMS = [[2, 'pet', 'sprig'], [3, 'outfit', 'cape'], [4, 'skin', 'gold'], [5, 'ko', 'fireworks'], [6, 'pose', 'flex'],
-  [7, 'title', 'brawler'], [8, 'outfit', 'sash'], [9, 'pet', 'bitbot'], [10, 'hat', 'cowboy'], [12, 'skin', 'neon'], [13, 'ko', 'hearts'],
-  [14, 'outfit', 'tail'], [15, 'pose', 'point'], [16, 'pet', 'fetch'], [18, 'skin', 'frost'], [19, 'outfit', 'kilt'], [20, 'title', 'wobbler'],
-  [21, 'ko', 'pixels'], [22, 'pose', 'dab'], [24, 'pet', 'zappy'], [25, 'hat', 'viking'], [26, 'outfit', 'ribbons'], [28, 'skin', 'pixel'],
-  [30, 'ko', 'stars'], [31, 'title', 'neon-ninja'], [33, 'outfit', 'champ'], [35, 'pet', 'tick'], [36, 'pose', 'shrug'], [38, 'skin', 'candy'],
-  [40, 'outfit', 'knight'], [42, 'ko', 'bubbles'], [44, 'title', 'pet-whisperer'], [45, 'hat', 'wizard'], [46, 'pet', 'bubbles'],
-  [48, 'skin', 'crystal'], [50, 'outfit', 'samurai'], [52, 'pose', 'salute'], [54, 'ko', 'ghost'], [56, 'pet', 'wisp'], [58, 'skin', 'lava'],
-  [60, 'outfit', 'cloak'], [62, 'title', 'untouchable'], [65, 'hat', 'halo'], [66, 'pose', 'bounce'], [68, 'ko', 'lightning'],
-  [70, 'outfit', 'banner'], [74, 'pet', 'glim'], [76, 'title', 'taunt-master'], [78, 'skin', 'void'], [80, 'outfit', 'mantle'],
-  [85, 'hat', 'crown'], [90, 'title', 'grand-duelist'], [95, 'title', 'legend'], [100, 'title', 'stick-legend']];
-const TRACK_MAX = 100;
-// TRACK[l] = the reward for reaching level l: { kind, key } or { kind: 'coins', n }.
-const TRACK = Array.from({ length: TRACK_MAX + 1 }, (_, l) => ({ kind: 'coins', n: (30 + l * 2) * (l % 5 ? 1 : 3) }));
-for (const [l, kind, key] of TRACK_ITEMS) TRACK[l] = { kind, key };
-const xpNeed = l => 100 + l * 6;                       // XP from level l to l + 1 (~40,000 in total)
-function trackLevel(xp) {
-  let l = 1;
-  while (l < TRACK_MAX && xp >= xpNeed(l)) { xp -= xpNeed(l); l++; }
-  return { lvl: l, into: xp, need: l < TRACK_MAX ? xpNeed(l) : 0 };
-}
-function trackRewardName(r) {
-  if (r.kind === 'coins') return `${r.n} coins`;
-  const reg = r.kind === 'hat' ? HATS : LOOKS[r.kind], d = reg && reg[r.key];
-  return (d ? d.name : r.key) + ' · ' + LOOK_NAMES[r.kind];
-}
-function trackIcon(r) {
-  if (r.kind === 'coins') return '🪙';
-  if (r.kind === 'hat') return '🎩';
-  const d = LOOKS[r.kind] && LOOKS[r.kind][r.key];
-  return d ? d.icon : '★';
-}
-// Adds XP, hands out every level reward passed, and returns the levels reached.
-function addXp(n, why) {
-  n = Math.max(0, Math.round(n));
-  if (!n) return [];
-  const before = trackLevel(PROG.xp).lvl;
-  PROG.xp += n;
-  const after = trackLevel(PROG.xp).lvl, ups = [];
-  for (let l = before + 1; l <= after; l++) { trackGive(l); ups.push(l); }
-  progSave();
-  emit('xp', n, why, ups);
-  return ups;
-}
-function trackGive(l) {
-  const r = TRACK[l];
-  if (r.kind === 'coins') addCoins(r.n);
-  else if (!lookGrant(r.kind, r.key)) addCoins(150);          // already owned (a shop hat): coins instead
-  if (typeof toast === 'function' && G_STATE.state !== 'over') toast(`Level ${l}!`, trackRewardName(r), trackIcon(r), '#5ef2ff');
-}
-
-// ---------- match XP and codex stats ----------
-const PROG_MATCH = { xp: 0, lines: [], ups: [], kos: 0, taunts: 0, mul: 1 };   // mul < 1: paid at a slowed practice speed
+// ---------- codex stats and match feats ----------
+const FEAT_MATCH = { taunts: 0, done: false };   // safe taunts this match (the Show-off secret)
 const progReal = () => typeof statsOn === 'function' && statsOn();
-on('matchStart', () => Object.assign(PROG_MATCH, { xp: 0, lines: [], ups: [], kos: 0, taunts: 0, mul: 1, done: false }));
-on('ko', (V, K) => { if (progReal() && isRealPlayer(K) && V !== K && !V.summon) { PROG_MATCH.kos++; codexKo(K); } });
-on('tauntDone', f => { if (progReal() && isRealPlayer(f)) PROG_MATCH.taunts++; });
+on('matchStart', () => Object.assign(FEAT_MATCH, { taunts: 0, done: false }));
+on('ko', (V, K) => { if (progReal() && isRealPlayer(K) && V !== K && !V.summon) codexKo(K); });
+on('tauntDone', f => { if (progReal() && isRealPlayer(f)) FEAT_MATCH.taunts++; });
 on('roundEnd', winner => { if (progReal()) for (const f of F.filter(isRealPlayer)) codexRound(f, f.team === winner); });
-on('matchOver', () => progSettle());
-// Works out the match XP once (called on matchOver and by the results screen, whichever comes first).
-function progSettle() {
-  if (!progReal() || PROG_MATCH.done) return;
-  PROG_MATCH.done = true;
-  const rw = (typeof settleMatch === 'function' && settleMatch()) || {}, mode = G_STATE.mode || {}, hs = rosterHumanTeams();
-  const add = (n, why) => { n = Math.round(n); if (n > 0) { PROG_MATCH.xp += n; PROG_MATCH.lines.push([why, n]); } };
-  add(40, 'Match played');
-  if (rw.won) add(60, 'Victory');
-  add(Math.min(60, hs.reduce((s, t) => s + (G_STATE.score[t] || 0), 0) * 10), 'Rounds won');
-  add(Math.min(50, PROG_MATCH.kos * 5), 'K.O.s');
-  if (mode.quest) add(40, mode.key === 'campaign' ? 'Quest battle' : 'Challenge');
-  const pm = typeof accessRewardMul === 'function' ? accessRewardMul() : 1;   // a slowed practice speed pays less (92-access)
-  if (pm < 1) { PROG_MATCH.mul = pm; PROG_MATCH.xp = Math.round(PROG_MATCH.xp * pm); }
-  PROG_MATCH.ups = addXp(PROG_MATCH.xp, 'match');
-  codexBoss(rw.won);
-  secretFeats(rw.won);
-}
+// Once per counted match: the boss codex rows and the feats that unlock secrets.
+on('matchOver', () => {
+  if (!progReal() || G_STATE.cfg.autopilot || FEAT_MATCH.done) return;
+  FEAT_MATCH.done = true;
+  const won = !!(recordMatch() || {}).won;
+  codexBoss(won);
+  secretFeats(won);
+});
 
 // Codex stats per entry: [uses, wins, K.O.s]. Kinds: w weapons, s skills, c classes, m arenas, p pets, b boss nodes.
 function codexBump(kind, key, slot, n = 1) {
@@ -124,99 +55,18 @@ function codexBoss(won) {
 }
 const codexRow = (kind, key) => ((PROG.codex[kind] || {})[key]) || [0, 0, 0];
 
-// ---------- daily and weekly quests ----------
-// Each task counts an event during real matches. Three dailies and three weeklies are drawn from the local date
-// (same for every save on that day); one daily may be rerolled per day.
-const TASKS = {
-  win: { text: 'Win {n} matches', d: 2 }, play: { text: 'Play {n} matches', d: 3 }, kos: { text: 'Score {n} K.O.s', d: 6 },
-  hits: { text: 'Land {n} hits', d: 40 }, skills: { text: 'Use skills {n} times', d: 12 }, parry: { text: 'Parry {n} attacks', d: 3 },
-  throws: { text: 'Throw {n} throwables', d: 4 }, ults: { text: 'Fire {n} ultimates', d: 2 }, walls: { text: 'Wall jump {n} times', d: 5 },
-  orbs: { text: 'Grab {n} power-up orbs', d: 4 }, taunts: { text: 'Finish {n} safe taunts', d: 3 }, grabs: { text: 'Grab-throw {n} foes', d: 3 },
-  heads: { text: 'Land {n} head hits', d: 8 }, rounds: { text: 'Win {n} rounds', d: 6 }, pets: { text: 'Let your pet help {n} times', d: 4 },
-  minis: { text: 'Win {n} party mini-games', d: 1 },
-};
-const TASK_REWARD = { daily: { xp: 120, coins: 40 }, weekly: { xp: 400, coins: 150 } };
-function taskRng(seed) {
-  let h = 2166136261;
-  for (const ch of seed) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
-  return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^= h >>> 16) >>> 0) / 4294967296; };
-}
-const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const dayKey = (d = new Date()) => ymd(d);
-const weekKey = (d = new Date()) => ymd(new Date(d.getFullYear(), d.getMonth(), d.getDate() - (d.getDay() + 6) % 7));   // that week's Monday
-function taskDraw(seed, n, avoid = []) {
-  const rng = taskRng(seed), keys = Object.keys(TASKS).filter(k => !avoid.includes(k)), out = [];
-  while (out.length < n && keys.length) out.push(keys.splice(Math.floor(rng() * keys.length), 1)[0]);
-  return out;
-}
-const taskNew = (k, weekly) => ({ k, n: 0, need: TASKS[k].d * (weekly ? 5 : 1), done: false });
-function tasksNow() {
-  const s = store.getObj('tasks'), day = dayKey(), wk = weekKey();
-  let dirty = false;
-  if (s.day !== day || !Array.isArray(s.daily)) { s.day = day; s.daily = taskDraw('d' + day, 3).map(k => taskNew(k, false)); dirty = true; }
-  if (s.week !== wk || !Array.isArray(s.weekly)) { s.week = wk; s.weekly = taskDraw('w' + wk, 3).map(k => taskNew(k, true)); dirty = true; }
-  if (dirty) store.set('tasks', s);
-  return s;
-}
-const taskCanReroll = () => tasksNow().rerolled !== dayKey();
-function taskReroll(i) {
-  const s = tasksNow(), cur = s.daily[i];
-  if (!cur || cur.done || !taskCanReroll()) return false;
-  const [k] = taskDraw('r' + s.day + i, 1, s.daily.map(t => t.k));
-  if (!k) return false;
-  s.daily[i] = taskNew(k, false); s.rerolled = s.day;
-  store.set('tasks', s);
-  return true;
-}
-function taskBump(key, n = 1) {
-  const s = tasksNow();
-  let changed = false;
-  for (const [list, kind] of [[s.daily, 'daily'], [s.weekly, 'weekly']]) for (const t of list) {
-    if (t.k !== key || t.done) continue;
-    t.n = Math.min(t.need, t.n + n); changed = true;
-    if (t.n >= t.need) taskComplete(t, kind);
-  }
-  if (changed) store.set('tasks', s);
-}
-function taskComplete(t, kind) {
-  t.done = true;
-  const r = TASK_REWARD[kind];
-  addCoins(r.coins);
-  addXp(r.xp, 'quest');
-  if (typeof toast === 'function') toast(`${capitalWord(kind)} quest done!`, `${taskText(t)}  +${r.xp} XP · +${r.coins} coins`, '📜', '#9dff5a');
-  emit('taskDone', t, kind);
-}
-const capitalWord = s => s[0].toUpperCase() + s.slice(1);
-const taskText = t => TASKS[t.k].text.replace('{n}', t.need);
-// Event wiring: only real players in real matches.
-const taskBy = (f, key, n) => { if (progReal() && isRealPlayer(f)) taskBump(key, n); };
-on('hit', A => taskBy(A, 'hits'));
-on('damage', (B, a, o) => { if (o && o.head && o.src) taskBy(o.src, 'heads'); });
-on('ko', (V, K) => { if (K && V !== K && !V.summon) taskBy(K, 'kos'); });
-on('skill', f => taskBy(f, 'skills'));
-on('parry', B => taskBy(B, 'parry'));
-on('throwable', f => taskBy(f, 'throws'));
-on('ultimate', f => taskBy(f, 'ults'));
-on('wallJump', f => taskBy(f, 'walls'));
-on('orb', f => taskBy(f, 'orbs'));
-on('throw', A => taskBy(A, 'grabs'));
-on('tauntDone', f => taskBy(f, 'taunts'));
-on('petUse', f => taskBy(f, 'pets'));
-on('miniEnd', (k, f) => { if (f) taskBy(f, 'minis'); });
-on('roundEnd', w => { if (progReal()) for (const f of F.filter(isRealPlayer)) if (f.team === w) taskBump('rounds'); });
-on('matchOver', () => { if (!progReal()) return; taskBump('play'); if (MATCH_TRACK.reward && MATCH_TRACK.reward.won) taskBump('win'); });
-
 // ---------- secrets and cheat codes ----------
 // Codes are typed on the title screen. Feats unlock during play. Found secrets show in the codex; the rest are ???.
+// Finding one un-hides its reward (a hidden def stays out of every menu until then).
 const SECRETS = {
   konami: { name: 'Retro Soul', code: '↑↑↓↓←→←→BA', hint: 'A very old code from very old games.', reward: 'Big Heads mutator + title',
-    give() { lookGrant('title', 'retro'); } },
+    give() { secretShow(TITLES, 'retro'); } },
   cluck: { name: 'Rubber Chicken', code: 'CLUCK', hint: 'What does the chicken say?', reward: 'Secret weapon', give() { secretShow(WEAPONS, 'rubber-chicken'); } },
   shiny: { name: 'Prism Crown', code: 'SHINY', hint: 'Something that sparkles.', reward: 'Secret hat', give() { secretShow(HATS, 'prism'); } },
-  boogie: { name: 'Disco Fever', code: 'BOOGIE', hint: 'Get down on the title screen.', reward: 'Secret K.O. effect', give() { secretShow(KOFX, 'disco'); lookGrant('ko', 'disco'); } },
-  nightowl: { name: 'Night Owl', hint: 'Finish a match in the small hours.', reward: 'Title', give() { lookGrant('title', 'night-owl'); } },
+  boogie: { name: 'Disco Fever', code: 'BOOGIE', hint: 'Get down on the title screen.', reward: 'Secret K.O. effect', give() { secretShow(KOFX, 'disco'); } },
+  nightowl: { name: 'Night Owl', hint: 'Finish a match in the small hours.', reward: 'Title', give() { secretShow(TITLES, 'night-owl'); } },
   showoff: { name: 'Show-off', hint: 'Taunt safely three times in one match, then win it.', reward: 'Secret outfit',
-    give() { secretShow(OUTFITS, 'jester'); lookGrant('outfit', 'jester'); } },
+    give() { secretShow(OUTFITS, 'jester'); } },
 };
 function secretShow(reg, key) { if (reg[key]) reg[key].hidden = false; }
 const secretFound = key => !!PROG.secrets[key];
@@ -235,7 +85,7 @@ on('boot', () => { for (const k in PROG.secrets) if (SECRETS[k]) SECRETS[k].give
 function secretFeats(won) {
   const h = new Date().getHours();
   if (h < 5) secretUnlock('nightowl');
-  if (won && PROG_MATCH.taunts >= 3) secretUnlock('showoff');
+  if (won && FEAT_MATCH.taunts >= 3) secretUnlock('showoff');
 }
 // Title-screen typing: keeps the last keys and checks every code's ending.
 const CHEAT = { buf: '' };
@@ -274,7 +124,7 @@ defWeapon('rubber-chicken', {
   },
 });
 defHat('prism', {
-  name: 'Prism Crown', hidden: true, price: 0, order: 99,
+  name: 'Prism Crown', hidden: true, order: 99,
   draw(ctx, f, h) {
     const r = h.r, y = -r * .75, t = hatT();
     ['#ff5ad1', '#ffd84a', '#5ef2ff', '#9dff5a', '#b98cff'].forEach((c, k) => {
@@ -314,10 +164,16 @@ const LORE_CAT = {
   shield: ['The {n} has never lost an argument, only gained dents.', 'Behind the {n}, even a rookie feels like a wall.'],
 };
 // The hand-written lines in 79-lore.js come first; the generator below covers anything added without a line.
+// Seeded by the entry, so a generated line never changes between visits.
+function loreRng(seed) {
+  let h = 2166136261;
+  for (const ch of seed) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^= h >>> 16) >>> 0) / 4294967296; };
+}
 function codexLore(kind, key, name, cat) {
   const t = typeof LORE_LINES === 'object' && LORE_LINES[kind] && LORE_LINES[kind][key];
   if (t) return t;
-  const rng = taskRng(kind + key), pickR = a => a[Math.floor(rng() * a.length)];
+  const rng = loreRng(kind + key), pickR = a => a[Math.floor(rng() * a.length)];
   const pool = kind === 'w' && LORE_CAT[cat] && rng() < .7 ? LORE_CAT[cat] : LORE[kind] || LORE.w;
   const line1 = pickR(pool).replace(/\{(\w+)\}/g, (_, k) => (k === 'n' ? name : pickR(LORE_FILL[k])));
   return line1[0].toUpperCase() + line1.slice(1) + ' ' + pickR(LORE_END);

@@ -1,6 +1,6 @@
-// 95-ui.js: the menu framework (DOM builder, screens, keyboard + gamepad navigation, toasts, coin badge) and the
-// title, mode-select and arena-select screens. The loadout screen is in 96-ui-loadout.js; settings, controls, help,
-// shop, stats, pause and results are in 97-ui-pages.js. Panels follow G_STATE.state via on('state') (wired in 97).
+// 95-ui.js: the menu framework (DOM builder, screens, keyboard + gamepad navigation, toasts) and the title,
+// mode-select and arena-select screens. The loadout screen is in 96-ui-loadout.js; settings, controls, help,
+// trophies & stats, pause and results are in 97-ui-pages.js. Panels follow G_STATE.state via on('state') (wired in 97).
 
 const UI_ROOT = document.getElementById('ui');
 const CAT_NAMES = { blade: 'Blades', heavy: 'Heavy', polearm: 'Polearms', chain: 'Chains', fist: 'Fists', ranged: 'Ranged',
@@ -88,19 +88,13 @@ function refreshScreen() {
 }
 
 // ---------- shared pieces ----------
-function coinBadge() {
-  return el('span', { class: 'coins', title: 'Coins: earn them in matches, spend them in the Shop' }, el('i', { 'aria-hidden': 'true' }), el('b', { text: PROFILE.coins.toLocaleString() }));
-}
-on('coins', total => { for (const b of document.querySelectorAll('.coins b')) b.textContent = total.toLocaleString(); });
-
-// A full-screen sheet: header (back, title, coins), scrolling body, footer buttons.
+// A full-screen sheet: header (back, title, extras), scrolling body, footer buttons.
 function sheet(title, body, footer, opts = {}) {
   return el('div', { class: 'sheet' + (opts.cls ? ' ' + opts.cls : '') },
     el('header', { class: 'sheet-head' },
       el('button', { class: 'back', 'aria-label': 'Back', onclick: goBack }, '◂ Back'),
       el('h2', {}, title),
-      opts.headExtra || null,
-      coinBadge()),
+      opts.headExtra || null),
     el('div', { class: 'sheet-body' }, body),
     footer ? el('footer', { class: 'sheet-foot' }, footer) : null);
 }
@@ -130,12 +124,11 @@ SCREENS.menu = () => {
         item('Quick Fight', quickSummary(), startFromMenu, 'go'),
         item('Play', 'Pick a mode, loadout and arena', () => openScreen('modes', 'menu')),
         typeof questMenuItems === 'function' ? questMenuItems(item) : null,   // Mythic Quest + Challenges (98-campaign-ui)
-        item('Shop', `${ownedHats().length - 1}/${listOf(HATS).length - 1} hats · colour packs`, () => openScreen('shop', 'menu')),
         item('Trophies & Stats', `${done}/${Object.keys(ACHIEVEMENTS).length} trophies`, () => openScreen('stats', 'menu')),
         item('Settings', 'Rounds, speed, effects, sound', () => openScreen('settings', 'menu')),
         item('Controls', 'Keys, rebinding, gamepads', () => openScreen('controls', 'menu')),
         item('How to Play', 'Moves, skills, orbs, tips', () => openScreen('howto', 'menu'))),
-      el('div', { class: 'title-foot' }, coinBadge(), typeof rankBadge === 'function' ? rankBadge() : null, el('span', { class: 'hint', text: IS_TOUCH ? `v${VERSION}` : `↑↓ choose · Enter select · Esc back · v${VERSION}` }))));
+      el('div', { class: 'title-foot' }, typeof rankBadge === 'function' ? rankBadge() : null, el('span', { class: 'hint', text: IS_TOUCH ? `v${VERSION}` : `↑↓ choose · Enter select · Esc back · v${VERSION}` }))));
 };
 
 // ---------- mode select ----------
@@ -270,6 +263,7 @@ function menuCfg() {
     weather: wxMenuPick(),                        // 58-world: 'random' | 'clear' | a WEATHER key
     mutators: typeof mutatorsPicked === 'function' ? mutatorsPicked() : [],   // 79-mutators (picked on the arena screen)
     joined: joinCfg(mode),                        // 93-pads: local players from the join lobby (crowd modes)
+    ...duoMenuCfg(mode),                          // 73: round length, handicap, silly rules
   };
 }
 function loadoutForMatch(i) {
@@ -279,7 +273,8 @@ function loadoutForMatch(i) {
     throws: lo.throws.map(k => k === 'none' ? null : k), persona: lo.persona,   // persona: the CPU rival (67)
     look: typeof lookForMatch === 'function' ? lookForMatch(lo, isCpuPicker(i)) : undefined };   // outfit, skins, pet... (98-ui-progress)
 }
-// The saved loadout for picker i, filled with defaults (humans keep owned hats/colours only).
+// The saved loadout for picker i, filled with defaults. Every hat and colour is free; an unknown one, or a secret hat or
+// weapon not found yet (hidden), falls back.
 function menuLoadout(i) {
   const cpuSide = isCpuPicker(i);
   const lo = MENU.loadouts[i] = MENU.loadouts[i] || {};   // edited in place: screens hold on to this object
@@ -290,8 +285,9 @@ function menuLoadout(i) {
   if (!Array.isArray(lo.throws)) lo.throws = ['random', 'random'];
   if (lo.cls !== 'random' && !CLASSES[lo.cls]) lo.cls = 'random';
   if (lo.hat === 'random' && !cpuSide) lo.hat = 'none';
-  if (lo.hat !== 'random' && (!HATS[lo.hat] || !ownsHat(lo.hat))) lo.hat = 'none';
-  if (!/^#[0-9a-f]{6}$/i.test(lo.color || '') || !ownsColor(lo.color)) lo.color = DEFAULT_COLORS[i % 4];
+  if (lo.hat !== 'random' && (!HATS[lo.hat] || HATS[lo.hat].hidden)) lo.hat = 'none';
+  if (lo.weapon !== 'random' && (!WEAPONS[lo.weapon] || WEAPONS[lo.weapon].hidden)) lo.weapon = 'random';
+  if (!/^#[0-9a-f]{6}$/i.test(lo.color || '')) lo.color = DEFAULT_COLORS[i % 4];
   return lo;
 }
 // Whether picker i of the current mode is a CPU (from the mode's labels, e.g. ['You', 'CPU']).
@@ -311,8 +307,8 @@ function startFromMenu() {
 const NAV_DIRS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0] };
 const menusActive = () => G_STATE.state !== 'play' && G_STATE.state !== 'killcam' && !!activePanel();
 
-function focusables(panel) {
-  return [...panel.querySelectorAll('button, input, select, [tabindex="0"]')].filter(e => !e.disabled && e.offsetParent !== null);
+function focusables(panel) {   // tabindex="-1" controls (the weapon grid's ☆) stay out of the arrow / d-pad order
+  return [...panel.querySelectorAll('button, input, select, [tabindex="0"]')].filter(e => !e.disabled && e.offsetParent !== null && e.tabIndex >= 0);
 }
 // Moves focus to the nearest control in a direction (spatial navigation), so arrows work on grids and lists alike.
 function moveFocus(dir) {
@@ -326,7 +322,10 @@ function moveFocus(dir) {
   for (const e of list) {
     if (e === cur) continue;
     const b = e.getBoundingClientRect(), bx = b.left + b.width / 2, by = b.top + b.height / 2;
-    const along = (bx - ax) * dir[0] + (by - ay) * dir[1], perp = Math.abs((bx - ax) * dir[1] - (by - ay) * dir[0]);
+    // Sideways offset to the target's nearest edge, not its centre: a wide control (the weapon search box, a full-width
+    // menu row) right above or below counts as in line.
+    const sx = clamp(ax, b.left, b.right), sy = clamp(ay, b.top, b.bottom);
+    const along = (bx - ax) * dir[0] + (by - ay) * dir[1], perp = Math.abs((sx - ax) * dir[1] - (sy - ay) * dir[0]);
     if (along <= 4) continue;
     const score = along + perp * 2.2;
     if (score < bestScore) { bestScore = score; best = e; }
@@ -388,7 +387,7 @@ function uiPadRead() {
   const gp = navigator.getGamepads ? Array.from(navigator.getGamepads()).find(Boolean) : null;
   if (!gp) return null;
   const btn = i => !!(gp.buttons[i] && gp.buttons[i].pressed), ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
-  return { up: btn(12) || ay < -.6, down: btn(13) || ay > .6, left: btn(14) || ax < -.6, right: btn(15) || ax > .6, a: btn(0), b: btn(1) };
+  return { up: btn(12) || ay < -.6, down: btn(13) || ay > .6, left: btn(14) || ax < -.6, right: btn(15) || ax > .6, a: btn(0), b: btn(1), y: btn(3) };
 }
 function uiPadLoop(now) {
   requestAnimationFrame(uiPadLoop);
@@ -410,6 +409,7 @@ function uiPadLoop(now) {
   if (now2.a) UI_FRESH.padUpAt = 0;
   if (now2.a && !was.a && fresh) uiPadPress();
   else if (now2.b && !was.b) uiPadBack();
+  else if (now2.y && !was.y) emit('menuAlt');   // Y: the focused control's second action (96: favourite the weapon)
 }
 // B: back one screen in the menus; in the pause menu it backs out of Settings/Controls, then resumes.
 function uiPadBack() {
@@ -423,7 +423,7 @@ function uiPadPress() {
 }
 requestAnimationFrame(uiPadLoop);
 
-// ---------- toasts (achievements, purchases) ----------
+// ---------- toasts (trophies, secrets, notices) ----------
 const TOASTS = el('div', { class: 'toasts', 'aria-live': 'polite' });
 UI_ROOT.append(TOASTS);
 function toast(title, sub, icon = '★', color = '#ffd84a') {
@@ -436,12 +436,13 @@ function toast(title, sub, icon = '★', color = '#ffd84a') {
   setTimeout(() => t.remove(), 4100);
 }
 // Toasts stay out of the kill-cam replay (the results screen lists the match's new trophies anyway).
-on('state', now => { TOASTS.style.visibility = now === 'killcam' ? 'hidden' : ''; });
-// On the results screen new trophies are listed in the reward box instead of toasting over the buttons.
-on('achievement', a => { if (G_STATE.state === 'over') return; toast('Trophy unlocked: ' + a.name, `${a.desc}  +${a.coins} coins`, a.icon); uiSfx('unlock'); });
+// On the results card they sit at the top, clear of its buttons.
+on('state', now => { TOASTS.style.visibility = now === 'killcam' ? 'hidden' : ''; TOASTS.classList.toggle('top', now === 'over'); });
+// On the results screen new trophies are listed on the card instead of toasting over the buttons.
+on('achievement', a => { if (G_STATE.state === 'over') return; toast('Trophy unlocked: ' + a.name, a.desc, a.icon); uiSfx('unlock'); });
 
 defSfx('nav', () => tone(620, 700, .03, 'triangle', .025));
 defSfx('back', () => tone(700, 480, .06, 'triangle', .05));
 defSfx('unlock', () => { tone(660, 660, .1, 'square', .05); tone(880, 880, .1, 'square', .05, .1); tone(1320, 1320, .25, 'triangle', .07, .2); });
-defSfx('coin', () => { tone(1250, 1250, .05, 'square', .04); tone(1650, 1650, .18, 'square', .04, .06); });
+defSfx('chime', () => { tone(1250, 1250, .05, 'square', .04); tone(1650, 1650, .18, 'square', .04, .06); });
 defSfx('deny', () => tone(220, 160, .14, 'square', .05));

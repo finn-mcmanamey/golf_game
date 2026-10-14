@@ -1,8 +1,9 @@
-// 96-ui-loadout.js: the loadout screen (one tab per picker): weapon grid by category with drawn icons, skill picker
-// (choose 2), colour + hat picker, and a live preview of the fighter with stat bars. Previews use real fighters from
-// makeFighter (never added to F) posed by hand, so every weapon and hat draws exactly as it does in the arena.
+// 96-ui-loadout.js: the loadout screen (one tab per picker): weapon grid by category with drawn icons, a search box,
+// favourites and a Recent row, skill picker (choose 2), colour + hat picker (all free), and a live preview of the
+// fighter with stat bars. Previews use real fighters from makeFighter (never added to F) posed by hand, so every
+// weapon and hat draws exactly as it does in the arena.
 
-const LO = { picker: 0, tab: 'weapon', cat: 'all', confirm: null };
+const LO = { picker: 0, tab: 'weapon', cat: 'all', query: '' };   // query: the weapon search box (kept between rebuilds)
 const LIVE_CANVASES = new Set();
 const PREVIEW_FIGHTERS = new Map();
 
@@ -168,7 +169,7 @@ function iconMeasure(f, thick) {
 // handed back on every rebuild: a tap on the loadout no longer redraws ~55 icons (and allocates their backing stores)
 // each time. The cache is emptied when it grows past UI_TILE_MAX entries (a few colour sets).
 const UI_TILES = new Map();
-const UI_TILE_MAX = 240;
+const UI_TILE_MAX = 320;   // ~51 weapons × 2 colours + the Recent row, ~34 hats × 2 and the Codex icons fit
 function uiTile(id, w, h, cls, draw) {
   const dpr = Math.min(2, window.devicePixelRatio || 1), key = `${id}|${w}x${h}|${dpr}`;
   let c = UI_TILES.get(key);
@@ -238,7 +239,7 @@ SCREENS.loadout = () => {
   const tabs = n > 1 ? el('div', { class: 'player-tabs', role: 'tablist' }, Array.from({ length: n }, (_, k) => {
     const l = menuLoadout(k);
     return el('button', { role: 'tab', 'aria-selected': String(k === i), 'data-key': 'picker-' + k, style: { '--pc': l.color },
-      onclick: () => { LO.picker = k; LO.confirm = null; uiSfx('click'); refreshScreen(); } }, el('i'), labels[k] || `Fighter ${k + 1}`);
+      onclick: () => { LO.picker = k; uiSfx('click'); refreshScreen(); } }, el('i'), labels[k] || `Fighter ${k + 1}`);
   })) : null;
   const sections = [['weapon', 'Weapon'], ['skills', 'Skills'], ['class', 'Class'], ['gear', 'Throwables'], ['style', 'Style'], ['look', 'Look']];
   const subTabs = el('div', { class: 'seg sub-tabs', role: 'tablist' }, sections.map(([k, t]) =>
@@ -251,7 +252,7 @@ SCREENS.loadout = () => {
     last ? mode.loadoutLabel || 'Arena ▸' : `Next: ${labels[i + 1] || 'Fighter ' + (i + 2)} ▸`);
   return sheet('Loadout', [tabs, typeof presetBar === 'function' ? presetBar(i, lo) : null, el('div', { class: 'lo-grid', style: { '--pc': lo.color } },
     previewPane(i, lo, label), el('div', { class: 'lo-pick' }, subTabs, content))],
-  [uiButton('◂ Back', goBack, 'foot-back'), last ? null : uiButton('Skip to arena', () => openScreen('maps', 'loadout'), 'skip'), next], { cls: 'sheet-loadout' });
+  [uiButton('◂ Back', goBack, 'foot-back'), last || mode.loadoutNext ? null : uiButton('Skip to arena', () => openScreen('maps', 'loadout'), 'skip'), next], { cls: 'sheet-loadout' });
 };
 
 function previewPane(i, lo, label) {
@@ -302,10 +303,16 @@ function classTab(i, lo) {
     el('div', { class: 'skill-grid class-grid' }, random, tiles));
 }
 
+// The key picker i's player presses for an action now (90's keySets: Compact 2P aware); '' for a CPU picker or no key.
+function pickerKey(i, act) {
+  const b = !isCpuPicker(i) && keySets()[pickPlayer(i)];
+  return b && b[act] ? keyLabel(b[act]) : '';
+}
+
 // ---------- throwables tab ----------
 function gearTab(i, lo) {
   const th = lo.throws, set = (a, b) => { lo.throws = [a, b]; saveMenu(); uiSfx('click'); refreshScreen(); };
-  const human = !isCpuPicker(i), key = human && BINDS[Math.min(i, 1)] ? keyLabel(BINDS[Math.min(i, 1)].throw) : '';
+  const key = pickerKey(i, 'throw');
   const slots = el('div', { class: 'skill-slots' }, [0, 1].map(s => {
     const d = THROWABLES[th[s]];
     return el('div', { class: 'slot', style: d ? { '--sc': d.color } : null }, el('small', { text: `Throw ${s + 1}` + (key ? ` · key ${key}` : '') }),
@@ -331,31 +338,138 @@ function gearTab(i, lo) {
     el('p', { class: 'hint', text: 'Pick two throwables. Each can be thrown once per round, lobbed at the nearest foe.' }), slots, grid);
 }
 
+// ---------- favourite and recent weapons ----------
+// Saved per player as store 'picks' = { fav: [[P1 keys], [P2 keys]], recent: [[...], [...]] } (recent: newest first).
+const PICKS_RECENT = 6;
+const PICKS = (() => {
+  const s = store.getObj('picks');
+  const lists = v => [0, 1].map(k => (Array.isArray(v) && Array.isArray(v[k]) ? v[k] : []).filter(x => typeof x === 'string').slice(0, 80));
+  return { fav: lists(s.fav), recent: lists(s.recent) };
+})();
+const picksSave = () => store.set('picks', PICKS);
+// Whose lists picker i shows: human pickers in order are P1 and P2; a CPU picker shows P1's (P1 is choosing for it).
+function pickPlayer(i) {
+  const own = (MODES[MENU.mode] || {}).pickerOwner;   // Tag Team (74)
+  if (own) return own[i] || 0;
+  if (isCpuPicker(i)) return 0;
+  let n = 0;
+  for (let k = 0; k < i; k++) if (!isCpuPicker(k)) n++;
+  return Math.min(n, 1);
+}
+// Keys of weapons that exist and aren't secret: a favourite secret weapon waits until it is found again.
+const picksLive = list => list.filter(k => WEAPONS[k] && !WEAPONS[k].hidden);
+function favToggle(p, key) {
+  const list = PICKS.fav[p], at = list.indexOf(key);
+  if (at >= 0) list.splice(at, 1); else list.push(key);
+  picksSave();
+  return at < 0;
+}
+// The weapon a real player carries into a match joins the front of their Recent row. matchStart fires once round 1's
+// fighters exist (and after 75 has decided whether this match counts).
+on('matchStart', () => {
+  if (!MATCH_TRACK.active || G_STATE.cfg.autopilot) return;
+  const used = F.filter(f => isRealPlayer(f) && (f.slot === 0 || f.slot === 1) && WEAPONS[f.wkey] && !WEAPONS[f.wkey].hidden);
+  for (const f of used) PICKS.recent[f.slot] = [f.wkey, ...PICKS.recent[f.slot].filter(k => k !== f.wkey)].slice(0, PICKS_RECENT);
+  if (used.length) picksSave();
+});
+
 // ---------- weapon tab ----------
+// Category chips (with Favourites), a search box, the Recent row and a star on every weapon. Typing filters the tiles in
+// place (weaponFilter), so the box keeps its focus and caret; a rebuild re-applies LO.query.
 function weaponTab(i, lo) {
-  const all = listOf(WEAPONS), cats = WEAPON_CATS.filter(c => all.some(w => w.cat === c));
-  if (LO.cat !== 'all' && !cats.includes(LO.cat)) LO.cat = 'all';
-  const chips = el('div', { class: 'cat-chips', role: 'group', 'aria-label': 'Weapon category' },
-    [['all', 'All', '★'], ...cats.map(c => [c, CAT_NAMES[c] || c, CAT_ICONS[c] || ''])].map(([c, name, icon]) =>
-      el('button', { 'aria-pressed': String(LO.cat === c), 'data-key': 'cat-' + c, onclick: () => { LO.cat = c; uiSfx('click'); refreshScreen(); } },
-        icon + ' ' + name + (c === 'all' ? '' : ` ${all.filter(w => w.cat === c).length}`))));
+  const all = listOf(WEAPONS), cats = WEAPON_CATS.filter(c => all.some(w => w.cat === c)), p = pickPlayer(i), favs = picksLive(PICKS.fav[p]);
+  if (!['all', 'fav', ...cats].includes(LO.cat)) LO.cat = 'all';
+  const chip = (c, label) => el('button', { 'aria-pressed': String(LO.cat === c), 'data-key': 'cat-' + c, onclick: () => { LO.cat = c; uiSfx('click'); refreshScreen(); } }, label);
+  const chips = el('div', { class: 'cat-chips', role: 'group', 'aria-label': 'Weapon category' }, chip('all', 'All'), chip('fav', `★ Favourites ${favs.length}`),
+    cats.map(c => chip(c, `${CAT_ICONS[c] || ''} ${CAT_NAMES[c] || c} ${all.filter(w => w.cat === c).length}`)));
   const pick = key => () => { lo.weapon = key; saveMenu(); uiSfx('click'); refreshScreen(); };
-  const groups = (LO.cat === 'all' ? cats : [LO.cat]).map(c => el('section', { class: 'w-group' },
-    el('h4', { text: `${CAT_ICONS[c] || ''} ${CAT_NAMES[c] || c}` }),
-    el('div', { class: 'tile-grid' }, all.filter(w => w.cat === c).map(w => {
-      const c2 = uiTile(`w|${w.key}|${lo.color}`, 132, 54, null, cnv => drawWeaponIcon(cnv, w.key, lo.color));
-      return el('button', { class: 'tile w-tile' + (lo.weapon === w.key ? ' sel' : ''), 'data-key': 'w-' + w.key, title: w.desc, onclick: pick(w.key) },
-        c2, el('span', { text: w.name }));
-    }))));
+  const group = (title, list, empty) => el('section', { class: 'w-group' }, el('h4', { text: title }),
+    list.length ? el('div', { class: 'tile-grid' }, list.map(w => weaponCell(w, lo, p, pick(w.key)))) : el('p', { class: 'hint', text: empty }));
+  const groups = LO.cat === 'fav' ? [group('★ Favourites', favs.map(k => WEAPONS[k]), `No favourites yet: ${touchUI() ? 'tap' : 'click'} the ☆ on any weapon.`)]
+    : (LO.cat === 'all' ? cats : [LO.cat]).map(c => group(`${CAT_ICONS[c] || ''} ${CAT_NAMES[c] || c}`, all.filter(w => w.cat === c)));
   const random = el('button', { class: 'tile w-tile random' + (WEAPONS[lo.weapon] ? '' : ' sel'), 'data-key': 'w-random', onclick: pick('random') },
     el('span', { class: 'big-icon', text: '🎲' }), el('span', { text: 'Random each match' }));
-  return el('div', { class: 'tab-body' }, chips, el('div', { class: 'tile-grid' }, random), groups);
+  const body = el('div', { class: 'tab-body w-tab' }, weaponSearchBox(), chips,
+    el('div', { class: 'w-browse' }, LO.cat === 'all' ? recentRow(lo, p, pick) : null, el('div', { class: 'tile-grid' }, random)), groups);
+  weaponFilter(body, LO.query);
+  return body;
+}
+// One weapon: its tile (picks it) and a star in the corner (favourite, updated in place). data-find is what the search
+// box matches: name, key, category, description and traits.
+function weaponCell(w, lo, p, onpick) {
+  const find = [w.name, w.key, w.cat, CAT_NAMES[w.cat], w.desc, ...weaponTraits(w)].join(' ').toLowerCase();
+  const star = el('button', { class: 'w-fav', tabindex: '-1', 'data-key': 'fav-' + w.key, onclick: () => {   // arrows skip it (favFocused)
+    const on = favToggle(p, w.key), chip = document.querySelector('#loadout [data-key="cat-fav"]');
+    favStar(star, w, on); uiSfx(on ? 'chime' : 'click');
+    if (chip) chip.textContent = `★ Favourites ${picksLive(PICKS.fav[p]).length}`;
+  } });
+  favStar(star, w, PICKS.fav[p].includes(w.key));
+  return el('div', { class: 'w-cell', 'data-find': find },
+    el('button', { class: 'tile w-tile' + (lo.weapon === w.key ? ' sel' : ''), 'data-key': 'w-' + w.key, title: w.desc, onclick: onpick },
+      uiTile(`w|${w.key}|${lo.color}`, 132, 54, null, cnv => drawWeaponIcon(cnv, w.key, lo.color)), el('span', { text: w.name })),
+    star);
+}
+// F or a pad's Y favourites the tile in focus, so the ☆ can stay out of the arrow / d-pad order.
+function favFocused() {
+  const a = document.activeElement, cell = a && a.closest && a.closest('#loadout .w-cell'), star = cell && cell.querySelector('.w-fav');
+  if (star) star.click();
+  return !!star;
+}
+on('menuAlt', favFocused);
+addEventListener('keydown', e => { if (e.code === 'KeyF' && !e.repeat && menusActive() && !typingIn(e.target) && favFocused()) e.preventDefault(); });
+function favStar(b, w, on) {
+  b.textContent = on ? '★' : '☆';
+  b.setAttribute('aria-pressed', String(on));
+  b.setAttribute('aria-label', `Favourite: ${w.name}`);
+  b.title = on ? 'Remove from favourites' : 'Add to favourites';
+}
+// Up to six weapons this player used lately, newest first (shown while browsing everything).
+function recentRow(lo, p, pick) {
+  const list = picksLive(PICKS.recent[p]);
+  if (!list.length) return null;
+  return el('div', { class: 'w-recent', role: 'group', 'aria-label': 'Recent weapons' }, el('span', { class: 'lbl', text: 'Recent' }),
+    list.map(k => el('button', { class: 'w-chip' + (lo.weapon === k ? ' sel' : ''), 'data-key': 'wr-' + k, title: WEAPONS[k].desc, onclick: pick(k) },
+      uiTile(`wr|${k}|${lo.color}`, 56, 24, null, c => drawWeaponIcon(c, k, lo.color)), el('span', { text: WEAPONS[k].name }))));
+}
+// The search box. The menu's key navigation leaves text fields alone (typingIn, 95-ui), so W/A/S/D type; here ↓ goes
+// to the first match (or the next row), ↑ to the row above, Enter picks the first match and Esc clears the text first.
+function weaponSearchBox() {
+  const box = el('input', { class: 'w-search', type: 'search', value: LO.query, placeholder: 'Search weapons: name, type or effect',
+    'aria-label': 'Search weapons by name, type or effect', 'data-key': 'w-search', autocomplete: 'off', spellcheck: 'false', enterkeyhint: 'search',
+    oninput: e => { LO.query = e.target.value; weaponFilter(e.target.closest('.w-tab'), LO.query); },
+    onkeydown: weaponSearchKey });
+  return el('div', { class: 'w-find' }, box, el('small', { class: 'w-found', role: 'status' }),
+    touchUI() ? null : el('small', { class: 'w-tip', text: 'F or pad Y: ★ favourite the weapon in focus' }));
+}
+function weaponSearchKey(e) {
+  const tab = e.target.closest('.w-tab'), first = tab && tab.querySelector('.w-cell:not([hidden]) .w-tile');
+  if (e.key === 'Escape' && e.target.value) {
+    e.preventDefault(); e.stopPropagation();
+    e.target.value = LO.query = ''; weaponFilter(tab, '');
+  } else if (e.key === 'Enter' && LO.query.trim() && first) {
+    e.preventDefault(); first.focus(); first.click();   // picks it; the rebuild keeps the focus on its tile
+  } else if (e.key === 'ArrowDown' && LO.query.trim() && first) {
+    e.preventDefault(); first.focus(); first.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault(); moveFocus([0, e.key === 'ArrowDown' ? 1 : -1]);
+  }
+}
+// Shows the weapons whose search text holds every typed word, hides groups left empty and, while searching, the
+// Random tile and the Recent row.
+function weaponFilter(tab, query) {
+  if (!tab) return;
+  const words = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
+  let n = 0;
+  for (const c of tab.querySelectorAll('.w-cell')) { const hit = words.every(w => c.dataset.find.includes(w)); c.hidden = !hit; if (hit) n++; }
+  for (const g of tab.querySelectorAll('.w-group')) g.hidden = !!words.length && !g.querySelector('.w-cell:not([hidden])');
+  for (const b of tab.querySelectorAll('.w-browse, .w-tip')) b.hidden = !!words.length;
+  const found = tab.querySelector('.w-found');
+  if (found) found.textContent = !words.length ? '' : n ? `${n} found` : 'No weapon matches. Try a type like “blade” or an effect like “fire”.';
 }
 
 // ---------- skills tab ----------
 function skillsTab(i, lo) {
-  const human = !isCpuPicker(i), sk = lo.skills;
-  const keyFor = s => human && BINDS[Math.min(i, 1)] ? keyLabel(BINDS[Math.min(i, 1)]['skill' + (s + 1)]) : '';
+  const sk = lo.skills, keyFor = s => pickerKey(i, 'skill' + (s + 1));
   const setSkills = (a, b) => { lo.skills = [a, b]; saveMenu(); uiSfx('click'); refreshScreen(); };
   const slots = el('div', { class: 'skill-slots' }, [0, 1].map(s => {
     const d = SKILLS[sk[s]];
@@ -391,52 +505,17 @@ function skillsTab(i, lo) {
   return el('div', { class: 'tab-body' }, el('p', { class: 'hint', text: `Choose two skills. ${touch ? 'Tap' : 'Click'} a chosen skill again to drop it.` }), slots, info, grid);
 }
 
-// ---------- style tab (colour + hat) ----------
+// ---------- style tab (colour + hat): every colour pack and hat is free ----------
 function styleTab(i, lo) {
-  const cpu = isCpuPicker(i);
-  const swatches = COLOR_PACKS.map(p => {
-    const owned = ownsPack(p.key);
-    return el('div', { class: 'pack-row' + (owned ? '' : ' locked') },
-      el('small', { text: p.name + (owned ? '' : ` · 🔒 ${p.price}`) }),
-      el('div', { class: 'swatches' }, p.colors.map(c => el('button', {
-        class: 'swatch' + (lo.color === c ? ' sel' : ''), style: { '--c': c }, 'data-key': 'col-' + c,
-        'aria-label': owned ? `Colour ${c}` : `Locked: buy ${p.name} for ${p.price} coins`,
-        onclick: () => owned ? (lo.color = c, saveMenu(), uiSfx('click'), refreshScreen()) : tryBuy('pack', p.key, () => { lo.color = c; saveMenu(); }),
-      }, owned ? null : el('span', { text: LO.confirm === 'pack:' + p.key ? '?' : '🔒' })))));
-  });
-  const hats = listOf(HATS).map(h => hatTile(h, lo));
-  if (cpu) hats.unshift(el('button', { class: 'tile hat-tile' + (lo.hat === 'random' ? ' sel' : ''), 'data-key': 'hat-random',
-    onclick: () => { lo.hat = 'random'; saveMenu(); uiSfx('click'); refreshScreen(); } }, el('span', { class: 'big-icon', text: '🎲' }), el('span', { text: 'Random' })));
+  const set = (k, v) => () => { lo[k] = v; saveMenu(); uiSfx('click'); refreshScreen(); };
+  const swatches = COLOR_PACKS.map(p => el('div', { class: 'pack-row' }, el('small', { text: p.name }),
+    el('div', { class: 'swatches' }, p.colors.map(c => el('button', {
+      class: 'swatch' + (lo.color === c ? ' sel' : ''), style: { '--c': c }, 'data-key': 'col-' + c, 'aria-label': `${p.name} colour ${c}`, onclick: set('color', c) })))));
+  const hats = listOf(HATS).map(h => el('button', { class: 'tile hat-tile' + (lo.hat === h.key ? ' sel' : ''), 'data-key': 'hat-' + h.key, onclick: set('hat', h.key) },
+    uiTile(`hat|${h.key}|${lo.color}`, 84, 84, null, cnv => drawHatIcon(cnv, h.key, lo.color)), el('span', { text: h.name })));
+  if (isCpuPicker(i)) hats.unshift(el('button', { class: 'tile hat-tile' + (lo.hat === 'random' ? ' sel' : ''), 'data-key': 'hat-random', onclick: set('hat', 'random') },
+    el('span', { class: 'big-icon', text: '🎲' }), el('span', { text: 'Random' })));
   return el('div', { class: 'tab-body' },
     el('h4', { text: 'Colour' }), el('div', { class: 'packs' }, swatches),
     el('h4', { text: 'Hat' }), el('div', { class: 'tile-grid hats' }, hats));
-}
-
-function hatTile(h, lo) {
-  const owned = ownsHat(h.key), asking = LO.confirm === 'hat:' + h.key;
-  const c = uiTile(`hat|${h.key}|${lo.color}`, 84, 84, null, cnv => drawHatIcon(cnv, h.key, lo.color));
-  const onclick = () => owned ? (lo.hat = h.key, saveMenu(), uiSfx('click'), refreshScreen())
-    : tryBuy('hat', h.key, () => { lo.hat = h.key; saveMenu(); });
-  return el('button', { class: 'tile hat-tile' + (lo.hat === h.key ? ' sel' : '') + (owned ? '' : ' locked') + (asking ? ' asking' : ''), 'data-key': 'hat-' + h.key, onclick },
-    c, el('span', { text: h.name }),
-    owned ? null : el('em', { class: 'price', text: asking ? `Buy · ${h.price}` : `🔒 ${h.price}` }));
-}
-
-// Buying from a tile takes two clicks: the first asks, the second pays. Not enough coins: a hint toast.
-function tryBuy(kind, key, then) {
-  const item = kind === 'hat' ? HATS[key] : COLOR_PACKS.find(p => p.key === key), id = kind + ':' + key;
-  if (!item) return;
-  if (PROFILE.coins < item.price) {
-    uiSfx('deny');
-    toast('Not enough coins', `${item.name} costs ${item.price}. You have ${PROFILE.coins}. Win matches to earn more!`, '🪙', '#ff8a2e');
-    return;
-  }
-  if (LO.confirm !== id) { LO.confirm = id; uiSfx('click'); refreshScreen(); return; }
-  LO.confirm = null;
-  if (buyItem(kind, key)) {
-    uiSfx('coin');
-    toast('Unlocked: ' + item.name, `−${item.price} coins`, kind === 'hat' ? '🎩' : '🎨', '#5dff9a');
-    if (then) then();
-  }
-  refreshScreen();
 }

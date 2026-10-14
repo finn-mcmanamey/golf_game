@@ -81,7 +81,14 @@ function beam(x1, y1, x2, y2, color = '#ffffff', width = 6, life = .25) {
 
 function shake(amount) { if (FX_RECORD) FX_RECORD('shake', arguments); FX.shake = Math.max(FX.shake, amount * FX.shakeMul); }
 // Freezes the action for a few frames on big hits so they land with weight (real-time play only).
-function hitstop(seconds) { if (!G_STATE.sim) FX.hitstop = Math.max(FX.hitstop, Math.min(seconds, .15)); }
+function hitstop(seconds) { if (!G_STATE.sim) FX.hitstop = Math.max(FX.hitstop, Math.min(seconds, .25)); }
+// How long a hit of `amt` damage freezes the action: nothing for chip and light hits (a flurry must stay fluid), then
+// growing with the damage up to TUNE.hitstopMax; a K.O. blow holds longest, the round-deciding one a bit longer still.
+function hitstopFor(amt, ko = false, deciding = false) {
+  if (ko) return TUNE.hitstopKO + (deciding ? .03 : 0);
+  if (amt < TUNE.hitstopMin) return 0;
+  return lerp(TUNE.hitstopLow, TUNE.hitstopMax, clamp((amt - TUNE.hitstopMin) / (TUNE.maxHit - TUNE.hitstopMin), 0, 1));
+}
 function slowmo(seconds, rate = .3) { if (!G_STATE.sim) { FX.slow = Math.max(FX.slow, seconds); FX.slowRate = rate; } }
 function flashScreen(color = '#ffffff', alpha = .3) { if (FX_RECORD) FX_RECORD('flashScreen', arguments); FX.flash = color; FX.flashA = Math.max(FX.flashA, alpha); }
 
@@ -158,13 +165,13 @@ function drawFx(ctx) {
   }
   ctx.globalAlpha = 1;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
-  const view = floatViewX();
+  const view = floatViewX(), raw = artRaw(ctx);   // the outline skips the art style: chalk would turn it to light grain
   for (const t of FLOATS) {
     const pop = 1 + Math.max(0, t.life - .85) * 2.5;
     ctx.globalAlpha = clamp(t.life * 1.5, 0, 1);
     ctx.font = `${Math.round(t.size * pop)}px ${FONT_DISPLAY}`;
     const half = ctx.measureText(t.text).width / 2 + 8, x = clamp(t.x, view[0] + half, Math.max(view[0] + half, view[1] - half));
-    ctx.lineWidth = 5; ctx.strokeStyle = '#07080f'; ctx.strokeText(t.text, x, t.y);
+    raw.lineWidth = 5; raw.strokeStyle = '#07080f'; raw.strokeText(t.text, x, t.y);
     ctx.fillStyle = t.color; ctx.fillText(t.text, x, t.y);
   }
   ctx.globalAlpha = 1;

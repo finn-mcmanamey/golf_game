@@ -151,7 +151,8 @@ async function testPhoto(browser, { check, rows, SHOTS }) {
   }
   await page.mouse.move(640, 300); await page.mouse.down(); await page.mouse.move(540, 330); await page.mouse.up();
   await page.click('[data-photo="save"]');
-  await page.waitForFunction(() => SC.photo.state.last, null, { timeout: 5000 }).catch(() => {});
+  // 15 s: Chromium's toBlob encodes in idle time; a loaded machine (the full suite) has little of it.
+  await page.waitForFunction(() => SC.photo.state.last, null, { timeout: 15000 }).catch(() => {});
   const saved = await page.evaluate(() => SC.photo.state.last);
   await page.keyboard.press('Enter');          // closes the preview
   await page.keyboard.press('Escape');         // leaves photo mode

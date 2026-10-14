@@ -11,7 +11,10 @@
 // hold-to-charge weapons).
 
 // ---------- shared helpers ----------
-const RANGED_PARRY_SPEED = 620;     // weapon-tip speed (px/s, relative to the hip) that bats a projectile away
+// v4 gun pass (players found guns too weak): shots hit GUN_POWER × harder (30-combat weaponPower), fly ~15% faster,
+// the bigger magazines hold a round or more less, the arm aims steadier (20-fighter) and melee turns fewer of them.
+const GUN_POWER = 1.12;
+const RANGED_PARRY_SPEED = 720;     // weapon-tip speed (px/s, relative to the hip) that bats a projectile away (v3: 620)
 const RANGED_PARTY = ['#ff5ad1', '#ffd84a', '#5ef2ff', '#9dff5a', '#ff8a2e', '#b98cff'];
 
 // +1 when the gun points right, -1 when left: multiply a side offset by it so grips and stocks stay below the barrel.
@@ -82,20 +85,23 @@ function rangedProj(o) {
   });
 }
 
-// A melee weapon swung fast through a projectile bats it back toward the shooter's side.
+// A melee weapon swung fast through a projectile bats it back toward the shooter's side. A `deflect` blade (the Energy
+// Saber) catches any shot it touches while swinging and sends it straight back at whoever fired it.
 function rangedParry(p, dt) {
   const x0 = p.x - p.vx * dt, y0 = p.y - p.vy * dt;
   for (const B of F) {
     if (!B.alive || B.team === p.team) continue;
     for (const rig of rigsOf(B)) {
       if (rig.w.ranged || rig.w.dmg <= 0) continue;
-      const tip = B.P[rig.tip], hip = B.P[2];
-      if (Math.hypot(vx(tip) - vx(hip), vy(tip) - vy(hip)) < RANGED_PARRY_SPEED) continue;
+      const tip = B.P[rig.tip], hip = B.P[2], saber = rig.w.deflect && B.swingT > 0;
+      if (!saber && Math.hypot(vx(tip) - vx(hip), vy(tip) - vy(hip)) < RANGED_PARRY_SPEED) continue;
       for (const [i, j] of rig.ws) {
         const a = B.P[i], b = B.P[j], r = segSeg(x0, y0, p.x, p.y, a.x, a.y, b.x, b.y);
-        if (r.d > Math.max(2, p.r) + rig.w.width * B.scale + 6) continue;
+        if (r.d > Math.max(2, p.r) + rig.w.width * B.scale + (saber ? 8 : 4)) continue;
+        const shooter = p.owner;
         deflectProj(p, B, a, b, r.qx, r.qy);
         p.vx *= 1.25; p.vy *= 1.25;                 // a good swing sends it back faster than the shove-off
+        if (saber && shooter && shooter.alive) rangedAimAt(p, chest(shooter));
         float(r.qx, r.qy - 26, 'PARRY!', '#ffe9a8', 22);
         ring(r.qx, r.qy, 40, '#ffe9a8', .2, 3);
         sfx('clash');
@@ -104,6 +110,12 @@ function rangedParry(p, dt) {
     }
   }
   return false;
+}
+
+// Points a projectile at (x, y), keeping its speed.
+function rangedAimAt(p, c) {
+  const sp = Math.hypot(p.vx, p.vy), d = Math.hypot(c.x - p.x, c.y - p.y) || 1;
+  p.vx = (c.x - p.x) / d * sp; p.vy = (c.y - p.y) / d * sp;
 }
 
 // A projectile that never hits anything (negative radius): used for stuck arrows, bubbles and gravity wells.
@@ -142,7 +154,7 @@ function rangedBeamHits(f, x, y, ux, uy, len) {
     let best = null;
     for (const T of HIT_SHAPES) {
       const c = B.P[T.a], d = B.P[T.b], r = segSeg(x, y, ex, ey, c.x, c.y, d.x, d.y);
-      if (r.d <= T.r * B.scale + 4 && (!best || r.s < best.s)) best = { B, s: r.s, x: r.px, y: r.py, T, blocked: false };
+      if (r.d <= hurtR(B, T) + 4 && (!best || r.s < best.s)) best = { B, s: r.s, x: r.px, y: r.py, T, blocked: false };
     }
     if (!best) continue;
     const sh = rangedShieldOnRay(B, x, y, ex, ey);
@@ -158,7 +170,7 @@ function rangedShieldOnRay(B, x, y, ex, ey) {
     if (!(rig.w.block > 0)) continue;
     for (const [i, j] of rig.ws) {
       const a = B.P[i], b = B.P[j], r = segSeg(x, y, ex, ey, a.x, a.y, b.x, b.y);
-      if (r.d <= rig.w.width * B.scale + 4 && Math.random() < rig.w.block) return { s: r.s, x: r.px, y: r.py };
+      if (r.d <= rig.w.width * B.scale + 4 && Math.random() < shotBlock(rig.w.block)) return { s: r.s, x: r.px, y: r.py };
     }
   }
   return null;
@@ -351,9 +363,10 @@ on('boot', () => {
 // =====================================================================================================================
 // ---------- Pulse Pistol: the all-rounder ----------
 defWeapon('pistol', {
+  power: 1.1,    // balance: × damage dealt with it (see tmp/balance.md; v4 1 -> 1.1: the weakest gun)
   name: 'Pulse Pistol', cat: 'ranged', desc: 'Six quick energy shots, then a reload. Keep your distance.', order: 10,
   len: 34, mass: .7, dmg: .25, width: 4, color: '#5ef2ff',
-  ranged: { cooldown: .3, ammo: 6, reload: 1.6, speed: 1500, spread: .05, recoil: 150,
+  ranged: { cooldown: .3, ammo: 5, reload: 1.6, speed: 1700, spread: .05, recoil: 150,
     proj: rangedProj({ dmg: 6, r: 4, life: 1.2, kind: 'bullet' }) },
   ai: { range: 400, style: 'ranged' },
   attack(f) { rangedAttack(f, rangedFire); },
@@ -372,7 +385,7 @@ defWeapon('revolver', {
   power: 1.0,    // balance: × damage dealt with it (see tmp/balance.md; raised from .88 for v3 guards)
   name: 'Thunder Six', cat: 'ranged', desc: 'Six slow, heavy rounds that knock foes back. Long reload.', order: 11,
   len: 40, mass: .9, dmg: .25, width: 4, color: '#ffd84a', bodyRecoil: 160,
-  ranged: { cooldown: .5, ammo: 6, reload: 2.3, speed: 2100, spread: .035, recoil: 320, sfx: 'gun-revolver',
+  ranged: { cooldown: .5, ammo: 5, reload: 2.3, speed: 2400, spread: .035, recoil: 320, sfx: 'gun-revolver',
     proj: rangedProj({ dmg: 8, r: 5, life: 1, kb: 420, kind: 'bullet' }) },
   ai: { range: 420, style: 'ranged' },
   attack(f) { rangedAttack(f, rangedFire); },
@@ -393,10 +406,10 @@ defWeapon('revolver', {
 
 // ---------- Boomstick: shotgun ----------
 defWeapon('shotgun', {
-  power: 0.92,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 0.87,   // balance: × damage dealt with it (see tmp/balance.md; v4 .92 -> .87)
   name: 'Boomstick', cat: 'ranged', desc: 'Six pellets per blast. Brutal up close, kicks like a mule.', order: 12,
   len: 56, mass: 1.2, dmg: .25, width: 5, color: '#ff8a2e', twoHanded: true, bodyRecoil: 380,
-  ranged: { cooldown: .8, ammo: 2, reload: 2, speed: 1350, spread: .17, pellets: 6, recoil: 380, sfx: 'gun-shotgun',
+  ranged: { cooldown: .8, ammo: 2, reload: 2, speed: 1500, spread: .17, pellets: 6, recoil: 380, sfx: 'gun-shotgun',
     proj: { dmg: 0, pdmg: 2.4, pkb: 260, packWindow: .07, r: 3, life: .42, drag: 1.6 } },
   ai: { range: 230, style: 'ranged' },
   attack(f) { rangedAttack(f, g => rangedFire(g, rangedProj({ packKey: rangedVolleyKey(), onHit: rangedPackHit }))); },
@@ -416,7 +429,7 @@ defWeapon('minigun', {
   power: 0.9,    // balance: × damage dealt with it (see tmp/balance.md; raised from .82 for v3 guards)
   name: 'Buzzsaw', cat: 'ranged', desc: 'Hold attack to spin up, then a hail of bullets. Heavy: you walk slower.', order: 13,
   len: 58, mass: 1.6, dmg: .25, width: 6, color: '#ffe066', twoHanded: true, speed: .85, bodyRecoil: 30,
-  ranged: { cooldown: .08, ammo: 40, reload: 3, auto: true, speed: 1700, spread: .1, recoil: 50, sfx: 'gun-minigun',
+  ranged: { cooldown: .08, ammo: 34, reload: 3, auto: true, speed: 1950, spread: .1, recoil: 50, sfx: 'gun-minigun',
     proj: rangedProj({ dmg: 0, pdmg: 1.6, pkb: 90, packWindow: .3, packKey: 'minigun', r: 3, life: .9, onHit: rangedPackHit }) },
   ai: { range: 380, style: 'ranged',
     think(f, foe, d) { f.inp.attackHeld = d < 600 && (f.mem.spin > .2 || chance(.65)); } },
@@ -452,14 +465,14 @@ defWeapon('sniper', {
   power: 0.85,   // balance: × damage dealt with it (see tmp/balance.md)
   name: 'Longshot', cat: 'ranged', desc: 'Huge damage, two shots, slow reload. Stand still for a steady aim.', order: 14,
   len: 74, mass: 1.3, dmg: .25, width: 4, color: '#ff3d5a', twoHanded: true, speed: .92, bodyRecoil: 420,
-  ranged: { cooldown: 1.3, ammo: 2, reload: 2.8, speed: 3400, spread: 0, recoil: 460, sfx: 'gun-sniper',
+  ranged: { cooldown: 1.3, ammo: 2, reload: 2.8, speed: 3900, spread: 0, recoil: 460, sfx: 'gun-sniper',
     proj: rangedProj({ dmg: 14, r: 4, life: .8, pierce: 1, kb: 520, headMul: 1.5 }) },
   ai: { range: 560, style: 'ranged' },
   attack(f) {
     rangedAttack(f, g => {
       const b = rangedBarrel(g), moving = Math.abs(vx(g.P[2])) > 120 || !g.grounded;
       const a = Math.atan2(b.uy, b.ux) + rnd(-1, 1) * (moving ? .11 : .012);   // running or airborne shots stray
-      rangedFire(g, { vx: Math.cos(a) * 3400, vy: Math.sin(a) * 3400 });
+      rangedFire(g, { vx: Math.cos(a) * 3900, vy: Math.sin(a) * 3900 });
       flashScreen(this.color, .08);
     });
   },
@@ -484,7 +497,7 @@ defWeapon('sniper', {
 
 // ---------- Skyrocket: rocket launcher (blast yourself for a rocket jump) ----------
 function rocketStep(p, dt) {
-  const sp = Math.hypot(p.vx, p.vy) || 1, k = Math.min(1500, sp + 2600 * dt) / sp;   // accelerates after launch
+  const sp = Math.hypot(p.vx, p.vy) || 1, k = Math.min(1700, sp + 2900 * dt) / sp;   // accelerates after launch
   p.vx *= k; p.vy *= k;
   if (chance(dt * 40)) burst(p.x - p.vx * .01, p.y - p.vy * .01, chance(.5) ? '#8a8fa8' : '#ffb347', 1, 60, { grav: -120, life: .5, size: 1.6 });
 }
@@ -511,10 +524,10 @@ function rocketDraw(ctx, p) {
   circle(ctx, p.x - c * 16, p.y - s * 16, 2.5, '#ffffff');
 }
 defWeapon('rocket', {
-  power: 0.94,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 0.82,   // balance: × damage dealt with it (see tmp/balance.md; v4 .94 -> .82)
   name: 'Skyrocket', cat: 'ranged', desc: 'One big explosive rocket. Blast your own feet to rocket jump.', order: 15,
   len: 62, mass: 1.6, dmg: .25, width: 7, color: '#ff5a3a', twoHanded: true, speed: .9, bodyRecoil: 340,
-  ranged: { cooldown: .6, ammo: 1, reload: 2.3, speed: 520, spread: .02, recoil: 360, sfx: 'gun-rocket',
+  ranged: { cooldown: .6, ammo: 1, reload: 2.3, speed: 600, spread: .02, recoil: 360, sfx: 'gun-rocket',
     proj: rangedProj({ dmg: 19, r: 6, life: 2.4, explode: 100, kb: 760, kind: 'rocket', trail: true, onStep: rocketStep,
       onExpire: rocketSelfBlast, draw: rocketDraw }) },
   ai: { range: 380, style: 'ranged' },
@@ -541,7 +554,7 @@ defWeapon('grenade', {
   power: 0.8,   // balance: × damage dealt with it (see tmp/balance.md)
   name: 'Pop Launcher', cat: 'ranged', desc: 'Lobs bouncing grenades that blow after a short fuse.', order: 16,
   len: 50, mass: 1.3, dmg: .25, width: 6, color: '#9dff5a', twoHanded: true, bodyRecoil: 160,
-  ranged: { cooldown: .55, ammo: 3, reload: 2.3, speed: 980, spread: .04, recoil: 260, sfx: 'gun-thump',
+  ranged: { cooldown: .55, ammo: 3, reload: 2.3, speed: 1060, spread: .04, recoil: 260, sfx: 'gun-thump',
     proj: rangedProj({ dmg: 11, r: 7, life: 1.15, grav: .9, bounce: 4, explode: 92, kb: 640, kind: 'grenade', trail: false,
       onStep(p) { if (!p.lob) { p.lob = true; p.vy -= 360; } },     // lob a little higher than the barrel points
       onBounce() { sfx('gun-bounce'); }, draw: grenadeDraw }) },
@@ -570,7 +583,7 @@ defWeapon('crossbow', {
   power: 0.82,   // balance: × damage dealt with it (see tmp/balance.md)
   name: 'Nailbow', cat: 'ranged', desc: 'Fast heavy bolts that pin the target\'s legs in place.', order: 17,
   len: 46, mass: 1, dmg: .25, width: 5, color: '#ffcf6b', bodyRecoil: 90,
-  ranged: { cooldown: .4, ammo: 1, reload: 1.1, speed: 2300, spread: .02, recoil: 200, sfx: 'gun-twang',
+  ranged: { cooldown: .4, ammo: 1, reload: 1.1, speed: 2600, spread: .02, recoil: 200, sfx: 'gun-twang',
     proj: rangedProj({ dmg: 12, r: 4, life: 1.2, grav: .12, kb: 260, kind: 'bolt', status: ['pinned', .8], trail: false,
       draw: boltDraw, onExpire(p, why) { rangedStick(p, why, 24, '#c9b37a'); } }) },
   ai: { range: 440, style: 'ranged' },
@@ -601,7 +614,7 @@ function arrowDraw(ctx, p) {
   lineXY(ctx, p.x - c * len, p.y - s * len, p.x - c * (len - 8) + s * 5, p.y - s * (len - 8) - c * 5, p.color, 2);
 }
 function longbowRelease(f, k) {
-  const speed = lerp(950, 2500, k), full = k >= 1;
+  const speed = lerp(1100, 2850, k), full = k >= 1;
   const b = rangedBarrel(f), a = Math.atan2(b.uy, b.ux) - (1 - k) * .08;    // weak draws droop, so aim a touch higher
   rangedFire(f, { vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, dmg: lerp(4, 16.5, k), kb: lerp(140, 420, k),
     pierce: full ? 1 : 0, full, color: full ? '#d8f0ff' : f.w.color });
@@ -611,7 +624,7 @@ defWeapon('longbow', {
   power: 0.9,   // balance: × damage dealt with it (see tmp/balance.md)
   name: 'Moonbow', cat: 'ranged', desc: 'Hold attack to draw, release to fire. A full draw pierces.', order: 18,
   len: 30, mass: .7, dmg: .25, width: 4, color: '#b9c8ff', chargeTime: .8, chargeMax: 2.4,
-  ranged: { cooldown: .25, ammo: 1, reload: .4, speed: 2000, spread: .015, recoil: 110, sfx: 'gun-twang',
+  ranged: { cooldown: .25, ammo: 1, reload: .4, speed: 2300, spread: .015, recoil: 110, sfx: 'gun-twang',
     proj: rangedProj({ dmg: 12, r: 4, life: 1.6, grav: .45, kind: 'arrow', trail: false, draw: arrowDraw,
       onExpire(p, why) { rangedStick(p, why, 30, '#d8c8a0'); } }) },
   ai: { range: 470, style: 'ranged', think: rangedChargeThink },
@@ -643,7 +656,7 @@ defWeapon('kunai', {
   power: 1.12,   // balance: × damage dealt with it (see tmp/balance.md)
   name: 'Shadow Kunai', cat: 'ranged', desc: 'Throw a fan of three spinning knives. Quick to restock.', order: 19,
   len: 26, mass: .5, dmg: .35, width: 4, color: '#b98cff',
-  ranged: { cooldown: .45, ammo: 3, reload: 1.6, speed: 1500, spread: .11, pellets: 3, recoil: 90, sfx: 'gun-throw',
+  ranged: { cooldown: .45, ammo: 3, reload: 1.6, speed: 1700, spread: .11, pellets: 3, recoil: 90, sfx: 'gun-throw',
     proj: rangedProj({ dmg: 3.2, r: 4, life: 1, grav: .3, kb: 160, kind: 'kunai', trail: false, draw: kunaiDraw,
       onExpire(p, why) { rangedStick(p, why, 14, '#dfe6ff'); } }) },
   ai: { range: 340, style: 'ranged' },
@@ -763,10 +776,10 @@ function plasmaRelease(f, k) {
   if (big) rangedShove(f, 240 * k);
 }
 defWeapon('plasma', {
-  power: 0.94,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 0.89,   // balance: × damage dealt with it (see tmp/balance.md; v4 .94 -> .89)
   name: 'Nova Cannon', cat: 'ranged', desc: 'Hold to grow a plasma orb. Big orbs explode on impact.', order: 22,
   len: 48, mass: 1.4, dmg: .25, width: 6, color: '#7a5cff', twoHanded: true, chargeTime: 1.1, chargeMax: 2.6,
-  ranged: { cooldown: .35, ammo: 1, reload: 1, speed: 780, spread: .01, recoil: 260, sfx: 'gun-plasma',
+  ranged: { cooldown: .35, ammo: 1, reload: 1, speed: 900, spread: .01, recoil: 260, sfx: 'gun-plasma',
     proj: rangedProj({ dmg: 10, r: 8, life: 1.8, kind: 'plasma', trail: true, draw: plasmaDraw }) },
   ai: { range: 420, style: 'ranged', think: rangedChargeThink },
   attack(f) { rangedAttack(f, rangedChargeStart); },
@@ -802,7 +815,7 @@ defWeapon('flamethrower', {
   power: 1.4,    // balance: × damage dealt with it (see tmp/balance.md; raised from 1.08 for v3 guards)
   name: "Dragon's Breath", cat: 'ranged', desc: 'A short cone of fire. Sets foes alight; runs dry fast.', order: 23,
   len: 52, mass: 1.3, dmg: .25, width: 6, color: '#ff8a2e', twoHanded: true,
-  ranged: { cooldown: .04, ammo: 45, reload: 2.6, auto: true, speed: 640, spread: .16, recoil: 18, sfx: 'gun-silent',
+  ranged: { cooldown: .04, ammo: 39, reload: 2.6, auto: true, speed: 700, spread: .16, recoil: 18, sfx: 'gun-silent',
     proj: { dmg: 0, pdmg: .62, pkb: 110, pstatus: ['burn', 1.3, .6], packWindow: .3, packKey: 'flame', r: 10, life: .4,
       drag: 2.2, grav: -.12, pierce: 3, kind: 'flame', trail: false, onHit: rangedPackHit, draw: flameDraw } },
   ai: { range: 175, style: 'ranged',
@@ -849,7 +862,7 @@ defWeapon('cryo', {
   power: 0.88,   // balance: × damage dealt with it (see tmp/balance.md)
   name: 'Cryo Ray', cat: 'ranged', desc: 'A stream of ice shards. Slows; a long burst freezes solid.', order: 24,
   len: 50, mass: 1.1, dmg: .25, width: 5, color: '#9fe8ff', twoHanded: true,
-  ranged: { cooldown: .1, ammo: 22, reload: 2.3, auto: true, speed: 1250, spread: .05, recoil: 40, sfx: 'gun-ice',
+  ranged: { cooldown: .1, ammo: 19, reload: 2.3, auto: true, speed: 1400, spread: .05, recoil: 40, sfx: 'gun-ice',
     proj: rangedProj({ dmg: 0, pdmg: 1.9, pkb: 60, pstatus: ['slow', 1.1], packWindow: .3, packKey: 'cryo', r: 4, life: .5, drag: .8, kind: 'shard',
       onHit: cryoHit, draw: shardDraw }) },
   ai: { range: 330, style: 'ranged',
@@ -935,7 +948,7 @@ defWeapon('wand', {
   power: 0.74,   // balance: × damage dealt with it (see tmp/balance.md)
   name: 'Starlight Wand', cat: 'magic', desc: 'Slow stars that curve toward the nearest foe.', order: 31,
   len: 40, mass: .5, dmg: .25, width: 4, color: '#ffe36b',
-  ranged: { cooldown: .42, ammo: 4, reload: 1.7, speed: 640, spread: .25, recoil: 70, sfx: 'gun-wand',
+  ranged: { cooldown: .42, ammo: 4, reload: 1.7, speed: 720, spread: .25, recoil: 70, sfx: 'gun-wand',
     proj: rangedProj({ dmg: 6.6, r: 6, life: 2, homing: 3.2, kb: 200, kind: 'star', draw: starDraw,
       onStep(p, dt) { if (chance(dt * 25)) burst(p.x, p.y, '#fff6c0', 1, 40, { grav: 0, life: .4, size: .8 }); } }) },
   ai: { range: 400, style: 'ranged' },
@@ -1002,10 +1015,10 @@ function voidOrbDraw(ctx, p) {
   ctx.beginPath(); ctx.arc(p.x, p.y, 15, p.t * 8, p.t * 8 + 2); ctx.stroke();
 }
 defWeapon('void-orb', {
-  power: 0.82,   // balance: × damage dealt with it (see tmp/balance.md)
+  power: 0.74,   // balance: × damage dealt with it (see tmp/balance.md; v4 .82 -> .74)
   name: 'Void Orb', cat: 'magic', desc: 'Lob a dark orb that opens a gravity well (early, if it flies past a foe), then bursts.', order: 32,
   len: 30, mass: .8, dmg: .25, width: 5, color: '#b98cff',
-  ranged: { cooldown: .5, ammo: 1, reload: 2, speed: 860, spread: .02, recoil: 120, sfx: 'gun-wand',
+  ranged: { cooldown: .5, ammo: 1, reload: 2, speed: 920, spread: .02, recoil: 120, sfx: 'gun-wand',
     proj: rangedProj({ dmg: 5, r: 9, life: .7, drag: 1.3, kb: 120, kind: 'void', trail: false, draw: voidOrbDraw,
       onStep: voidProximity, onExpire: voidCollapse }) },
   ai: { range: 360, style: 'ranged' },
@@ -1024,14 +1037,14 @@ defWeapon('void-orb', {
 
 // ---------- Pebble Sling: bouncy, bonks heads ----------
 function pebbleHit(p, B, dealt) {
-  const head = B.P[0], onHead = Math.hypot(p.x - head.x, p.y - head.y) < (HEAD_R + 6) * B.scale + p.r;
+  const head = B.P[0], onHead = Math.hypot(p.x - head.x, p.y - head.y) < hurtR(B, HIT_SHAPES[0]) + 6 * B.scale + p.r;   // Giant Heads bonk too
   if (dealt > 0 && onHead) { addStatus(B, 'stun', .45, 1, p.owner); float(p.x, p.y - 30, 'BONK', '#ffd84a', 22); sfx('gun-bonk'); }
 }
 defWeapon('slingshot', {
   power: 0.84,   // balance: × damage dealt with it (see tmp/balance.md)
   name: 'Pebble Sling', cat: 'ranged', desc: 'Bouncing pebbles with a big shove. Headshots stun.', order: 25,
   len: 32, mass: .5, dmg: .25, width: 4, color: '#c9b37a',
-  ranged: { cooldown: .4, ammo: 5, reload: 1.4, speed: 1350, spread: .04, recoil: 100, sfx: 'gun-sling',
+  ranged: { cooldown: .4, ammo: 4, reload: 1.4, speed: 1500, spread: .04, recoil: 100, sfx: 'gun-sling',
     proj: rangedProj({ dmg: 6, r: 5, life: 1.4, grav: .6, bounce: 2, kb: 440, headMul: 1.6, kind: 'pebble', trail: false,
       onHit: pebbleHit, onBounce() { sfx('gun-bounce'); },
       draw(ctx, p) { circle(ctx, p.x, p.y, 5, '#a8a090', '#5a5448', 2); } }) },
@@ -1059,7 +1072,7 @@ defWeapon('bubble', {
   power: 1.15,   // balance: × damage dealt with it (see tmp/balance.md)
   name: 'Bubble Blaster', cat: 'exotic', desc: 'Silly slow bubbles. Trapped foes float helplessly upward.', order: 40,
   len: 36, mass: .6, dmg: .25, width: 5, color: '#8fe9ff',
-  ranged: { cooldown: .34, ammo: 5, reload: 1.5, speed: 640, spread: .12, recoil: 60, sfx: 'gun-bubble',
+  ranged: { cooldown: .34, ammo: 4, reload: 1.5, speed: 700, spread: .12, recoil: 60, sfx: 'gun-bubble',
     proj: rangedProj({ dmg: 5, r: 10, life: 2.2, grav: -.03, drag: .5, kb: 60, kind: 'bubble', trail: false,
       status: ['bubbled', 1.1], draw: bubbleDraw,
       onStep(p, dt) { p.vy += Math.sin(p.t * 7) * 240 * dt; },
@@ -1097,7 +1110,7 @@ defWeapon('confetti', {
   power: 0.95,   // balance: × damage dealt with it (see tmp/balance.md)
   name: 'Party Popper', cat: 'exotic', desc: 'A blast of confetti. Barely hurts, but it shoves hard.', order: 41,
   len: 40, mass: .7, dmg: .25, width: 6, color: '#ff5ad1', bodyRecoil: 200,
-  ranged: { cooldown: .55, ammo: 2, reload: 1.8, speed: 1150, spread: .3, pellets: 12, recoil: 260, sfx: 'gun-party',
+  ranged: { cooldown: .55, ammo: 2, reload: 1.8, speed: 1250, spread: .3, pellets: 12, recoil: 260, sfx: 'gun-party',
     proj: { dmg: 0, pdmg: 1.05, pkb: 330, packWindow: .08, r: 4, life: .5, drag: 2.6, grav: .3, kind: 'confetti', trail: false,
       draw: confettiDraw } },
   ai: { range: 200, style: 'ranged' },

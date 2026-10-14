@@ -7,10 +7,31 @@ install, and the whole game is one offline HTML file.
 **To play:** open `dist/stick-clash.html` in Chrome, Edge, Firefox or Safari. If it isn't there yet, run
 `node build.mjs` first. It works offline from your disk.
 
-Everything you fight with is unlocked from the start: 51 weapons, 24 skills, 6 classes, 6 throwables, 8 ultimates,
-23 arenas and 22 modes, plus the **Mythic Quest** campaign (24 stops across 4 realms) and **31 challenges**. Looks
-(outfits, weapon skins, K.O. effects, pets, victory poses, titles) unlock on the free 100-level **Track**, and coins buy
-hats and colour packs in the Shop. None of it changes how strong you are.
+Everything is unlocked from the start: 51 weapons, 24 skills, 6 classes, 6 throwables, 8 ultimates, 23 arenas and
+25 modes, the **Mythic Quest** campaign (24 stops across 4 realms) and **31 challenges**, and every look: hats, colour
+packs, outfits, weapon skins, K.O. effects, pets, victory poses and titles. There is nothing to buy or grind; only a few
+secret extras stay hidden until you find them (see **Secrets** below). None of it changes how strong you are.
+
+## New in v4
+
+- **Two players on one iPad:** turn on **Table mode** (next to Fight! in 2-player modes, or Settings → Touch), lay the
+  iPad flat and sit facing each other. Each player's controls are turned toward them.
+- **Two players on one laptop:** Settings → Controls → Key layout → **Compact 2P**. Player 1 uses A D (move), W (jump),
+  S (block), F (attack), G (skill); Player 2 uses the arrows, `.` (attack), `/` (skill) and `,` (skill 2). Small key
+  strips at the screen edges remind each player.
+- **Simple or Advanced controls** for each player (Settings → Controls). Simple is move, jump, attack and one skill;
+  hold back from an attack to block. A controls card before your first fight shows just your keys or buttons.
+- **Rivals:** type both players' names to keep a head-to-head record. The player who keeps winning starts with a little
+  less health (Handicap), and **Rematch · new weapons** jumps straight back in.
+- **New ways to play:** Co-op Waves, Tag Team (P1 vs P2, or vs CPU), the Mythic Quest with two players, a **silly rules
+  vote** before each round (Bouncy Floor, Giant Heads, Reversed Controls…) and Short / Normal / Long rounds.
+- **Art styles:** ink, pixel, paper and chalk arenas, with fighters drawn to match (Settings → Effects → Arena art).
+- **Sillier fights:** floppier bodies, bigger hits, stronger guns, swords that each feel different, and CPUs that make
+  human mistakes.
+- **Sound:** every weapon has its own swing and hit, the music has real melodies, and fighters grunt "oof!"
+  (Settings → Sound → Voice grunts).
+- **Simpler progress:** no coins, shop, levels or quests. Everything is unlocked; trophies and Ranked stay, and old saves
+  keep them.
 
 ## Controls
 
@@ -358,21 +379,23 @@ the arena so only lamps, fighters and glowing weapons light it.
 - **Pets** follow you and help a little: Bit-Bot zaps a shot out of the air, Sprig heals you when you are low, Zappy and
   Ember Wisp nip at nearby foes, Fetch brings orbs closer, Tick slows a bullet, Bubbles washes off a debuff and Glim
   tops up your super. Pets are off in Ranked.
+- **Weapon picker** (loadout): start typing in the search box to find a weapon by name, type or effect ("fire",
+  "polearm", "stun"...), tap the ☆ on any weapon to keep it under **★ Favourites**, and pick again from the **Recent**
+  row (your last six weapons). Player 1 and Player 2 each keep their own favourites and recent weapons.
 - **Fighter Creator:** save named presets (weapon, skills, class, throwables, hat, colour and look) and load them in
-  one click.
-- **Track:** a free 100-level track. Every match, campaign stop, challenge and quest earns XP, and every level hands
-  out a reward (looks, hats, coins, titles).
-- **Quests:** three daily and one weekly task ("land 3 parries", "win on Candy Land"...) for bonus XP. You can re-roll
-  one a day.
+  one click, and pick the title shown on the title screen.
 - **Codex:** every weapon, skill, class, arena, boss, realm and pet with two lines of its own lore and your stats with it.
-- **Secrets:** a few hidden things unlock by typing codes on the title screen (or into the box on the Codex's Secrets
-  tab) or by doing something unusual. The Codex gives hints, and found secrets get their lore too.
-- **Coins and Shop:** coins come from every match (more for wins, harder CPUs, tournament runs and survival waves;
-  Training earns nothing) and buy 34 hats and colour packs.
-- **Trophies & Stats:** 28 trophies to unlock, plus your lifetime stats.
+- **Secrets:** a few easter eggs stay hidden until you find them, by typing codes on the title screen (or into the box
+  on the Codex's Secrets tab) or by doing something unusual: a secret weapon, a secret hat, a K.O. effect, an outfit, a
+  mutator and two titles. Until then they are not in any list. The Codex gives hints, and found secrets get their lore too.
+- **Trophies & Stats:** 30 trophies, all earned by playing (wins, combos, weapons, modes, arenas, K.O.s...), plus your
+  lifetime stats.
 - **Highlights:** the best K.O.s of the session (big blows, combos, ring-outs, comebacks) are kept as clips. Replay them
   from the title screen and export one as a WebM video (in the downloaded file; some embedded viewers block downloads).
 - **Transfer progress** (Settings): copy one code that holds all your saves and paste it on another device.
+- **Saves from v3** carry over: trophies, stats, Ranked, the campaign and its skill tree, challenge stars, the codex,
+  presets, settings and keys are kept. Coins, shop purchases, track levels and quests are dropped, since everything is
+  free now. Old save codes still import the same way.
 
 ## Look and sound
 
@@ -388,8 +411,8 @@ the arena so only lamps, fighters and glowing weapons light it.
 Settings → Accessibility: **colour-blind palettes** (deutan, protan, tritan) with a shape marker on every fighter and
 health card, **reduce flashing** (softer flashes, little shake, no strobing lightning; on by default when your system
 asks for reduced motion), **one-button mode** for P1, P2 or both, a **practice game speed** slider (25–100%, solo play,
-never Ranked), and gamepad rumble and phone haptics strength. A match played at a slowed practice speed still earns
-coins and XP, scaled by the slowest speed used (× 0.4 at 25%, the full reward at 100%); the results card says so.
+never Ranked), and gamepad rumble and phone haptics strength. A match played at a slowed practice speed still counts
+toward your stats and trophies.
 
 ## On a phone or iPad
 

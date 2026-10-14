@@ -14,7 +14,7 @@ const PHOTO_FILTERS = {
 };
 const PHOTO_FRAMES = ['none', 'neon', 'polaroid', 'cinema'];
 const PHOTO = { on: false, x: W / 2, y: H / 2, z: 1, hud: false, filter: 'none', frame: 'none', keys: new Set(),
-  drag: null, bar: null, saved: null, last: null, bake: '' };
+  drag: null, bar: null, saved: null, last: null, bake: '', saving: 0 };
 const PHOTO_PTS = new Map();   // pointerId -> { x, y }: fingers (or the mouse) down on the picture
 
 const photoHidesHud = () => PHOTO.on && !PHOTO.hud;
@@ -107,7 +107,10 @@ function photoCaption(c2, x, y, align, color) {
 // ---------- saving ----------
 // Renders a fresh frame (bloom included, drawn in the same task so the WebGL canvas can still be read), crops the
 // arena viewport, bakes the filter in and offers it as a PNG download plus an on-screen preview.
+// Chromium's toBlob encodes in idle time, which redrawing every frame starves (1–7 s, not 0.1 s): no redraws meanwhile.
+const photoBusy = () => PHOTO.saving > 0 && performance.now() - PHOTO.saving < 8000;   // 8 s: a lost callback
 function photoSave() {
+  if (photoBusy()) return;
   render(0);
   const vw = Math.round(VIEW.vw), vh = Math.round(VIEW.vh), out = document.createElement('canvas');
   out.width = vw; out.height = vh;
@@ -125,12 +128,19 @@ function photoSave() {
     try { const id = g.getImageData(0, 0, vw, vh); photoBakeFilter(id, PHOTO.bake); g.putImageData(id, 0, 0); } catch (e) { report(e, 'photo filter'); }
   }
   const name = 'stick-clash-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.png';
+  const slow = setTimeout(photoSaving, 1000, true);   // slow: say so on the button
+  PHOTO.saving = performance.now();
   const done = blob => {
+    clearTimeout(slow); PHOTO.saving = 0; photoSaving(false);
     PHOTO.last = { w: vw, h: vh, bytes: blob ? blob.size : 0, name };
     if (!blob) return fxModal('Could not save', el('p', { text: 'This browser could not turn the picture into a PNG.' }));
     hlDeliver(blob, name, 'png');   // 89-replays: share sheet, download and preview
   };
   try { out.toBlob(done, 'image/png'); } catch (e) { report(e, 'photo save'); done(null); }
+}
+function photoSaving(on) {
+  const b = PHOTO.bar && PHOTO.bar.querySelector('[data-photo="save"]');
+  if (b) { b.disabled = on; b.textContent = on ? 'Saving…' : '📷 Save PNG'; }
 }
 
 // ---------- baking a CSS filter into pixels ----------
@@ -306,6 +316,8 @@ on('boot', () => {
     if (list) list.insertBefore(uiButton('📷 Photo mode', photoEnter, null, { 'data-key': 'photo' }), list.children[1] || null);
     return node;
   };
+  const draw = render;   // photoSave's encoder gets the idle time
+  render = function (dt) { if (!photoBusy() || !PHOTO.on) draw(dt); };
   // Safari's own pinch (page zoom) must not fire while two fingers zoom the picture.
   addEventListener('gesturestart', e => { if (PHOTO.on) e.preventDefault(); }, { passive: false });
   if (window.SC) window.SC.photo = { state: PHOTO, enter: photoEnter, exit: photoExit, save: photoSave, bake: photoBakeFilter };

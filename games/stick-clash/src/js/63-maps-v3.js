@@ -270,8 +270,8 @@ const JUNGLE_LANES = [530, 352];       // dart lane tops (floor fighters' chests
 const JUNGLE_MOSS = { fill: '#4a5a3e', edge: '#9fe07a', debris: ['#8a9a6e', '#3e4a2e'] };
 
 defMap('jungle', {
-  name: 'Jungle Temple', desc: 'Grab a vine in mid-air (grab key) to swing over the spike pit; jump to let go. Stone faces spit darts when their eyes glow.', order: 220,
-  floor: 650, gravity: 2200,
+  name: 'Jungle Temple', desc: 'Grab a vine in mid-air (grab key; on Simple just touch it) to swing over the spike pit; jump to let go. Stone faces spit darts when their eyes glow.', order: 220,
+  floor: 650, gravity: 2200, style: 'ink',
   palette: { sky1: '#06180e', sky2: '#1e4a2a', ground: '#2a2a1a', line: '#9fe07a', accent: '#ffd84a', solid: '#5a5a42' },
   solids: [
     // The steps sink 14 px into the ground (like BRK_SINK): a block ending exactly at the floor let a fighter lying on
@@ -295,7 +295,21 @@ defMap('jungle', {
     jungleStepVines(this, dt);
   },
   frame(f, phase, enter) { if (phase === 'think' && !enter) jungleBrain(this, f); },
+  // Ink: a jade sun, misty hills, the temple in grey wash, bamboo; the faces and vines stay live.
+  art: { top: ART_PAPER,
+    bg(g, m) {
+      const fl = m.floor;
+      inkPaper(g, 23);
+      inkSun(g, 1060, 150, 66, '#9cc7a8');
+      inkWash(g, 430, 170, .008, 1.3, .1, fl); inkWash(g, 520, 90, .013, 3.1, .14, fl);
+      poly(artMono(g, 'rgba(30,32,26,.36)'), [[440, 600], [640, 140], [840, 600]]);
+      g.fillStyle = ART_INK; g.fillRect(612, 520, 56, 80);
+      for (let k = 0; k < 13; k++) jungleInkBamboo(g, 30 + k * 104 + artHash(k) * 40, fl, 260 + artHash(k + 5) * 380, 4 + artHash(k + 9) * 3, k % 3 ? .2 : .55, k);
+      inkGround(g, fl, 37);
+    },
+    live(c, m, t) { for (const k of [0, 1]) jungleDrawFace(c, k ? 980 : 300, k ? -1 : 1, m.hazards, t); jungleDrawVines(c, m, t); } },
   drawBg(ctx, t) {
+    if (artBg(ctx, this, t)) return;
     const fl = this.floor;
     mapSky(ctx, fl, ['#041008', '#0e2a16', '#1e4a2a']);
     for (let k = 0; k < 5; k++) mapGlow(ctx, 200 + k * 230, 80 + mapHash(k) * 60, 160, '#c8ff9a', .07);   // light shafts
@@ -310,6 +324,7 @@ defMap('jungle', {
     jungleDrawVines(ctx, this, t);
   },
   drawFg(ctx, t) {
+    if (artIs('ink')) return;                                             // ink: no canopy, the sky stays paper
     for (let k = 0; k < 9; k++) {                                         // hanging canopy leaves
       const x = k * 150 + 20, sw = Math.sin(t * .8 + k) * 6;
       ctx.fillStyle = k % 2 ? '#14381e' : '#1c4a26'; ctx.beginPath(); ctx.ellipse(x + sw, -10, 110, 46, .1, 0, TAU); ctx.fill();
@@ -321,6 +336,15 @@ defMap('jungle', {
     if (!s.oneWay) { ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 2; ctx.beginPath(); for (let x = s.x + 45; x < s.x + s.w; x += 60) { ctx.moveTo(x, s.y + 4); ctx.lineTo(x, s.y + s.h); } ctx.stroke(); }
   },
 });
+
+// An ink bamboo stalk: tapering joints, a leaf at every other one.
+function jungleInkBamboo(g, x, base, h, w, a, seed) {
+  const col = `rgba(26,30,22,${a})`, n = Math.max(3, Math.round(h / 75));
+  g.fillStyle = col; g.beginPath();
+  for (let i = 0; i < n; i++) artTaper(g, x + i, base - h * i / n - 2, x + i + 1, base - h * (i + 1) / n + 5, w, w * .8);
+  g.fill();
+  for (let i = 1; i < n; i += 2) { const y = base - h * i / n, s = artHash(seed * 7 + i) > .5 ? 1 : -1; inkStroke(g, [[x, y], [x + s * 24, y - 8], [x + s * 50, y + 2]], w * .8, .4, col); }
+}
 
 function jungleVines(m) { return m.vineState || (m.vineState = JUNGLE_VINES.map((v, i) => Object.assign({ a: i ? -.35 : .35, w: 0, holder: null }, v))); }
 const jungleTip = v => ({ x: v.x + Math.sin(v.a) * v.len, y: v.y + Math.cos(v.a) * v.len });
@@ -336,9 +360,11 @@ function jungleStepVines(m, dt) {
   for (const f of F) {
     if (!f.alive) continue;
     if (f.mem.vine) jungleHang(f, dt);
-    else if (f.inp.grab && !f.grounded && !f.heldBy && !f.holding && !f.mount) jungleCatch(f, vines);
+    else if ((f.inp.grab || jungleAutoCatch(f)) && !f.grounded && !f.heldBy && !f.holding && !f.mount) jungleCatch(f, vines);
   }
 }
+// Simple has no grab key (90-input): touching a vine in mid-air catches it, not just after letting go.
+const jungleAutoCatch = f => f.ctrl === 'human' && !f.autopilot && simpleOn(f.slot) && G_STATE.t >= (f.mem.vineFree || 0);
 
 // Catch the nearest vine within reach of the neck or a hand.
 function jungleCatch(f, vines) {
@@ -373,7 +399,7 @@ function jungleHang(f, dt) {
 
 function jungleLetGo(f, jumped) {
   const st = f.mem.vine;
-  f.mem.vine = null;
+  f.mem.vine = null; f.mem.vineFree = G_STATE.t + .5;   // see jungleAutoCatch
   if (st) st.v.holder = null;
   if (!jumped) return;
   f.inp.jump = false;
@@ -463,7 +489,7 @@ const CANDY_CHOCO = { fill: '#5a3020', edge: '#ffb0d0', debris: ['#7a4a2a', '#3a
 
 defMap('candy', {
   name: 'Candy Land', desc: 'Caramel puddles stick to your feet and slow you down. Marshmallow blocks bounce you sky-high.', order: 230,
-  floor: 650, gravity: 2200,
+  floor: 650, gravity: 2200, style: 'paper',
   palette: { sky1: '#ffb8e0', sky2: '#a8d8ff', ground: '#ff8ac8', line: '#ff5ab0', accent: '#7ae0ff', solid: '#ffe0f0' },
   solids: [
     { x: 470, y: 540, w: 110, mallow: true }, { x: 700, y: 540, w: 110, mallow: true },   // floating marshmallows: springs
@@ -478,21 +504,11 @@ defMap('candy', {
     mapStepPads(this, this.livePads, dt);
     for (const f of F) if (f.alive && f.grounded && candyInGoo(f)) arDamp(f, .09);
   },
-  drawBg(ctx, t) {
-    const fl = this.floor;
-    mapSky(ctx, fl, ['#c86aa8', '#b88ad8', '#8ab8e8']);
-    for (let k = 0; k < 5; k++) {                                         // cotton-candy clouds
-      const x = mapWrap(k * 300 + t * 8, W + 300) - 150, y = 70 + mapHash(k) * 120;
-      for (const [dx, r] of [[-40, 34], [0, 46], [42, 32]]) circle(ctx, x + dx, y, r, 'rgba(255,230,245,.7)');
-    }
-    mapRidge(ctx, fl - 60, 110, .007, .8, '#ffa8d8', fl);
-    for (let k = 0; k < 6; k++) candyDrawLolly(ctx, 90 + k * 225, fl - 20, 50 + mapHash(k) * 60, k, t);
-    ctx.fillStyle = '#ff8ac8'; ctx.fillRect(-40, fl, W + 80, H - fl + 40);
-    ctx.fillStyle = '#ffffff';
-    for (let x = -40; x < W + 40; x += 40) { ctx.beginPath(); ctx.moveTo(x, fl); ctx.lineTo(x + 20, fl); ctx.lineTo(x + 50, H + 40); ctx.lineTo(x + 30, H + 40); ctx.fill(); }
-    glowLine(ctx, 0, fl, W, fl, '#ff5ab0', 3);
-    mapParticles(ctx, t, 26, { vy: 30, sway: 14, size: 3, color: '#7ae0ff', alpha: .7, seed: 5 });   // sprinkles
-  },
+  // Paper: the same scene cut from card; the sprinkles fall as confetti.
+  art: { top: '#d9a6d6',
+    bg(g, m) { paperBackdrop(g, p => candyDrawBg(p, m, 0, false)); },
+    live(c, m, t) { for (const [color, seed] of [['#7ae0ff', 5], ['#ff7ab0', 9], ['#ffd84a', 13]]) mapParticles(c, t, 10, { vy: 30, sway: 14, size: 4, color, alpha: .9, seed }); } },
+  drawBg(ctx, t) { if (!artBg(ctx, this, t)) candyDrawBg(ctx, this, t, true); },
   drawSolid(ctx, s, t) {
     if (s.mallow) {
       const pd = (this.livePads || []).find(p => p.x === s.x), sq = pd ? pd.squash : 0, top = s.y + sq * 8;
@@ -506,6 +522,22 @@ defMap('candy', {
     glowLine(ctx, s.x, s.y, s.x + s.w, s.y, '#ff5ab0', 3);
   },
 });
+
+function candyDrawBg(ctx, m, t, sprinkles) {
+  const fl = m.floor;
+  mapSky(ctx, fl, ['#c86aa8', '#b88ad8', '#8ab8e8']);
+  for (let k = 0; k < 5; k++) {                                         // cotton-candy clouds
+    const x = mapWrap(k * 300 + t * 8, W + 300) - 150, y = 70 + mapHash(k) * 120;
+    for (const [dx, r] of [[-40, 34], [0, 46], [42, 32]]) circle(ctx, x + dx, y, r, 'rgba(255,230,245,.7)');
+  }
+  mapRidge(ctx, fl - 60, 110, .007, .8, '#ffa8d8', fl);
+  for (let k = 0; k < 6; k++) candyDrawLolly(ctx, 90 + k * 225, fl - 20, 50 + mapHash(k) * 60, k, t);
+  ctx.fillStyle = '#ff8ac8'; ctx.fillRect(-40, fl, W + 80, H - fl + 40);
+  ctx.fillStyle = '#ffffff';
+  for (let x = -40; x < W + 40; x += 40) { ctx.beginPath(); ctx.moveTo(x, fl); ctx.lineTo(x + 20, fl); ctx.lineTo(x + 50, H + 40); ctx.lineTo(x + 30, H + 40); ctx.fill(); }
+  glowLine(ctx, 0, fl, W, fl, '#ff5ab0', 3);
+  if (sprinkles) mapParticles(ctx, t, 26, { vy: 30, sway: 14, size: 3, color: '#7ae0ff', alpha: .7, seed: 5 });
+}
 
 function candyInGoo(f) {
   return [f.P[8], f.P[10]].some(p => p.g && CANDY_GOO.some(g => p.x > g.x && p.x < g.x + g.w) && p.y > 630);

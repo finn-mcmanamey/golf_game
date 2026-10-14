@@ -24,10 +24,13 @@ function shatterSpawn(pts, color, scale, nx, ny) {
   if (G_STATE.sim) return;
   if (FX_RECORD) FX_RECORD('shatter', [pts.slice(), color, scale, nx, ny]);
   const t0 = G_STATE.t, hx = pts[4], hy = pts[5];
-  const piece = (x, y, len, ang, head) => {
-    const away = Math.atan2(y - hy, x - hx), sp = SHATTER.speed * rnd(.5, 1.1);
+  // TUNE's silly profile: pieces pop further (koPop), pinwheel faster (koSpin) and bounce higher (koBounce; the head
+  // most of all, like a rubber ball).
+  const pop = TUNE.koPop, piece = (x, y, len, ang, head) => {
+    const away = Math.atan2(y - hy, x - hx), sp = SHATTER.speed * pop * rnd(.5, 1.1);
     SHARDS.push({ x, y, len, ang, head, color, w: 6.5 * scale, r: HEAD_R * scale, t0, last: t0, life: SHATTER.life * rnd(.8, 1.1),
-      vx: Math.cos(away) * sp + nx * 380, vy: Math.sin(away) * sp + ny * 380 - 420, va: rnd(-SHATTER.spin, SHATTER.spin) });
+      vx: Math.cos(away) * sp + nx * 380 * pop, vy: Math.sin(away) * sp + ny * 380 * pop - 420 * (head ? pop : 1),
+      va: rnd(-SHATTER.spin, SHATTER.spin) * TUNE.koSpin, bounce: Math.min(.85, TUNE.koBounce * (head ? 1.25 : 1)), squash: 0 });
   };
   piece(pts[0], pts[1], 0, 0, true);
   for (const [a, b] of BODY_LINKS) {
@@ -51,7 +54,7 @@ function shatterDraw(c2) {
     const age = (now - s.t0) / s.life, a = age < .6 ? 1 : 1 - (age - .6) / .4;
     c2.globalAlpha = a;
     c2.shadowColor = s.color; c2.shadowBlur = 16;
-    if (s.head) circle(c2, s.x, s.y, s.r, null, s.color, 4);
+    if (s.head) shatterHead(c2, s);
     else {
       const dx = Math.cos(s.ang) * s.len / 2, dy = Math.sin(s.ang) * s.len / 2;
       lineXY(c2, s.x - dx, s.y - dy, s.x + dx, s.y + dy, s.color, s.w);
@@ -67,6 +70,18 @@ function shatterMove(s, dt) {
   s.vy += PHYS.gravity * .8 * dt;
   s.x += s.vx * dt; s.y += s.vy * dt; s.ang += s.va * dt;
   if (MAP && MAP.walls && (s.x < 10 || s.x > W - 10)) { s.x = clamp(s.x, 10, W - 10); s.vx = -s.vx * .5; }
+  s.squash = Math.max(0, (s.squash || 0) - dt * 4);
   const g = MAP ? groundBelow(s.x, s.y - 30) : null;
-  if (g != null && s.y > g - 4 && s.vy > 0) { s.y = g - 4; s.vy *= -.35; s.vx *= .7; s.va *= .6; }
+  if (g != null && s.y > g - 4 && s.vy > 0) {
+    if (s.vy > 160) s.squash = Math.min(.45, s.vy / 1600);   // a hard landing squashes the piece for a moment
+    s.y = g - 4; s.vy *= -(s.bounce ?? .35); s.vx *= .7; s.va *= .6;
+  }
+}
+
+// The head piece: a ring that squashes flat when it lands and springs back round (drawing only).
+function shatterHead(c2, s) {
+  const q = s.squash || 0;
+  c2.save(); c2.translate(s.x, s.y + s.r * q * .5); c2.scale(1 + q, 1 - q);
+  circle(c2, 0, 0, s.r, null, s.color, 4);
+  c2.restore();
 }

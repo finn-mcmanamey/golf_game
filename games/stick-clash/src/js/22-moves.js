@@ -6,10 +6,11 @@
 // Guard tuning. chip: share of damage that still gets through a front block, per damage kind.
 const BLOCK = {
   parryWin: .15,       // a hit landing this soon after the guard went up is parried
+  parryShot: .1,       // v4: a shot must be met sooner (guns were too weak: guards turned too many bullets)
   reArm: .3,           // re-raising the guard sooner than this after dropping it gets no parry window (no mashing)
   moveMul: .35,        // walking speed while guarding
   kbMul: .35,          // knockback through a guard
-  chip: { melee: .2, proj: .2, skill: .5, explode: .6 },
+  chip: { melee: .2, proj: .3, skill: .5, explode: .6 },
   cost: 3.2, costBase: 6,   // stamina per point of blocked damage, plus a flat cost per blocked hit
   drain: 5, regen: 30, regenDelay: .55,   // stamina/s while holding, per second back, delay after use
   parryRefund: 30, parryStun: .65, breakStun: 1.1, breakRefill: .4,
@@ -51,8 +52,9 @@ function guardFront(B, A, o) {
 function guardHit(B, A, o, x, y, amount) {
   const share = BLOCK.chip[o.kind];
   if (!B.blocking || share == null || o.unblockable || !guardFront(B, A, o)) return 1;
-  if (G_STATE.t - B.blockStart < BLOCK.parryWin && !o.blast) { parry(B, A, o, x, y); return 0; }   // blasts can't be parried
-  B.stamina -= amount * BLOCK.cost + BLOCK.costBase;
+  const g = B.w.guard || 1;   // a guarding weapon (the broadsword's flat) lets less through, tires less, parries wider
+  if (G_STATE.t - B.blockStart < (o.proj ? BLOCK.parryShot : BLOCK.parryWin) * (2 - g) && !o.blast) { parry(B, A, o, x, y); return 0; }   // blasts can't be parried
+  B.stamina -= (amount * BLOCK.cost + BLOCK.costBase) * g;
   B.staminaCd = BLOCK.regenDelay;
   B.stats.blocks++;
   if (A && o.kind === 'melee') guardRecoil(A, o, 300);
@@ -61,7 +63,7 @@ function guardHit(B, A, o, x, y, amount) {
   sfx('block', .8);
   emit('block', B, A);
   if (B.stamina <= 0) { guardBreak(B); return 1; }                // the hit that breaks the guard lands in full
-  return share;
+  return share * g;
 }
 
 // The attacker's weapon bounces off a guard (and harder off a parry).

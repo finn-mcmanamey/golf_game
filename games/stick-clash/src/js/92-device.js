@@ -25,18 +25,22 @@ const DEVICE = {
   lastAt: 0,
   fs: false,         // in fullscreen now
   wake: null,        // the screen wake lock sentinel ('pending' while requested)
-  fsFailAt: 0,       // when fullscreen was last refused (the promise and the error event both report it)
+  fsFailAt: -1e9,    // when fullscreen was last refused (the promise and the error event both report it; never yet)
   lw: 0, lh: 0,      // window size at the last layout
   relayouts: 0,      // layouts run (tests watch it)
   pinchSkips: 0,     // visual-viewport resizes ignored because the page was pinched (scale ≠ 1)
 };
 
 // ---------- touch mode ----------
+// Table mode needs a tablet (short side ≥ 700 CSS px): on a phone it is neither offered (94) nor applied (93).
+const tableFits = () => Math.min(innerWidth, innerHeight) >= 700;
+const tableOn = () => !!SETTINGS.tableMode && tableFits();
 function touchWanted() {
   const m = SETTINGS.touchMode;
   if (m === 'on') return true;
   if (m === 'off') return false;
   if (JOINED && JOINED.some(j => j.touch)) return true;   // a lobby seat chose the touch screen
+  if (SETTINGS.tableMode && TSETS[1].slot >= 0 && DEVICE.touch) return true;   // table mode: a stray key keeps both sets
   return DEVICE.lastInput === 'touch' || (DEVICE.lastInput === null && IS_TOUCH);
 }
 // Every real input says what the player is holding; the on-screen controls appear or go when that changes.

@@ -134,10 +134,12 @@ function aiWallKick(f, L, dt) {
   if ((climbing || falling || cornered) && chance(L.wall * dt * 4)) f.inp.jump = true;
 }
 
-// Raises the guard from `delay` seconds from now for `secs` seconds (unless a guard is already planned).
+// Raises the guard from `delay` seconds from now for `secs` seconds (unless a guard is already planned). Now and then
+// (the level's mistime) it comes up late or drops too early, like a human's would.
 function aiGuard(f, delay, secs) {
   const a = f.ai, t = G_STATE.t;
   if (f.stamina < AI_GUARD_MIN || f.guardBroken > 0 || f.mount || (a.guardUntil || 0) > t + delay) return;
+  if (chance(aiLevel(f).mistime || 0)) { if (chance(.5)) delay += rnd(.15, .3); else secs *= .3; aiSlip(f, 'mistime'); }
   a.guardAt = t + delay; a.guardUntil = t + delay + secs;
 }
 
@@ -157,6 +159,14 @@ function aiGuardStep(f, L) {
   f.inp.blockHeld = up;
 }
 
+// A parry attempt: the guard should rise just as the swing starts; parryErr (s) of human timing error, and a slip
+// when the error is big enough to miss the parry window.
+function aiParry(B, L) {
+  const err = rnd(-1, 1) * (L.parryErr || 0);   // early guards are clamped to now: only a late one can miss
+  if (err > .06) aiSlip(B, 'parry');
+  aiGuard(B, Math.max(0, .01 + err), .25);
+}
+
 // A foe started a swing: CPUs in its reach may answer with a parry (timed) or a late guard.
 on('attack', A => {
   if (!A.alive || G_STATE.lock > 0) return;
@@ -165,7 +175,7 @@ on('attack', A => {
     if (!B.alive || B.team === A.team || !aiBrain(B) || B.summon || !B.ai) continue;
     if (Math.abs(B.P[2].x - A.P[2].x) > reach || Math.abs(B.P[2].y - A.P[2].y) > 120) continue;
     const L = aiLevel(B);
-    if (chance(L.parry || 0)) aiGuard(B, .01, .25);
+    if (chance(L.parry || 0)) aiParry(B, L);
     else if (chance((L.block || 0) * .5)) aiGuard(B, L.react * rnd(.4, 1), .4);
   }
 });

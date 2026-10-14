@@ -1,4 +1,4 @@
-# Stick Clash v3: architecture contract
+# Stick Clash v4: architecture contract
 
 Stick Clash is an **original** browser game: wobbly physics stickmen fighting with floppy weapons. It is inspired by the
 stickman-duel genre, but every name, visual and sound must be our own. Never use the name "Supreme Duelist" or copy any
@@ -54,6 +54,7 @@ don't read, edit or follow rules from `/home/user/golf_game`. `v1-reference.html
 | `56-fusion.js`, `57-mounts.js` | core (v3) | elements + elemental orbs (`defElement`), mounts + mount orbs (`defMount`) |
 | `60-maps.js` | maps | map defs |
 | `58-world.js` | maps (v3) | weather, darkness + lights, breakables (`brkSolid`), the `worldFrame` hook |
+| `59-styles.js` | art (v4) | arena art styles (`defStyle`): the style proxy, fighter/effect drawers, cached backdrops, the pixel layer, the "Arena art" setting |
 | `63-maps-v3.js`, `64-maps-v3b.js` | maps (v3) | the 8 v3 arenas; 64 also adds breakables and weather rules to older arenas |
 | `65-ai.js` | ai | CPU brain |
 | `66-ai-moves.js` | core (v3), ai may extend | how CPUs use guard, parry, grabs, throwables, ultimates, walls, pickups, mounts |
@@ -61,12 +62,13 @@ don't read, edit or follow rules from `/home/user/golf_game`. `v1-reference.html
 | `71-modes-party.js`, `72-modes-survive.js` | modes (v3) | party helpers + CTF, Soccer, Hot Potato, Gun Game, Juggernaut; Zombie Horde, Battle Royale, Lava Rising |
 | `73-modes-ranked.js` | modes (v3) | the Ranked ladder, `rankBadge()` for the title screen, rank-up celebration (CSS `styles/73-ranked.css`) |
 | `74-boss-phases.js` | modes (v3) | `bossPhases` (multi-phase bosses, also for the campaign) and Boss Rush's phases |
+| `73-duo.js`, `74-tagteam.js`, `79-silly.js` | modes (v4) | two players on one device: names, head-to-head records, handicap, round length, quick rematch, the 2-player setup panel; Tag Team; the silly-rules vote (CSS `styles/73-duo.css`). Co-op Waves is a Survival variant in 70, the co-op quest node is in 76/98 |
 | `76-campaign.js`, `77-challenges.js`, `98-campaign-ui.js` | campaign (v3) | the trial engine, Mythic Quest (24 nodes, realm bosses, skill tree), 31 challenges; world map, dialogue and lists (CSS `styles/98-campaign.css`) |
-| `75-cosmetics.js` | ui | hats, colour palettes, progression (coins, unlocks, achievements, stats) |
+| `75-cosmetics.js` | ui | hats, colour packs, settings, the v4 save migration, lifetime stats and achievements (trophies) |
 | `78-outfits.js`, `78-pets.js` | cosmetics (v3) | outfits (cloth), weapon skins, K.O. effects, taunts + victory poses; helper pets |
-| `79-lore.js`, `79-mutators.js`, `79-progress.js` | cosmetics (v3) | the Codex's hand-written lore (`LORE_LINES`, by registry key); match mutators + party mini-games; 100-level track, quests, secrets/cheat codes (`cheatKey`, `cheatEnter`), codex stats, presets |
-| `98-ui-progress.js` | cosmetics (v3) | Look tab, presets, Fighter Creator, Track & Quests, Codex (with the Secrets tab's code box), arena mutators, results XP (CSS `styles/98-progress.css`, `styles/98-codex.css`) |
-| `80-audio.js`, `81-music.js` | juice | sound effects (WebAudio synth, buses, panning) and the procedural synthwave music |
+| `79-lore.js`, `79-mutators.js`, `79-progress.js` | cosmetics (v3) | the Codex's hand-written lore (`LORE_LINES`, by registry key); match mutators + party mini-games; titles, secrets/cheat codes (`cheatKey`, `cheatEnter`), codex stats, presets |
+| `98-ui-progress.js` | cosmetics (v3) | Look tab, presets, Fighter Creator (title picker), title-menu entries + title badge, Codex (with the Secrets tab's code box), arena mutators (CSS `styles/98-progress.css`, `styles/98-codex.css`) |
+| `80-audio.js`, `80b-weapon-sfx.js`, `81-music.js`, `83b-voices.js` | juice (v4 sound) | sound effects (WebAudio synth, buses, panning), a sound per weapon, the procedural music with lead melodies, silly voice grunts |
 | `87-juice.js` | juice | game feel: punch zoom, K.O. chroma/vignette, landing dust, speed streaks, heartbeat, hit colours, extra settings |
 | `85-render.js` | core, juice extends | camera, world drawing, fighters, HUD, banners |
 | `88-killcam.js` | juice | K.O. instant replay (ring-buffer snapshots, slow-motion playback, letterbox) |
@@ -76,7 +78,8 @@ don't read, edit or follow rules from `/home/user/golf_game`. `v1-reference.html
 | `92-device.js` | input (v3.1) | the device layer: touch mode Auto/On/Off (`inputSeen`), the rotate card, fullscreen + landscape lock, viewport changes (CSS `styles/92-device.css`); see the slice header |
 | `90-input.js` | core, juice extends | keyboard + rebinding, gamepads, touch |
 | `91-touch.js`, `92-access.js`, `93-pads.js`, `94-savecode.js` | input (v3) | touch stick/gestures/button arc; accessibility; pad remap + join lobby; save codes (CSS `styles/92-access.css`) |
-| `95-ui.js`, `96-ui-loadout.js`, `97-ui-pages.js` | ui | menu framework + title/modes/arenas; loadout with live previews; settings, controls, help, shop, trophies, pause, results (CSS in `src/styles/95-ui.css`) |
+| `94-controls-card.js` | input (v4) | key strips, the controls card, the Controls settings group and the table-mode switches (CSS `styles/94-controls.css`); the schemes, Compact 2P and touch sets live in 90/91 |
+| `95-ui.js`, `96-ui-loadout.js`, `97-ui-pages.js` | ui | menu framework + title/modes/arenas; loadout with live previews and the weapon picker (search, favourites, Recent); settings, controls, help, trophies & stats, pause, results (CSS in `src/styles/95-ui.css`, `96-loadout-v3.css`) |
 | `99-main.js` | core | match/round flow, world step, main loop, boot, `window.SC` |
 
 Owners edit only their own slices. If you need a hook in a core slice, make a **small additive edit** (re-read the file
@@ -92,6 +95,12 @@ W = 1280, H = 720, DT = 1/120, TAU, VERSION, DEFAULT_COLORS (8 neon colours, one
 TUNE            // feel constants: speed, accelGround, accelAir, jumpVel, riseGrav, fallGrav, cutGrav, coyote, buffer,
                 // dashVel/dashCd/dashTime, minHit, hitCd, dmgDiv, maxHit, headMul, kbMul, kbMax, staggerPerDmg,
                 // hitstopMin, roundLimit, koDelay, startLock. Change only with SC.sim measurements.
+                // v4 hit feel: hitstopLow/hitstopMax (freeze for a hitstopMin..maxHit hit), hitstopKO; kbHeavyFrom,
+                // kbHeavy, kbLaunch (heavy hits knock harder and pop the victim up).
+TUNE_SILLY, TUNE_CLASSIC   // v4 body profile (TUNE starts with TUNE_SILLY; Object.assign(TUNE, TUNE_CLASSIC) = the v3 feel):
+                // headLift/neckLift/hipLift, headSpring, spineK (neck bobble), armFlail, armTrail, legScramble,
+                // tumbleMin/tumbleSpin/tumbleLift/tumbleTime, getUp (pop back up when lying, sitting or sunk on the hip),
+                // koSpin/koPop/koBounce (36-shatter pieces). tools/smoke-feel.cjs checks it.
 clamp, lerp, rnd(a,b), rndi(a,b), pick(arr), chance(p), shuffle(arr), dist(a,b), angleTo(a,b), inRect(x,y,rect,pad)
 segSeg(ax,ay,bx,by, cx,cy,dx,dy)   // closest points of two segments -> { d, s, t, px, py, qx, qy } (ONE shared object,
                                    // reused by the next call: read it at once and copy what you keep)
@@ -227,6 +236,15 @@ Melee: every step each weapon rig (main **and** off-hand) is tested against enem
 `TUNE.minHit` hits for `(speed − minHit + 60) / dmgDiv × weapon.dmg` (× head bonus, capped). Weapons meeting at speed
 **clash** (sparks, both bounce, no damage); `block` > 0 bounces harder.
 
+v4 hit feel: the freeze is `hitstopFor(amt, ko, deciding)` (35-effects): 0 below `TUNE.hitstopMin` (9), then 35→120 ms
+up to `maxHit`, 190 ms for a K.O. blow (220 ms if it decides the round: `koDecides(B)`, at most one team left standing
+unless the mode's `koEndsRound(B)` says no, as Tag Team does while a partner waits; the zoom, 87's slow-mo and chroma,
+the announcer, the crowd and the highlight tags ask it too). `heavyShare(amt)` (0 below `kbHeavyFrom`, 1 at
+`maxHit`) adds up to `kbHeavy` × knockback and `kbLaunch` px/s of pop-up, gives a surviving victim its air jump back
+(so ledge launches are recoverable) and, from `tumbleMin` damage, `tumbleKick`: a spin round the hip and loose balance
+for `f.tumble` s (not for riders, held fighters, bosses or a `swingArmor` swing). Guns: shots and blasts from a ranged
+weapon also get `GUN_POWER` (45, 1.12); shields turn a shot with chance `shotBlock(block)` = block^1.7.
+
 ```js
 spawnProj({ owner, x, y, vx, vy, r: 4, dmg: 10, life: 2, grav: 0 /* × map gravity */, drag: 0 /* 1/s */, wind: 0,
   pierce: 0, bounce: 0, homing: 0 /* rad/s */, kind: 'bullet', color, trail: true, explode: 0 /* radius */,
@@ -275,7 +293,11 @@ render code checks for `null` (WebKit returns it when canvas memory is exhausted
 the arena; it is drawing-only. One exception (v3.1): the strip of the viewport under the HUD (`VIEW.hudOver`, `topPad`
 in arena units) is not usable height, so `updateCamera` zooms as if the viewport were that much shorter and, when
 fighters are near the arena's top, lets the view rise above y = 0 by at most `topPad` so they sit under the HUD instead
-of behind it. The viewport is first filled with `mapSkyTop(MAP)` (`skyTopLive` recorded by `mapSky`, else the map's
+of behind it. v4: that rise never pushes the lowest living fighter's feet below the view; when a high fighter and the
+floor can't both fit, it zooms out by up to 6% (`CAM_OUT`), then the floor wins. Focus zooms (ultimate cut-in,
+deciding K.O., kill-cam) keep their own framing. `bannerFit` shrinks each banner line to fit `W - 80` and splits a
+subtitle that would drop below 56 px into two lines; with reduced motion (`SETTINGS.reduceFlash` or the system
+setting) banners skip the pop-in zoom. The viewport is first filled with `mapSkyTop(MAP)` (`skyTopLive` recorded by `mapSky`, else the map's
 `skyTop`, else `palette.sky1`), and `mapSky` / `drawStdBackground` paint a whole screen above the arena, so nothing
 black shows there. `SC.view = { VIEW, CAM }` is the test hook. `focusCamera(x, y, secs)`, `banner(text, subText, seconds, color)`,
 `drawStdBackground(ctx, map, t)`, `drawGridFloor(ctx, floorY, fill, gridColor, edgeColor)`, `glowLine(...)`,
@@ -285,26 +307,78 @@ Fighters launched out of view get an arrow at the screen edge. Name tags and sta
 The HUD names a fighter's off-hand weapon only when it isn't `hidden` (twin halves, gloves, staff ends).
 `render` also calls `kcRecord()` (kill-cam snapshot), `juiceDrawWorld(ctx, dt)` (before fighters),
 `juiceDrawScreen(ctx, dt)` (after the screen overlays) and `kcDrawOverlay(ctx)` (last). The HUD hides during a replay.
+v4: `ctx` is a `let` (`CTX_MAIN` is the canvas's own context): the world pass (`drawWorld`) runs inside `artWorld`, which
+points `ctx` at the arena's art-style proxy (see "Art styles"); it is `CTX_MAIN` again before the HUD. Draw world content
+through `ctx` (or the context you are handed), never by holding on to a context, and never assume `ctx === CTX_MAIN`.
+
+### Art styles (`59-styles.js`, v4; drawing only)
+
+Each arena has an art style (`defMap(key, { style })`, default `'neon'`): **neon** (the classic glow + bloom), **ink**
+(black brush on rice paper, one accent colour: Dojo, Jungle Temple), **pixel** (a chunky low-res world: Moon Base, Robo
+Factory), **paper** (layered card with soft shadows: Candy Land, Giant's Kitchen) and **chalk** (pastel chalk on slate:
+Spike Pit, Haunted Graveyard). Settings → Effects → **Arena art**: `SETTINGS.arenaArt` `'arena'` (default) |
+`'neon'` (neon everywhere). `artStyleOf(map)` / `artNow()` (current `MAP`) / `artIs(key)` give the active style.
+- **The style proxy.** `artWorld(draw)` runs 85's world pass with `ctx = artProxy(realCtx, style)`: every `fillStyle`,
+  `strokeStyle`, `shadowColor` and gradient stop set on it goes through `style.map(rgba, use, hsl, alpha)`, so weapons,
+  hats, outfits, skins (78's proxy wraps this one), statuses, projectiles, pets and mode drawings take the style with no
+  code of their own. `artRaw(c)` unwraps it (draw unmapped, e.g. warnings); `artMono(c, colour)` paints one colour.
+  ink/paper/chalk set `GLOW_SCALE` to 0 for the pass and turn bloom and the additive lights off (84); pixel keeps a
+  small glow. Bodies: `style.body` (85's `artBody`); platform edges and slabs: `style.edge` / `style.slab` (85's
+  `glowLine`, 60's `mapSlab`); 35-effects' particles: `style.dot`; impacts (84): `style.spark` / `flash` / `ring` via
+  `artImpact`; `style.fxLife` makes flashes linger; paper adds card shadows (`artSurfaces`, `artWeaponShadow`).
+- **Backdrops.** An arena may add `art: { top, bg(g, m), live(c, m, t) }` and start its `drawBg` with
+  `if (artBg(ctx, this, t)) return;`. `bg` is drawn once into one reused offscreen canvas (`artBackdrop`, rebuilt on a
+  resize or an arena/style change; arena thumbnails draw it directly), `live` adds the moving or gameplay bits every frame
+  through the proxy (lanterns, vines and dart faces, steam, torches, bats), `top` is the colour above the arena.
+  Helpers: `inkPaper`, `inkStroke`, `inkWash`, `inkSun`, `inkGround`, `paperBackdrop(g, draw)` (the arena's own drawing
+  in card with shadows and cut edges), `chalkBoard`, `chalkLine`, `chalkHatch`, `artArc`. Hazards and platforms keep their
+  geometry; `mapDrawWarn` warnings use the style's `warn` colour, unmapped.
+- **pixel.** The world is drawn into one canvas about a quarter of the viewport's CSS size (`ART_PIXEL` = 4), resized
+  only when the view changes, then scaled up with image smoothing off; colours snap to the 216 web-safe colours
+  (fighters keep theirs). Text drawn there (damage numbers, name tags, warnings) is queued and redrawn crisp on top.
+- **Readability.** Dark text outlines (35's floating labels, 70's `modeText`) are drawn through `artRaw(ctx)`, since
+  chalk would turn them into light grain. Ink fighters and their weapons get a thin paper `halo` so they read against
+  dark ink (the Dojo gate). `style.frame` colours the letterbox bands around the arena (ink paper, paper card, chalk
+  wood; neon and pixel keep near-black).
+- Jitter and textures (chalk grain, paper fibres) are seeded (`artHash`, `artRng`) so nothing flickers; chalk grain
+  patterns are cached per colour. Test hooks: `SC.styles = { STYLES, ART, of(mapKey), reset(), layer() }`;
+  `node tools/smoke-styles.cjs` (also run by smoke.cjs) renders every styled arena with 2 and 8 fighters at 1280x720 and
+  1194x834 (`tmp/smoke/style-*.png`), checks the pixel layer, the setting, a kill-cam and a photo save, and that each
+  style renders in at most 1.5x neon's time on the same arena (measured: 0.5-0.8x, since bloom and glow are off).
 
 ### Audio (`80-audio.js`, `81-music.js`)
 
-`sfx(name, volume, always)` plays a synthesized sound (silent in the menu demo, in `SC.sim` and when muted);
+`sfx(name, volume, always)` plays a synthesized sound (silent in the menu demo, in `SC.sim`, when muted and while the
+AudioContext isn't running: `audioLive()`; `audioBusy()` is true then too, so no voice queues up to burst out on resume);
 `sfxAt(name, x, volume)` pans it by where `x` is on screen. Everything is a no-op where WebAudio is missing.
 Built-in names: hit, clash, ko, orb, jump, land, swing, dash, shoot, boom, skill, block, reload, shatter, blink, slam,
-round, fight, click, heartbeat, cheer, replay, plus hit layers `hit-slash|thud|stab|whip|punch|clang|bullet|magic|weird`
-and `swing-blade|swing-chain`. Content slices add their own at boot: melee `pan saw crack punch zap gust quake`,
+round, fight, click, heartbeat, cheer, replay. A name `family:arg` calls `SFX.family(vol, arg)`, so sounds that need a
+weapon key or a pitch still record and replay as `(name, vol)` in the kill-cam: `ws:<weapon>` (swing or shot) and
+`wh:<weapon>` (hit) from `80b-weapon-sfx.js`, `vox:<line>:<Hz>:<delay>` grunts from `83b-voices.js`.
+Content slices add their own at boot: melee `pan saw crack punch zap gust quake`,
 ranged `gun-*` (revolver, shotgun, minigun, sniper, rocket, twang, laser, plasma, flame, ice, zap, wand, void, ...),
-skills (lunge, fireball, thunder, well, push, heal, ...), maps, and the menus (`nav back unlock coin deny`).
+skills (lunge, fireball, thunder, well, push, heal, ...), maps, and the menus (`nav back unlock chime deny`).
 Check `defSfx` names before adding one: duplicates are reported as errors.
 Add sounds with `defSfx(name, vol => { ... })` using `tone(f0, f1, dur, type, vol, delay)`,
 `noise(dur, freq, vol, filterType, delay)`, `noiseSweep(dur, f0, f1, vol, filterType, delay, q)` (whooshes),
 `metal(freq, dur, vol, delay)` (clangs) and `thump(f0, f1, dur, vol, delay)` (kicks, impacts). Slices that load before
 80 register sounds inside `on('boot', ...)`. Weapons/skills can name their own: `ranged.sfx`, `skill.sfx`, and a weapon's
-`hitSfx` replaces the category layer that plays on its hits (blade → hit-slash, heavy → hit-thud, ...; projectiles →
-hit-bullet, magic → hit-magic). The crowd cheers on every K.O.
+`hitSfx` replaces its `wh:` hit sound. The crowd cheers on every K.O.
 Mix: tone/noise → `SFX_BUS` → `MASTER` → compressor; music → `MUSIC_BUS`. `AUDIO_MIX` + `applyAudioMix()` set the bus
-levels (Settings sliders); mute zeroes `MASTER`. Voices are capped (`AUDIO_MAX_VOICES`). `AUDIO_PITCH` < 1 pitches all
-effects down (the replay uses .8).
+levels (Settings sliders); mute zeroes `MASTER`. Voices are capped (`AUDIO_MAX_VOICES`); effects check
+`audioBusy()`, which leaves `AUDIO_MUSIC_ROOM` voices free for the music (music checks `audioBusy(0)`). `AUDIO_PITCH` < 1
+pitches all effects down (the replay uses .8; hit-stop drops it up to 10%).
+**v4 sound:**
+- **Weapons** (`80b-weapon-sfx.js`): `WSND` holds hand-made recipes; every other weapon uses `WSND_CAT[category]`, set by
+  mass and reach at a pitch hashed from its key, so all 60 differ. The `attack`, `fire` and `damage` events play them.
+  Held drones (chainsaw, minigun, flamethrower) use `audioHold(id, secs, …)`, which keeps playing while re-triggered
+  and fades once it stops.
+- **Punchier hits:** hits of about 13+ damage add a crack and a deeper thump; from about 17 `musicDuck(depth)` dips the
+  music for ~0.3 s.
+- **Grunts** (`83b-voices.js`, on 82's formant synth): oof/ow (big hits), waah (K.O.), hup (some jumps), hyah (heavy
+  swings, skills), yay/hoho (round winners). Pitch comes from class and size plus a per-fighter offset; 0.35 s per
+  fighter and 3 at once. Off in `SC.sim` and the demo, logged in `VOX.log`. Settings `voices` and `voiceVol`.
+  Test hook: `SC.sound`.
 Music (`81-music.js`): an original synthwave loop with a calm `menu` and a driving `fight` theme (`MUSIC_THEMES`, chords
 as semitones), switched on bar lines by game state. It starts after the first key or tap, follows `SETTINGS.musicOn`,
 muffles while paused / slow-mo / replaying, and adds hats when someone is low or at match point.
@@ -316,6 +390,10 @@ muffles while paused / slow-mo / replaying, and adds hats when someone is low or
   arenas without a row get a style rolled from their key). Grooves are 16-step strings in `MUSIC_DRUMS`. `musicIntensity()`
   (low health, match point, final round, `bossPhase`, last 10 s) eases into `MUSIC_DYN.level`, which adds 16th hats (.25),
   an octave bass + counter line (.45), snare rolls + crashes (.7); the final round modulates up 2 semitones.
+  v4 lead melodies: a theme's `mel` holds the tune per form section as `[step, semitones, 16ths]` triples (hand-written
+  for `menu`; `musicMelody()` seeds one per arena: a call ending open, an answer landing on the root). The lead rests
+  for the first 4 bars of each loop (an octave up and at once in the final round). Its instrument comes from
+  `MUSIC_LEADS[theme.leadStyle || art style]`: neon saw, ink flute/koto, pixel square, paper marimba, chalk whistle.
 - **Announcer** (82): `announce(text, prio)` (silent in demo/sim, logged in `ANN.log` even without audio). Calls: round /
   "Final round" / a mode's `roundLabel`, "Fight!" when the start lock ends, "K.O.!", "Perfect!", "Close call!", "Double
   K.O.!", "Time!", "Ring out!", "Ultimate!", "Parry!" (a human involved), "Phase two", "You win!" / "You lose!" / "Game!".
@@ -335,7 +413,9 @@ muffles while paused / slow-mo / replaying, and adds hats when someone is low or
 - **Photo mode** (86): pause → "Photo mode" (state `'photo'` + `G_STATE.override`): free camera (`photoCamera()` at the
   top of `updateCamera`), filters (CSS on `#c`/`#bloom`, baked with `ctx.filter` on save), frames, HUD toggle (hiding the
   HUD also hides name tags, status icons, speech bubbles and off-screen arrows: `photoHidesHud()`), PNG via
-  `toBlob` + download + a preview dialog (`fxModal`) because embedded viewers may block downloads.
+  `toBlob` + download + a preview dialog (`fxModal`) because embedded viewers may block downloads. Chromium's `toBlob`
+  encodes only in idle time, which a redraw every frame starves (1–7 s for 1280x720): while a PNG encodes
+  (`photoBusy()`) photo mode skips redraws (~0.1 s), and the button says "Saving…" after 1 s.
 - **Highlights** (89): every real K.O. is scored and its kill-cam history copied (`hlFlush`, also forced by `kcReset` /
   `kcStart`); the best 5 per session stay in memory, the all-time top 5 summaries in `store 'highlights'`. The title
   menu's Highlights screen replays a clip through `kcStart` and exports WebM: `hlRecordFrame()` (called at the end of
@@ -374,14 +454,52 @@ Defaults (rebindable in Controls, saved via `store`):
   2+ players); every mode's `setup` is wrapped at boot so CPU seats become humans P1..Pn (team with the fewest humans
   first) and `JOINED` maps player n to its own pad/keys only (`padSlot`, `bindsFor`). Up to 8.
 - **Rumble/haptics**: `feel(f, strength, ms, style)` on hits (both sides), K.O.s, parries, guard breaks and ultimates:
-  `padRumble` (dual-rumble × `SETTINGS.rumble`) for that player's pads, and for P1 `nativeHaptic(style)` →
+  `padRumble` (dual-rumble × `SETTINGS.rumble`) for that player's pads, and for a touch player `nativeHaptic(style)` →
   `window.StickClashNative.haptic` (iOS app, expo-haptics styles) or `navigator.vibrate`, rate-limited (90 ms).
 - Touch-first devices (coarse pointer) get on-screen controls during play; they hide once a hardware key is pressed.
-  91-touch: a floating stick where the left thumb lands (analog `TOUCH_AXIS.mx`; push up = jump, pull down =
+  91-touch: a floating stick where the left thumb lands (analog `TSETS[i].mx`; push up = jump, pull down =
   `SETTINGS.touchDown` block/grab/off), right-side gestures (`touchSwipe`: tap attack, swipe up jump, sideways dash,
   down grab) and the action buttons on two arcs around Attack (incl. taunt), sized/faded by `touchSize`/`touchAlpha`,
   relaid on resize (`touchLayout`). Multitouch: each finger is its own pointer. The skill buttons show the skill icons
   and a cooldown sweep (CSS `90-touch.css`, `92-access.css`). Esc/P pause, M mute. Switching tabs pauses.
+- **v4 controls** (90-input, 91-touch, 94-controls-card; Settings → Controls): a scheme per player slot (`CTL.schemes`,
+  store `controls` = `{ schemes: [P1..P8], layout }`, `schemeOf(slot)`, `setScheme`). **Advanced** = every action.
+  **Simple** = move, jump, attack, one skill button (`skill1`; the super instead while the meter is full, HUD hint
+  `★Q` / `SUPER · Q`, touch ★), block by holding back from an attacking foe (grounded; `simpleThreat`) or the block key,
+  dash by double-tap; grab, throwables, skill 2 and taunt are ignored (`SIMPLE_OFF` in `pressAction`) and in play the
+  fighter carries one skill and no throwables; an attack drops the guard (block + attack never grabs). With no grab
+  key, a Simple player catches a Jungle Temple vine by touching it in mid-air (`jungleAutoCatch`, 63), and Training's
+  key hint leaves out 3 (skill 2). With no save at
+  all a new player starts on Simple; any existing save starts on Advanced (written to `controls` at once). CPUs,
+  `SC.press` and trials are unaffected (`schemeOf` is Advanced in `mode.quest`: campaign nodes and challenges are built
+  around throwables, grabs and two skills). **Compact 2P** (`CTL.layout`, `setKeyLayout`): P1 A/D move, W jump, S block, F attack,
+  G skill; P2 ←/→, ↑, ↓ block, `.` attack, `/` skill and `,` skill 2 (its old block key; `COMPACT_KEYS`); the other
+  actions keep their binds unless a core key took them. `keySets()` is what the two key sets do now (use it, not `BINDS`, to read keys: the loadout's
+  `pickerKey(i, act)`, How to Play, the vote). `keyHint` names the player's own device: a key, a pad button (`padName`)
+  or nothing on the touch screen (94's `ctlDevices`, which keeps each slot's last device in `SLOT_DEV` so one player's
+  keys don't relabel a pad player). One-character key caps (`keyCap`, class `k1`) are wider and bold. In a fight every bound
+  key is `preventDefault`ed; `/` `'` `.` always (Firefox quick find). **Key strips** (`SETTINGS.keyStrips`): each
+  keyboard player's keys at their side (set 1 left, set 2 right), at match start and after 5 s idle, faded 3 s into
+  play. **Controls card** (`SETTINGS.controlsCard`): before the first fight of a page session, only the schemes and
+  devices in use (keys, pad buttons, a touch diagram; P2's turned in table mode); the fight waits behind it
+  (`G_STATE.override`) until any key, pad button or tap; also "Controls card" in the pause menu. It never opens by
+  itself under `navigator.webdriver` (like the benchmark): tests override it or call `SC.controls.card(hold)`.
+  `cardAfter(fn, cfg)` runs fn once the card is gone (at once if it isn't open or about to open for that match start):
+  73's first handicap toast waits for it instead of sitting behind its scrim. Key strips need a human in the roster.
+  **Touch sets** (`TSETS[i]` = `{ slot, held, mx, box, stick }`; `TOUCH_SLOT` mirrors set 0): **table mode**
+  (`SETTINGS.tableMode`, Settings → Touch, or "Both on this iPad: Table mode" beside Fight! for 2-player and party
+  modes on touch screens; the lobby then takes two touch seats) gives P2 a copy of the set turned 180° in the top half,
+  below the HUD block (`VIEW.hudY + hudH`), while P1's set takes the bottom half; each half drives only its player
+  (`touchSeats`, set by 93-pads' `touchSeatsUpdate`). Set 1's stick: up/down are its player's own, sideways follows
+  the screen. Haptics go to whichever touch player it was. Table mode needs a tablet: 92's `tableFits()` (the window's
+  short side ≥ 700 CSS px) gates both switches, and `tableOn()` gates set 1's seat and the lobby's second touch seat,
+  so a saved "on" does nothing on a phone. While set 1 drives a player, a hardware key or pad press doesn't hide the
+  sets (92's `touchWanted`). Switching table mode off with two touch seats in the lobby frees the second
+  (`lobbyTouchTrim`, with a toast that Player n needs a keyboard or pad).
+  Advanced buttons are spread along each ring by arc length with size floors (48 px inner ring and block, 44 px outer
+  ring) and at least ~7 px between any two, for one set and for both table-mode sets; a ring widens until its last
+  button clears the screen edge. Simple sets keep their 59/59/44 px. P2's set has its own pause (`.tpause.tpause2`,
+  added after P1's so `#touch .tpause` is still P1's). On coarse pointers, menu controls are at least 44 px.
 - **Accessibility** (92-access, Settings → Accessibility): `cbPalette` (deutan/protan/tritan colours for fighters and
   `PARTY_TEAMS`, plus shape markers + health-bar patterns via `accessCardMark`/`accessTagMark` in 85-render),
   `reduceFlash` (flashes ×.35, shake ×.25, arenas don't strobe: drawing code checks `SETTINGS.reduceFlash`),
@@ -389,11 +507,15 @@ Defaults (rebindable in Controls, saved via `store`):
   and `practiceSpeed` (`accessSpeedMul()` in `advance`: one human, never Ranked; also a slider in the pause menu).
 - **Save codes** (94-savecode, Settings → Transfer progress): `makeSaveCode()` / `readSaveCode(text)` /
   `savePreview(data)`: every `stickclash*` localStorage key as `SC1z.<base64url deflate>.<fnv1a>` (`p` = plain when
-  CompressionStream is missing); import previews, confirms in-page, replaces the keys and reloads.
+  CompressionStream is missing); import previews, confirms in-page, replaces the keys and reloads. An older (v3) code
+  is stripped of what v4 dropped (`saveStripV3`, 75) before its shapes are checked (`SAVE_SHAPES` / `SAVE_MAPS`, incl.
+  `duo` with its `pairs` map and `controls`).
 
 API: `BINDS[slot][action]`, `setBind(slot, action, code)`, `resetBinds()`, `keyLabel(code)`, `keyHint(slot, action)`,
 `captureNextKey(cb)`, `togglePause()`, `readHuman(f)`, `pollPads()`, `setPadBind(slot, action, button)`,
-`resetPadMap(slot)`, `feel(f, ...)`, `nativeHaptic(style)`. Tests: `node tools/smoke-access.cjs` (run by smoke.cjs).
+`resetPadMap(slot)`, `feel(f, ...)`, `nativeHaptic(style)`, v4: `keySets()`, `schemeOf(slot)`, `setScheme(slot, v)`,
+`setKeyLayout(v)`, `TSETS`, `touchSeats(a, b)`. Tests: `node tools/smoke-access.cjs` and `node tools/smoke-controls.cjs`
+(both run by smoke.cjs; the second covers schemes, Compact 2P, key strips, the card and table mode).
 
 ### Menus, settings and progression (`75-cosmetics.js`, `95`–`97-ui`)
 
@@ -402,8 +524,13 @@ API: `BINDS[slot][action]`, `setBind(slot, action, code)`, `resetBinds()`, `keyL
   draw)` (96-ui-loadout, v3.2): a cache keyed by id, size and pixel ratio that hands back the same canvas element on
   every rebuild, so a tap on the loadout no longer redraws ~55 icons; it empties itself past `UI_TILE_MAX` entries.
   Wording follows the controls: `touchUI()` picks "Tap…" over "Press…" / "Hover…" (kill-cam skip hint, skill info). Arrow keys/WASD and the gamepad d-pad move focus spatially, Enter/A presses, Esc/B goes back.
-  `toast(title, sub, icon, color)` shows a notification (hidden while a kill-cam replay plays). Test hooks the smoke test relies on: `#menu .go` (Quick Fight),
+  `toast(title, sub, icon, color)` shows a notification (hidden while a kill-cam replay plays; on the results card at the
+  top, newest only, clear of its buttons). Test hooks the smoke test relies on: `#menu .go` (Quick Fight),
   `#menu button` "Controls", `#controls .binds`/`.go`, `#pause .go` (Resume), `#over h2`, first `#over button:not(.go)` = Menu.
+  On the results card a toast shows only in the gap above the card; otherwise it waits until the card closes (97 wraps
+  `toast`; the card lists the match's trophies anyway), so none covers its title or score. A card taller than the
+  screen scrolls with its button row pinned to its bottom edge (`styles/97-results.css`). Arrows / d-pad skip
+  `tabindex="-1"` controls (`focusables`); a pad's Y in a menu emits `menuAlt` (the focused control's second action).
 - The results screen only takes a fresh confirm: pad A / Enter / Space must be seen released for 300 ms after a 1.2 s
   grace (`UI_FRESH` in 95-ui), so holding or mashing from the fight never starts a Rematch; mouse/touch clicks are unaffected.
 - The menu's cfg also carries `winScore` (only for modes whose `winScore` is the default 5 and that don't set
@@ -417,14 +544,28 @@ API: `BINDS[slot][action]`, `setBind(slot, action, code)`, `resetBinds()`, `keyL
 - `SETTINGS` (saved as `settings`) feeds `FX.shakeMul`, `FX.partMul` (particle count), `FX.dmgNumbers` and
   `AUDIO_MIX { master, sfx, music }` via `applySettings()`. Sound effects play through `SFX_BUS`; **music must connect
   to `MUSIC_BUS`** so the music slider works.
-- `PROFILE` (saved as `profile`): coins, owned hats/colour packs, lifetime stats, trophies. Hats take `price` (0 = free).
-  `defAchievement(key, { name, desc, icon, coins, need, progress(stats) })`, `unlockAchievement(key)`, `addCoins(n)`.
-  Only matches with a real (non-autopilot) human count; `mode.practice: true` (and `training`) earns nothing.
-  A match played at a slowed practice speed (92-access) pays `accessRewardMul()` of its coins and XP (× .4 at 25 %):
-  `settleMatch` sets `reward.mul` and `progSettle` sets `PROG_MATCH.mul`, and both results boxes say
-  "× 0.4 at practice speed".
-  A mode's `results()` may add `won` (boolean), `tournament: true` or `waves: n`; otherwise the score and
-  `G_STATE.info.run` (`cleared` waves, tournament `won` count) decide the coin reward.
+- **v4: no economy.** There are no coins, shop, track, XP or quests: every hat, colour pack and look is free from the
+  start, and a `hidden` def (the secret weapon, hat, K.O. effect, outfit and titles) stays out of every list until its
+  secret is found (`secretShow`, 79). `PROFILE` (saved as `profile`) = `{ ach, flags, stats }`: trophies and lifetime
+  stats. `defAchievement(key, { name, desc, icon, need, progress(stats) })` (all play-based, ≥ 28), `unlockAchievement(key)`,
+  `checkAchievements()` (also once at boot, so a migrated save gets the trophies it already qualifies for).
+  `recordMatch()` counts a finished match once (the results card and `matchOver` both ask) and returns `{ won }` or
+  null: only matches with a real (non-autopilot) human count; `mode.practice: true` (and `training`) count toward
+  nothing. A mode's `results()` may add `won` (boolean), `tournament: true` or `waves: n`; otherwise the score and
+  `G_STATE.info.run.cleared` decide. New trophies of the match are listed on the results card (`trophyBox`, 97).
+  (`accessRewardMul()` is gone from 92-access.)
+- **Save migration** (75, at load, before `PROFILE`/`PROG` are read): `saveMigrateV4()` strips `SAVE_V3_DROPS` from a v3
+  save (`profile`: coins, earned, hats, packs, stats.purchases; `prog`: xp, own, seen; the whole `tasks` key) and keeps
+  everything else; `SAVE_MIGRATED` makes the boot toast "Everything is unlocked". `saveStripV3(keys)` does the same to
+  a `{ fullKey: json }` map (94's imported codes). Fixture: `tools/fixtures/save-v3.2.json` (made by playing v3.2).
+- **Weapon picker** (96): store `picks` = `{ fav: [[P1], [P2]], recent: [[P1], [P2]] }` (`PICKS`, `favToggle`,
+  `pickPlayer(i)`: human pickers are P1/P2, a CPU picker shows P1's lists). The weapon a real player carries into a
+  match joins their Recent row (on `matchStart`, which fires after round 1's fighters exist; six, newest first). The
+  search box filters tiles in place (`weaponFilter` over each cell's `data-find`: name, key, category, description,
+  traits) and keeps `LO.query` across rebuilds; the menu's key navigation ignores text fields (`typingIn`), so WASD
+  type. `moveFocus` measures the sideways offset to a target's nearest edge, so wide controls are reachable by d-pad.
+  Each tile's ☆ is out of the arrow / d-pad order (`tabindex="-1"`): F or a pad's Y favourites the tile in focus
+  (`favFocused`; the `.w-tip` hint says so off touch screens).
 
 ### Customisation and progression (`78`–`79`, `98-ui-progress`)
 
@@ -447,23 +588,26 @@ API: `BINDS[slot][action]`, `setBind(slot, action, code)`, `resetBinds()`, `keyL
   `f.mem.pet`, event `petUse(f, key)`. `petsAllowed()` is false in `ranked`, `ohko`, `mode.noPets` or `cfg.pets === false`.
 - **Mutators**: `cfg.mutators: [keys]` (arena screen). `defMutator(key, { match(cfg), round(), fighter(f), step(dt),
   ko(V, K), hit(B, amt, o), secret })`. Off in ranked, campaign and challenge. Big Heads sets `f.headMul` (render only).
+  `fighter` hooks run once per fighter (`mutFighter`), also for fighters entering mid-round (71's `partyEnterRules`).
 - **Mini-games**: from round 2, every other round of versus/pvp/watch/team/ffa/roulette/tournament may open with a
   10-15 s mini-game (`cfg.minigames` true/false, else `SETTINGS.minigames` auto = watch and party modes). Nobody can
   be K.O.'d (damage x.01 with `f.quietHits` so no damage numbers pop, health refilled, fallers return); `miniFinish`
   then calls `newRound()` and the winner gets a
   small perk. `defMini(key, { time, score, start(m), step(m, dt), draw(c, m) /* world */, hud(c, m) })`; events
   `miniStart(key)`, `miniEnd(key, winner)`.
-- **Progression** (store `prog`): `addXp(n)` grants every `TRACK[level]` reward reached (looks, shop hats, coins);
-  `lookOwned(kind, key)`, `lookGrant(kind, key)`. Match XP is settled once (`progSettle`, on `matchOver`/results) for
-  real players only. Quests (store `tasks`): 3 daily + 3 weekly from `TASKS`, seeded by the local date, one daily
-  reroll per day, `taskBump(key, n)`. Secrets: `SECRETS` (codes typed on the title screen via `cheatKey`, typed into
+- **Progress** (store `prog` = `{ title, secrets, codex }`): `lookUsable(kind, key)` (exists and not hidden), the title
+  worn (`PROG.title`, picked in the Fighter Creator, shown on the title screen's badge). Codex rows and the feats that
+  unlock secrets are settled once per counted match (on `matchOver`). Secrets: `SECRETS` (codes typed on the title screen via `cheatKey`, typed into
   the Codex's Secrets tab via `cheatEnter(text)` (letters and ↑↓←→, returns the matched key), or feats),
   `secretUnlock(key)`. Codex stats: `codexRow(kind, key)` = [uses, wins, K.O.s]. Codex lore: `codexLore(kind, key,
   name, cat)` returns the hand-written `LORE_LINES[kind][key]` (79-lore: kinds w s c m b r p x, two sentences each,
   bosses by campaign node id, realms by `CAMP_REALMS[i].key`; `SC.lore` in tests) and falls back to its generator for
   entries without one. Presets (store `presets`):
   `presetSave/presetApply/presetDelete`.
-- Tests: `node tools/smoke-progress.cjs` (also run by `tools/smoke.cjs`).
+- Tests: `node tools/smoke-progress.cjs` (also run by `tools/smoke.cjs`): the looks, pets, mutators and mini-games, no
+  economy left (functions, fields, screens, and no coin/XP/Shop/Track/Quest text on any screen), every cosmetic free and
+  the secrets hidden until found, ≥ 28 trophies, a match counted once, Ranked settled once, the v3.2 fixture migrating
+  and importing as a code, and the weapon picker (search by keyboard, d-pad and touch, favourites, Recent).
 
 ## v3 fighting depth (core layer: every mode, arena and CPU gets it)
 
@@ -594,7 +738,9 @@ sets `crowd: [min, max, default]` to get a "Fighters" stepper on the arena scree
 
 - Party helpers (71): `partyTeamRoster(cfg, n)` / `partyFfaRoster(cfg, n, extra)` (you + CPUs), `partyMap(cfg, prefer)`
   (the menu's arena if it has a floor), `partySideSpot(team, slot)`, `partySafeSpot(f)`, `partyPlace(f, x, y)`,
-  `partyRespawn(old, x, y, over)` (rebuilds roster fighter `old.id` and swaps it into F), `partyTickRespawns(run, dt,
+  `partyRespawn(old, x, y, over)` (rebuilds roster fighter `old.id` and swaps it into F; it and 70's `kothRespawn` give
+  the newcomer `partyEnterRules(f)`: Settings health, round length and handicap, the match mutators, this round's silly
+  rule, each once), `partyTickRespawns(run, dt,
   spawn)` (counts down `run.dead[id]`), `partyEnd(team, reason, title, sub, color)` (endRound + the mode's banner),
   `partyHazard(o)`: a hazard owned by a mode (`{ kind, x, y, w, h, dps, tick, launch, status }`, mutate its x/y/w/h live).
   It rides PROJ as a zone instead of joining `MAP.hazards`, because arena scripts may index their own hazards.
@@ -641,6 +787,54 @@ sets `crowd: [min, max, default]` to get a "Fighters" stepper on the arena scree
   first threshold). Helpers: `bossSummonAdd(boss, o, k)`, `bossAddHazard(kind, x, w, o)`, `bossStrike(boss, o)`,
   `bossQuake(f, o)`.
 
+### Two players on one device (v4: `73-duo.js`, `74-tagteam.js`, `79-silly.js`)
+
+- **The 2-player setup** is the arena screen of a mode with `duo: 'versus'` (pvp, tagteam) or `'coop'` (coop,
+  coopwaves): `duoPanel` (prepended, CSS `order: -1`) holds the P1/P2 name fields, the pair's record and, for versus,
+  Handicap and Silly rules. 94-controls-card adds Table mode to the same screen's `.quick-set`; 73 adds Round length.
+- **Match cfg** (sent by 95 `menuCfg` through `duoMenuCfg`): `roundLen` ('short' | 'normal' | 'long': health and the
+  round limit ×0.7 / ×1 / ×1.6; party modes, i.e. `customRounds`, default Short; off in campaign, challenge, ranked and
+  training), `handicap` (bool) and `silly` ('vote' | 'off') for `duo: 'versus'` modes only, `names` (tests). **A cfg
+  without them plays exactly as before**
+  (SC.start, tools, the demo). `duoHpApply(f)` applies round length and handicap once per fighter (round start, the
+  respawn helpers, tag-ins); health carried over (`'hp' in run`) is left alone, as with `matchHpMul`.
+- **Records** (store `duo` = `{ names, hcap, silly, told, pairs }`): `duoPair()` names the two players of a match between
+  two humans and nobody else in a `duo: 'versus'` mode (lobby party modes never count, vote or handicap);
+  `duoSettle()` counts it once (the results card and `matchOver` both ask; never autopilot). `duoLoad` checks every saved
+  pair (`duoRepair`: bad counts and lists reset, a pair without two names dropped), and `duoResultsLine` ("Head-to-head:
+  …") never lets a failing record keep the results card from showing.
+  `pairs[key]` = `{ n: names sorted, w: wins, last: last 10 winners 'a'|'b'|'d', streak: [side, n], total, wave }`.
+  `duoHandicap(rec)`: whoever won more of the last 10 starts with 5 % less health per win of lead, at most 30 % (a "♥ −N%"
+  tag on the HUD card via 85's `duoBadge`, a toast the first time). Shown on the setup, the results card
+  (`duoResultsLine`) and Trophies & Stats → Rivals.
+- **Quick rematch**: results button "Rematch · new weapons", R, or a pad's Start: `quickRematch()` restarts the same cfg
+  with every loadout on a random weapon nobody just used (not for quest modes or modes without pickers).
+- **Silly rules vote** (79-silly): before each round of a 2-human duel with `cfg.silly === 'vote'` (not a party
+  mini-game round), both players pick one of three rules (`SILLY` defs + `SILLY_MUTS`, the round-safe 79 mutators) with
+  their own left/right + attack/jump keys (`keySets()`, in `JOINED`'s seat order), a pad's d-pad + A, or a tap on their side (P2's side faces
+  them in table mode). The world waits frozen (`G_STATE.override = sillyHold`), and the vote shows only from then on
+  (`sillyLive`): after 94's controls card and once table mode's touch seats are known (each side's rules in one row,
+  under the HUD); key strips wait for it. The hints are key caps, pad buttons or "Tap a rule". The timer (`SILLY_TIME`) picks for
+  anyone who hasn't; a split is drawn. `SILLY_ON` runs the rule's hooks for that round only; `sillyFighter(f)` applies
+  it to fighters that join mid-round. Giant Heads also sets `f.headHit`, which grows the head's hurt radius (20's `hurtR`)
+  to match its drawing for that round.
+- **Tag Team** (`tagteam` P1 vs P2, `tagcpu` vs the CPU; 4 loadout pickers, `pickerOwner` maps them to P1/P2 lists): only
+  the fighter on the field is in the roster; partners wait in `run.tag`. A K.O. with a partner left schedules `tagIn`
+  (`TAG_DELAY`, then `partyRespawn` at the side's spawn with `TAG_GUARD` s of protection); `holdRound` + `onStep` end a
+  round when a side has nobody left (time-out: partners left + health share). `koEndsRound` keeps a K.O. with a partner
+  waiting a mid-round one (`koDecides`). The partner takes its player's colour (the outgoing roster entry's, so a
+  colour-blind palette holds), and the mode's HUD row (`PARTY_HUD_Y`) shows each side's fighters left in that colour.
+- **Co-op Waves** (`coopwaves`, 70): Survival for two (`survivalWave(n, diff, color, duo)` adds a grunt or a tougher boss;
+  Survival's `run.hp` is per hero, 0 = K.O.'d, back up with `SURV_HEAL` next wave); best run per pair (`rec.wave`);
+  `noScore` (the waves cleared are the result).
+- **Co-op quest** (76/98): `cfg.coop` adds Player 2 as hero 1 (`questHero(cfg, me, 1)`, spawn 4); a lone foe gets ×1.4
+  health, a group one more member (`questCoopFoes`); `questHeroes()` / `questLead()` replace player 1 in the trial
+  rules, overrides and stars. Foes skip spawn 4 (Player 2's). The node card's "Play this node with 2 players" opens the
+  campaign's loadout on Player 2's picker (`CAMP_UI.coopPick`; `MODES.campaign` pickers, labels and loadoutLabel are
+  getters), whose Fight ▸ walks to the node and starts it with `CAMP_UI.coop`; `campCoopLoadouts()` reads picker 1 as
+  Player 2's own loadout (MENU.loadouts is shared by index), never as the Versus CPU's.
+- Tests: `node tools/smoke-2p.cjs` (also run by smoke.cjs); screenshots `tmp/smoke/2p-*.png` at 1280x720 and 1194x834.
+
 ### Campaign and challenges (`76-campaign.js`, `77-challenges.js`, `98-campaign-ui.js`)
 
 - **Trial engine** (76): a campaign node and a challenge are the same plain-data *spec* (see the comment at the top of
@@ -686,6 +880,10 @@ defWeapon('katana', {
   offhand: null,     // key of a (usually hidden) weapon def held in the back hand: dual wield, sword + shield
   block: 0,          // 0..1: chance to deflect projectiles; also bounces attackers harder in clashes
   cd: null,          // attack cooldown (default .5 + mass × .07)
+  guard: 1,          // v4: × chip and stamina cost when blocking with it; its parry window × (2 − guard) (broadsword .5)
+  swingArmor: 1,     // v4: × knockback taken (and no tumble) while it swings (greatsword .3)
+  deflect: false,    // v4: shots touching it mid-swing fly back at the shooter (energy saber)
+  arc: '', sig: '',  // v4 blades: swing arc and signature move, for tools and the Codex
   kb: 1, armor: 1, speed: 1,   // knockback ×, damage taken × while held, run speed ×
   color: '#dfe6ff',  // used for muzzle flashes, projectiles and HUD accents
   power: 1,          // balance knob: × all melee/projectile/blast damage dealt with it (tuned with tools/balance.cjs)
@@ -705,6 +903,10 @@ unit vector hand→tip and its normal, current length, thickness scale `k` (grow
 
 Melee weapons swing with the default spin unless `attack` is given. Ranged weapons aim the weapon arm at the nearest
 visible enemy (with a little wobble) and fire along the barrel; `auto: true` keeps firing while attack is held.
+Melee helpers (40): `spinAttack(f, power, pivot)` (pivot 1 neck = overhead, 2 hip = wide low sweep, 5 elbow = forearm
+flick), `meleeThrust(f, power, rig, lunge)`, `meleeLater(f, secs, fn)` + `meleeLaterStep` in the def's `onStep` (timed
+follow-ups: flurries, wind-ups), `meleeStreak(A, B, key, secs)` (hits in a row). The v4 blade table (reach, speed,
+damage, signature) is in `tmp/balance.md`.
 
 ### Skill
 
@@ -754,6 +956,7 @@ v3 map fields (all optional; `58-world.js` reads them):
   over a drop, or `undefined` to fall back to the flat rules (the asteroid returns its planets' tops, except while
   `astroFrame` holds the brain's flat floor at 1e5), so blinks, crates, mines, mount landings and the blade ultimate's
   dash find real ground.
+- `style` / `art` (v4): the arena's art style and styled backdrop (see "Art styles").
 - `skyTop` (v3.1): the colour above the arena's top edge, shown when the camera rises under the HUD (`mapSkyTop`,
   85-render). Maps that paint their sky with `mapSky` need nothing: it records `MAP.skyTopLive` every frame (so the
   Eruption's hot sky still matches); the others (Neon City, Haunted Mansion, Giant's Kitchen) name one; `palette.sky1`
@@ -793,6 +996,7 @@ defMode('tournament', { name: 'Tournament', desc: '…', order: 40,
   results() { return { title, color, lines: [] }; },      // called once when the match ends
   roundLabel() { return 'WAVE 3'; },                      // optional: HUD text instead of "ROUND n"
   holdRound() { return true; },                           // optional: the mode ends rounds itself via endRound(team, reason)
+  koEndsRound(victim) { return false; },                  // optional: this K.O. can't end the round (Tag Team's partner)
   aiGoal(f) { return { x, y, w }; },                      // optional: a zone CPUs should stand in (feet y)
   aiArmor: false,                                         // optional: CPUs skip the difficulty toughness factor
   rerollRandom: true })                                   // optional: re-roll 'random' weapons/skills every round
@@ -806,6 +1010,11 @@ rounds (ladders, waves), replace entries of `G_STATE.roster` in `roundOver` befo
 ### CPU brain (`65-ai.js`)
 
 `AI_LEVELS` (easy, normal, hard, insane) holds every difficulty knob; `aiShift(level, steps)` moves along `AI_ORDER`.
+v4 human-like slips (`AI_SLIPS`, merged in): `whiff` (swing out of reach), `mistime` (a guard late or dropped early, in
+`aiGuard`), `wrongDash`, `badJump` (hop in front of a foe about to swing), `hesitate` (freeze .15–.4 s), `jitter` (±
+share of `react`), `parryErr` (s of parry timing error, `aiParry`). Each slip calls `aiSlip(f, kind)` (`f.ai.slips`,
+event `aiSlip`). Tuned to ~16 / 8 / 3.5 / 1.3 slips a minute (Easy → Insane). Rivals with `flourish` ('taunt', 'hop',
+'bow') show off for a moment after scoring a K.O. (`aiFlourish`, 67).
 Modes can set `f.ai.behave = 'idle'` (stands still) or `'roam'` (moves, never attacks). Melee attack choice is learned
 per weapon at runtime (`AI_MOVES`: plain swing / jump + swing / dash + swing by distance), so new melee weapons need no
 AI code; ranged weapons are aimed with lead and arc compensation. Weapon `ai.think` still runs (every step for ranged
@@ -848,7 +1057,8 @@ every mode to a result; `SC.start({ mode: 'watch', diffs: ['easy', 'insane'] })`
 - **Rival balance**: each rival with its own favourite gear wins 49–60 % of rounds against a plain Normal CPU with random
   gear (`tmp/lead2/persona.cjs`, ~350 rounds each; `PATCH='{"torque":{"cls":"none"}}'` tries changes). Gear matters more
   than the knobs: a Brute with a heavy weapon ran ~70 %, so Torque is a Trickster and Fenn classless; `react` (> 1 =
-  slower reads) is the cleanest knob for toning a style down without changing it.
+  slower reads) is the cleanest knob for toning a style down without changing it. v4: Vale (Zoner) ran 64–69 % with the
+  gun buffs; react ×1.25 and attack ×.8 bring it to ~58 % (`tmp/balance.md`).
 
 ### Orb, hat
 
@@ -948,12 +1158,15 @@ defMode('ffa', {
 `node tools/map-balance.cjs` (arenas) and `node tools/ai-bench.cjs` (difficulty) measure these; run them after changing
 anything that affects feel or balance, and update `tmp/balance.md`.
 
-- Movement: run ~470 px/s reached in 0.13 s, stop in ~0.18 s (≈35 px of wobble-slide), turn in ~0.27 s.
-  Full jump ~214 px (apex 0.33 s, lands 0.68 s), tap = short hop ~117 px, double jump ~385 px, dash ~195 px.
+- Movement (v4 silly profile): top speed reached in 0.13 s, stop in ~0.19 s (≈36 px of wobble-slide), turn in
+  ~0.17 s; the head sways ~4.6 px standing (v3 1.7) and ~13 px when stopping (v3 9.6). Full jump ~212 px (apex
+  0.33 s, lands 0.68 s), tap = short hop ~115 px, double jump ~384 px, dash ~194 px. Limits: top speed ≤ 0.2 s, stop
+  ≤ 0.25 s.
 - Damage: a typical melee hit deals ~7–8 (heavy or head hits up to 26 before rage/status multipliers); 100 hp.
 - Rounds (CPU vs CPU, random loadouts): median 8–15 s per arena at Normal, 9–18 s at Easy, longer for gun-vs-gun.
   Humans miss more than bots, so real matches land in the 10–30 s target.
-- Fighters stay upright 86–99 % of the time.
+- Fighters stay upright 86–99 % of the time (v4 silly profile: 75–92 % per arena, 87 % on average; the Space Asteroid
+  is lowest; the limit is 70 % everywhere).
 - Weapons: every visible weapon wins 40–60 % (hard limits 35–65 %) of its round-robin rounds at Normal, where the
   shipped `power` values were tuned. Hard shifts a few slow-projectile guns down and instant ones up (≈34–68 %):
   Hard CPUs dodge 58 % of shots, so tune at Normal and check Hard stays inside 30–70 %.
@@ -962,7 +1175,7 @@ anything that affects feel or balance, and update `tmp/balance.md`.
   or two from Normal up, and every throwable used within a few rounds. Measure with the `on(...)` events.
 - Skills: every skill should help its carrier against a skill-less mirror (impact ≈52–68 %) and land 40–60 % in
   random-loadout fights; the CPU should use each one about once or twice a round.
-- Difficulty: each level beats the one below it in ~65–80 % of rounds (Easy→Normal→Hard→Insane).
+- Difficulty: each level beats the one below it in ~65–85 % of rounds (Easy→Normal→Hard→Insane; v4: 79 / 75 / 72 %).
 Keep new content near these numbers (a new weapon should land between 40 % and 60 % in `tools/balance.cjs`;
 adjust its `power` first, its mechanics second).
 
@@ -1010,11 +1223,15 @@ Tip: to stop the real-time loop interfering while you script a test, set `SC.G.s
   throwable, grab) on a phone-sized touch screen.
 - v3.1 (`tools/smoke-world.cjs`, also alone): the HUD band and camera on iPad Pro 11" and 12.9" layouts (fighters on the
   Kitchen shelf stay under the HUD; `tmp/smoke/ipad-hud-*.png`), the sky fill above the arena (no letterbox pixels in
-  the viewport with both fighters on the Asteroid's top planet), the Codex's code box, practice-speed rewards (× .4 at
-  25 %), the lore table (every key, all lines unique), the asteroid's `groundBelow` + Phase Step, CPU vines and the
+  the viewport with both fighters on the Asteroid's top planet), the Codex's code box, practice-speed results (counted,
+  no reward box), the lore table (every key, all lines unique), the asteroid's `groundBelow` + Phase Step, CPU vines and the
   "TOO BIG" label. `tools/smoke-ipad.cjs` (touch mode, fullscreen, performance) runs when present.
 - v3.2 (`tools/smoke-world.cjs` too): a hidden tab flushes dirty saves, a Ranked match abandoned by pagehide and then
   restored from the bfcache ends at the menu with the rank moved once, `GLOW_SCALE` through `glow()` and the settings,
   the campaign map's canvas cap and no idle redraws (`tmp/smoke/ipad-campaign-*.png`), the loadout tile cache, the
   Codex arrows not focusing the input, the HUD's stubbed safe-area inset, and "Tap to skip" on touch.
+- v4 feel (`tools/smoke-feel.cjs`, also alone): upright ≥ 70 % under `TUNE_SILLY` on six arenas (nobody down 4 s+) and
+  floppier than `TUNE_CLASSIC`; hit-stop 0 for light hits, growing with damage, longest on the K.O.; heavy hits knock
+  harder, launch and tumble; a short guns-vs-melee round robin within 30–70 %; every blade's reach and speed distinct
+  (no two within 10 % on both); every CPU level slips (Easy most) and still beats the level below.
 It prints a table and exits non-zero on any failure. Screenshots: `tmp/smoke/`.

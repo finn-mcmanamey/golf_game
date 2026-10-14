@@ -2,12 +2,13 @@
 // copyable code: JSON { v, t, k: { key: raw } } → deflate (CompressionStream, when the browser has it) → base64url,
 // written as SC<version><z|p>.<data>.<fnv-1a checksum of the JSON>. Importing checks the code, previews what will
 // change and asks for a confirm (no window.confirm: embedded viewers block it), then replaces the saves and reloads.
+// Older (v3) codes still import: the parts v4 dropped (coins, shop unlocks, track XP, quests) are stripped first.
 // A browser without DecompressionStream (iPadOS 16.0–16.3) unpacks 'z' codes with the small inflater at the end.
 
 const SAVE_CODE_V = 1, SAVE_KEY_PREFIX = 'stickclash';
-const SAVE_NAMES = { settings: 'Settings', profile: 'Coins, unlocks & stats', prog: 'Progress track', tasks: 'Quests', presets: 'Fighter presets',
+const SAVE_NAMES = { settings: 'Settings', profile: 'Trophies & stats', prog: 'Codex, secrets & title', presets: 'Fighter presets', picks: 'Favourite weapons',
   binds: 'Keys', padmap: 'Gamepad buttons', ranked: 'Ranked', quest: 'Campaign', challenges: 'Challenges', menu: 'Menu choices', highlights: 'Highlights',
-  bench: 'Performance test' };
+  bench: 'Performance test', duo: '2-player records', controls: 'Control schemes' };
 const XFER = { code: '', preview: null, msg: '', input: '' };
 
 const fnv1a = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0; return h.toString(16).padStart(8, '0'); };
@@ -25,18 +26,19 @@ async function makeSaveCode() {
   const zip = typeof CompressionStream === 'function';
   return `SC${SAVE_CODE_V}${zip ? 'z' : 'p'}.${toB64u(zip ? await codecPipe(raw, CompressionStream) : raw)}.${fnv1a(json)}`;
 }
-// The kind of value each known save must hold (o = object, a = array, n = number, b = boolean, s = string) and the
-// numbers that must be finite inside the profile. A hand-edited code with the wrong shapes is refused, not imported.
-const SAVE_SHAPES = { settings: 'o', profile: 'o', prog: 'o', tasks: 'o', presets: 'a', binds: 'a', padmap: 'a', ranked: 'o', quest: 'o',
+// The kind of value each known save must hold (o = object, a = array, n = number, b = boolean, s = string), the
+// numbers that must be finite and the maps that must be objects. A hand-edited code with the wrong shapes is refused.
+const SAVE_SHAPES = { settings: 'o', profile: 'o', prog: 'o', presets: 'a', picks: 'o', binds: 'a', padmap: 'a', ranked: 'o', quest: 'o',
   challenges: 'o', menu: 'o', highlights: 'a', wins: 'o', muted: 'b', camera: 'b', weather: 's', tourneyBest: 'n', survivalBest: 'n',
-  bossBest: 'n', zombieBest: 'n', bench: 'o' };
+  bossBest: 'n', zombieBest: 'n', bench: 'o', duo: 'o', controls: 'o' };
+const SAVE_MAPS = { profile: ['stats', 'ach', 'flags'], prog: ['secrets', 'codex'], duo: ['pairs'] };
 function saveShapeCheck(key, value) {
   const short = key.replace(/^stickclash\.(v\d+\.)?/, ''), want = SAVE_SHAPES[short];
   if (!want) return;
   const kind = Array.isArray(value) ? 'a' : value === null ? 'x' : typeof value === 'object' ? 'o' : typeof value === 'number' ? 'n' : typeof value === 'boolean' ? 'b' : typeof value === 'string' ? 's' : 'x';
   const num = (o, ks) => ks.every(k => o[k] === undefined || (typeof o[k] === 'number' && Number.isFinite(o[k])));
-  const ok = kind === want && (short !== 'profile' || (num(value, ['coins', 'earned']) && (value.stats === undefined || (value.stats && typeof value.stats === 'object' && !Array.isArray(value.stats))))) &&
-    (short !== 'ranked' || num(value, ['pts', 'best', 'wins', 'losses', 'streak'])) && (short !== 'prog' || num(value, ['xp']));
+  const maps = (o, ks) => ks.every(k => o[k] === undefined || (!!o[k] && typeof o[k] === 'object' && !Array.isArray(o[k])));
+  const ok = kind === want && maps(value, SAVE_MAPS[short] || []) && (short !== 'ranked' || num(value, ['pts', 'best', 'wins', 'losses', 'streak']));
   if (!ok) throw new Error(`The code holds a ${SAVE_NAMES[short] || short} save in the wrong shape, so it can’t be imported.`);
 }
 // Returns the decoded save object or throws an Error with a message for the player.
@@ -50,6 +52,7 @@ async function readSaveCode(text) {
   if (fnv1a(json) !== m[4]) throw new Error('The code is damaged or cut short (checksum mismatch).');
   const data = JSON.parse(json), keys = data && data.k;
   if (!keys || typeof keys !== 'object') throw new Error('The code has no saves in it.');
+  saveStripV3(keys);                                // a v3 code: coins, shop unlocks, track XP and quests are dropped (75)
   for (const [k, v] of Object.entries(keys)) {
     if (!k.startsWith(SAVE_KEY_PREFIX) || typeof v !== 'string') throw new Error('The code holds something that isn’t a save.');
     saveShapeCheck(k, JSON.parse(v));               // every save is JSON: a broken one throws (caught by the caller)
@@ -57,7 +60,7 @@ async function readSaveCode(text) {
   return data;
 }
 
-// What the import changes, key by key, plus headline numbers (coins, level, rank) before → after.
+// What the import changes, key by key, plus headline numbers (trophies, matches, rank) before → after.
 function savePreview(data) {
   const now = saveKeysNow(), next = data.k, rows = [];
   for (const k of new Set([...Object.keys(now), ...Object.keys(next)])) {
@@ -66,7 +69,7 @@ function savePreview(data) {
     if (st !== 'same') rows.push({ name: SAVE_NAMES[short] || short, st });
   }
   const num = (src, key, f) => { try { return f(JSON.parse(src[SAVE_KEY_PREFIX + '.v2.' + key])); } catch (e) { return '—'; } };
-  const facts = [['Coins', 'profile', p => p.coins], ['Track XP', 'prog', p => p.xp],
+  const facts = [['Trophies', 'profile', p => Object.keys(p.ach || {}).filter(k => ACHIEVEMENTS[k]).length], ['Matches', 'profile', p => (p.stats || {}).matches || 0],
     ['Rank', 'ranked', r => typeof rankOf === 'function' ? rankOf(r.pts).label : r.pts]].map(([label, key, f]) => [label, num(now, key, f), num(next, key, f)]);
   return { rows, facts, when: data.t ? new Date(data.t).toLocaleString() : '?', data };
 }
@@ -76,7 +79,7 @@ function applySaveCode(data) {
     for (const k of Object.keys(saveKeysNow())) if (!(k in data.k)) localStorage.removeItem(k);
     for (const [k, v] of Object.entries(data.k)) localStorage.setItem(k, v);
   } catch (e) { XFER.msg = 'Could not write the saves: ' + e.message; refreshScreen(); return; }
-  profileDirty = false;               // 75-cosmetics saves a dirty profile on pagehide: it must not undo the import
+  profileDirty = progDirty = false;   // 75 and 79 save dirty stores on pagehide: that must not undo the import
   location.reload();
 }
 
@@ -113,7 +116,7 @@ function transferScreen() {   // registered at boot by 93-pads
   if (!XFER.code) makeSaveCode().then(c => { XFER.code = c; out.value = c; }, e => { out.value = 'Could not make a code: ' + e.message; });
   const body = el('div', { class: 'set-grid two' },
     el('section', { class: 'set-group' }, el('h3', { text: 'Export' }),
-      el('p', { class: 'hint', text: 'This code holds all your progress: coins, unlocks, track, quests, campaign, ranked, settings and controls.' }),
+      el('p', { class: 'hint', text: 'This code holds all your progress: trophies, stats, ranked, campaign, challenges, codex, presets, settings and controls.' }),
       out, el('div', { class: 'access-links' }, uiButton('Copy code', () => copySaveCode(out), null, { 'data-key': 'xfer-copy' }),
         uiButton('New code', () => { XFER.code = ''; refreshScreen(); }))),
     el('section', { class: 'set-group' }, el('h3', { text: 'Import' }),

@@ -45,7 +45,7 @@ function strike(A, B, rig) {
     const a = A.P[ws[w][0]], b = A.P[ws[w][1]];
     for (let h = 0; h < HIT_SHAPES.length; h++) {
       const T = HIT_SHAPES[h], c = B.P[T.a], d = B.P[T.b], r = segSeg(a.x, a.y, b.x, b.y, c.x, c.y, d.x, d.y);
-      if (r.d > T.r * B.scale + width) continue;
+      if (r.d > hurtR(B, T) + width) continue;
       const rx = lerp(vx(a), vx(b), r.s) - lerp(vx(c), vx(d), r.t), ry = lerp(vy(a), vy(b), r.s) - lerp(vy(c), vy(d), r.t);
       const rel = Math.sqrt(rx * rx + ry * ry);
       if (rel > bestRel) { bestRel = rel; bestRx = rx; bestRy = ry; bestT = T; bestX = r.px; bestY = r.py; }
@@ -104,8 +104,9 @@ function damage(B, amount, o = {}) {
 // A weapon's `power` (balance knob, default 1) scales what its wielder deals with it; skills and statuses are unaffected.
 // Weapon levels (33-power) add to it: Lv2 and Lv3 hit harder with that weapon.
 // The Brute class (24-classes) adds meleeCls on top for melee hits.
+// Shots and blasts from a gun also get GUN_POWER (45): v4 made every gun hit harder.
 const weaponPower = (A, kind) => kind === 'melee' || kind === 'proj' || kind === 'explode' ?
-  (A.w.power || 1) * (A.lvlDmg || 1) * (kind === 'melee' ? A.meleeCls || 1 : 1) : 1;
+  (A.w.power || 1) * (A.lvlDmg || 1) * (kind === 'melee' ? A.meleeCls || 1 : A.w.ranged ? GUN_POWER : 1) : 1;
 
 // Hits within 0.1 s of the last counted one (a pellet spread, a kunai fan, a minigun burst) are one combo step.
 // Each fighter has one combo label that updates in place. In crowded matches CPUs only show milestones (5, 10, ...).
@@ -120,18 +121,39 @@ function countCombo(A) {
   float(A.P[0].x, A.P[0].y - 54 * A.scale, A.combo + ' HIT COMBO', A.color, 19 + Math.min(10, A.combo), 'combo' + A.id);
 }
 
+// 0 for ordinary hits, rising to 1 at TUNE.maxHit damage: how "heavy" a hit is for knockback, launch and tumbles.
+const heavyShare = amt => clamp((amt - TUNE.kbHeavyFrom) / (TUNE.maxHit - TUNE.kbHeavyFrom), 0, 1);
+
 // Shoves the struck part hardest and the whole body a bit, then staggers so the shove isn't cancelled at once.
+// Heavy hits knock harder and pop the victim up into a spinning tumble; a launched survivor gets its air jump back,
+// so a big hit near a ledge is a scramble to recover rather than an instant ring-out.
 function knockback(B, o, amt) {
   B.stagger = Math.max(B.stagger, clamp(amt * TUNE.staggerPerDmg, .06, TUNE.staggerMax));
   if (!o.kb) return;
-  const kb = o.kb * (B.hp > 0 ? 1 : 1.6) / Math.pow(B.scale, 1.5) * (B.kbMul || 1) * (B.kbCls || 1) * mountMul(B, 'kb');   // v3: class mass, mounts
-  const nx = o.nx || 0, ny = o.ny || 0, lift = 60 + kb * .18;
+  const heavy = o.blocked ? 0 : heavyShare(amt), body = 1 / Math.pow(B.scale, 1.5) * (B.kbMul || 1) * (B.kbCls || 1) * mountMul(B, 'kb');   // v3: class mass, mounts
+  const kb = o.kb * (1 + heavy * TUNE.kbHeavy) * (B.hp > 0 ? 1 : 1.6) * body * swingArmor(B);
+  const nx = o.nx || 0, ny = o.ny || 0, lift = 60 + kb * .18 + heavy * TUNE.kbLaunch * body;
   const parts = o.parts || [1, 2];
   for (const j of ALL_BODY) {
     const k = parts.includes(j) ? 1 : .38;
     kick(B.P[j], nx * kb * k, (ny * kb - lift) * k);
   }
+  if (heavy <= 0 || B.hp <= 0) return;
+  B.airJumps = Math.max(B.airJumps, 1);
+  if (amt >= TUNE.tumbleMin && swingArmor(B) === 1 && !B.mount && !B.heldBy && B.scale < 1.2) tumbleKick(B, nx || (B.P[2].x - (o.x ?? B.P[2].x)) || 1, heavy);
 }
+
+// A heavy hit spins the body round its hip (head along the push, feet the other way) and loosens its balance for a
+// moment (driveBody reads f.tumble), so it cartwheels before it stands back up.
+function tumbleKick(B, dir, heavy) {
+  if (!(TUNE.tumbleSpin > 0)) return;
+  const hip = B.P[2], spin = Math.sign(dir) * (5 + 9 * heavy) * TUNE.tumbleSpin;   // rad/s
+  for (const j of ALL_BODY) { const p = B.P[j]; kick(p, -(p.y - hip.y) * spin, (p.x - hip.x) * spin); }
+  B.tumble = Math.max(B.tumble || 0, TUNE.tumbleTime * (.5 + heavy * .5));
+}
+
+// A weapon with swingArmor (the greatsword) keeps its wielder planted while it swings: knockback × that, no tumble.
+const swingArmor = B => B.swingT > 0 && B.w && B.w.swingArmor ? B.w.swingArmor : 1;
 
 function hitFeedback(B, amt, x, y, o, direct) {
   const nums = FX.dmgNumbers && !B.quietHits;     // quietHits: a party mini-game's token hits (79) show no numbers
@@ -144,7 +166,9 @@ function hitFeedback(B, amt, x, y, o, direct) {
   ring(x, y, 16 + amt * 1.4, 'rgba(255,255,255,.75)', .18, 3);
   if (nums) float(x, y - 24, (o.head ? 'HEAD ' : '') + amt, o.head ? '#ffd84a' : o.color || '#ffffff', 20 + Math.min(amt, 30) * .6);
   shake(Math.min(18, 3 + amt * .45));
-  if (amt >= TUNE.hitstopMin) hitstop(clamp(amt * .0035, .035, .1));
+  const ko = B.hp <= 0, deciding = ko && koDecides(B);
+  const stop = hitstopFor(amt, ko && !B.summon, deciding);   // scaled with the damage; the K.O. blow holds longest
+  if (stop > 0) hitstop(stop);
   sfx('hit', clamp(amt / 22, .4, 1.4));
 }
 
@@ -162,6 +186,11 @@ function blockHit(B, A, x, y, o) {
   emit('block', B, A);
 }
 
+// Whether B's K.O. ends the round: one team left, unless mode.koEndsRound says no (Tag Team's waiting partner).
+function koDecides(B) {
+  return new Set(F.filter(e => e.alive && e !== B && !e.summon).map(e => e.team)).size <= 1 && hook(G_STATE.mode, 'koEndsRound', B) !== false;
+}
+
 function knockout(B, A, o = {}) {
   if (!B.alive) return;
   B.alive = false; B.hp = 0; B.status = {};
@@ -170,7 +199,7 @@ function knockout(B, A, o = {}) {
   if (o.kind !== 'ringout') { burst(c.x, c.y, B.color, 40, 600); burst(c.x, c.y, '#ffffff', 16, 800); ring(c.x, c.y, 120, B.color, .5, 5); }
   float(clamp(c.x, 80, W - 80), clamp(c.y - 70, 60, H - 40), o.kind === 'ringout' ? 'RING OUT' : 'K.O.', '#ff4a6a', 34);
   shake(24); slowmo(1.1); flashScreen(B.color, .22);
-  if (aliveTeams().length <= 1) focusCamera(c.x, c.y);    // zoom in on the round-deciding KO only
+  if (koDecides(B)) focusCamera(c.x, c.y);               // zoom in on the round-deciding KO only
   sfx('ko');
   emit('ko', B, A, o);
   hook(G_STATE.mode, 'onKO', B, A, o);
@@ -266,7 +295,10 @@ function steerProj(p, dt) {
   p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp;
 }
 
-// Weapons with block > 0 (shields) may deflect a projectile back at its owner's team (rolled once per shield).
+// Weapons with block > 0 (shields) may deflect a projectile back at its owner's team (rolled once per shield), with
+// chance shotBlock(block): v4 made it block^1.7 (a kite shield's .5 turns 31% of shots, not half; a full 1 still always
+// does) because shields and blocking blades turned too many bullets.
+const shotBlock = b => Math.pow(b, 1.7);
 function projHitsShield(p, x0, y0) {
   for (const B of F) {
     if (!B.alive || B.team === p.team) continue;
@@ -275,7 +307,7 @@ function projHitsShield(p, x0, y0) {
       for (const [i, j] of rig.ws) {
         const a = B.P[i], b = B.P[j], r = segSeg(x0, y0, p.x, p.y, a.x, a.y, b.x, b.y);
         if (r.d > p.r + rig.w.width * B.scale + 2) continue;
-        const roll = p.rolled[B.id] ?? (p.rolled[B.id] = Math.random() < rig.w.block);
+        const roll = p.rolled[B.id] ?? (p.rolled[B.id] = Math.random() < shotBlock(rig.w.block));
         if (!roll) continue;
         deflectProj(p, B, a, b, r.qx, r.qy);
         return true;
@@ -302,7 +334,7 @@ function projHitsBody(p, x0, y0) {
     if (!B.alive || B.team === p.team || p.hits.includes(B.id) || B.inv > 0) continue;
     for (const T of HIT_SHAPES) {
       const c = B.P[T.a], d = B.P[T.b], r = segSeg(x0, y0, p.x, p.y, c.x, c.y, d.x, d.y);
-      if (r.d > T.r * B.scale + p.r) continue;
+      if (r.d > hurtR(B, T) + p.r) continue;
       projHit(p, B, T, r.px, r.py);
       return p.dead;
     }

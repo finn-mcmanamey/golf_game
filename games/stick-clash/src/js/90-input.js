@@ -3,6 +3,8 @@
 // one-shot flags. When only one human is playing, slot 0 answers to both key sets and every gamepad.
 // v3: per-player gamepad maps (remapped in 93-pads), up to 8 players from the join lobby (JOINED), the touch stick's
 // analog axis (91-touch), one-button mode (92-access) and rumble + native haptics scaled by SETTINGS.rumble.
+// v4: a control scheme per player (CTL, below), the Compact 2P key layout (keySets) and one touch set per touch seat
+// (TSETS; table mode, 91-touch). CPUs never read any of this.
 
 const BIND_ACTIONS = ['left', 'right', 'jump', 'attack', 'skill1', 'skill2', 'dash', 'block', 'grab', 'throw', 'super', 'taunt'];
 const ACTION_LABELS = { left: 'Move left', right: 'Move right', jump: 'Jump', attack: 'Attack', skill1: 'Skill 1', skill2: 'Skill 2', dash: 'Dash',
@@ -21,11 +23,13 @@ const DOUBLE_TAP_MS = 260;
 
 let BINDS = loadBinds();
 const KEYS = new Set();            // key codes currently held
-const TOUCH = new Set();           // actions held on the on-screen buttons (they drive TOUCH_SLOT)
-const TOUCH_AXIS = { mx: 0 };      // the touch stick's analog x (91-touch), for TOUCH_SLOT
-let TOUCH_SLOT = 0;                // the player the touch screen drives: 0, or the lobby's touch seat (93-pads; -1 = nobody)
+// Touch sets (91-touch): 0 = #touch's markup, 1 = table mode's copy. slot: its player (-1 = nobody); held: actions held
+// on its buttons; mx: its stick's x. TOUCH_SLOT mirrors set 0's slot (P1 or the lobby's touch seat).
+const TSETS = [0, 1].map(i => ({ i, slot: i ? -1 : 0, held: new Set(), mx: 0 }));
+let TOUCH_SLOT = 0;
 let PADS = [];                     // per connected pad: { slot, held: {action: bool}, axis }
 const TAPS = Array.from({ length: MAX_FIGHTERS }, () => ({}));   // last left/right press per slot, for double-tap dash
+const SLOT_DEV = [];   // per slot: 'key' | 'pad' last pressed, so one player's keys don't relabel a pad player (94)
 // Players who joined in the party lobby (93-pads), in join order: [{ pad: gamepad index } | { keys: 0 | 1 }].
 // While set, player n is driven only by its own entry. null = the classic rules (pad n -> P(n+1), both key sets in 1P).
 let JOINED = null;
@@ -46,7 +50,6 @@ function loadBinds() {
   });
   return out;
 }
-function saveBinds() { store.set('binds', BINDS); }
 // Binds a key; if it was used elsewhere, the two actions swap keys so nothing is left unbound.
 function setBind(slot, action, code) {
   const old = BINDS[slot][action];
@@ -55,11 +58,48 @@ function setBind(slot, action, code) {
   saveBinds();
 }
 function resetBinds() { BINDS = DEFAULT_BINDS.map(b => ({ ...b })); saveBinds(); }
+function saveBinds() { KEYSETS = null; store.set('binds', BINDS); }
 function captureNextKey(cb) { KEY_CAPTURE = cb; }
 // Stops listening for a rebind (the Controls screen was left or rebuilt) so the next key isn't silently bound.
 function cancelKeyCapture() { KEY_CAPTURE = null; }
 // Keys with a fixed job everywhere (pause, mute): they can't be bound to fighter actions.
 const RESERVED_KEYS = new Set(['Escape', 'KeyP', 'KeyM']);
+
+// ---------- control schemes and the key layout (v4) ----------
+// Advanced = every action. Simple = move, jump, attack, one skill button (the super while the meter is full), block by
+// holding back from an attacking foe (or the block key), dash by double-tap; grab, throwables, skill 2 and taunt off.
+const SIMPLE_OFF = new Set(['grab', 'throw', 'skill2', 'taunt']);
+// Compact 2P: both players' core keys on one laptop keyboard; other actions keep their binds unless a core key took them.
+// P2's skill 2 moves to Comma (its free block key): Slash is the core skill key here.
+const COMPACT_KEYS = [
+  { left: 'KeyA', right: 'KeyD', jump: 'KeyW', block: 'KeyS', attack: 'KeyF', skill1: 'KeyG' },
+  { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', block: 'ArrowDown', attack: 'Period', skill1: 'Slash', skill2: 'Comma' },
+];
+let KEYSETS = null;                // keySets() cache: dropped when the binds or the layout change
+// Store 'controls' = { schemes: [P1..P8], layout }. Without one: Simple for a brand-new player (no save at all), else
+// Advanced, written at once so later loads keep it.
+const CTL = ctlLoad();
+function ctlLoad() {
+  const raw = store.getObj('controls'), list = Array.isArray(raw.schemes) ? raw.schemes : null;
+  let fresh = true;
+  try { fresh = !Object.keys(localStorage).some(k => k.startsWith(STORE_PREFIX)); } catch (e) { /* no storage */ }
+  const ok = v => v === 'simple' || v === 'advanced', def = fresh ? 'simple' : 'advanced';
+  const c = { schemes: Array.from({ length: MAX_FIGHTERS }, (_, i) => list && ok(list[i]) ? list[i] : def), layout: raw.layout === 'compact' ? 'compact' : 'standard' };
+  if (!list) store.set('controls', c);
+  return c;
+}
+// In force: trials (mode.quest) are built around every move, so they always use Advanced.
+const schemeOf = slot => G_STATE.mode && G_STATE.mode.quest ? 'advanced' : CTL.schemes[slot] || 'advanced';
+const simpleOn = slot => schemeOf(slot) === 'simple';
+function setScheme(slot, v) { CTL.schemes[slot] = v; store.set('controls', CTL); if (typeof touchLayout === 'function') touchLayout(); }
+function setKeyLayout(v) { CTL.layout = v; KEYSETS = null; store.set('controls', CTL); }
+// What each keyboard set's keys do now: the binds, or under Compact 2P the fixed core keys plus the other binds.
+function keySets() {
+  if (KEYSETS) return KEYSETS;
+  if (CTL.layout !== 'compact') return (KEYSETS = BINDS);
+  const core = new Set(COMPACT_KEYS.flatMap(Object.values));
+  return (KEYSETS = BINDS.map((b, i) => Object.assign(Object.fromEntries(BIND_ACTIONS.map(a => [a, core.has(b[a]) ? null : b[a]])), COMPACT_KEYS[i])));
+}
 
 // Punctuation keys get a name next to the symbol (a lone '.' in a key cap looks unbound); `short` keeps just the symbol.
 function keyLabel(code, short) {
@@ -74,24 +114,42 @@ function keyLabel(code, short) {
 }
 
 const humanCount = () => G_STATE.roster.filter(r => r.ctrl === 'human').length;
-// Binding sets a slot listens to: in one-human modes, slot 0 accepts both.
+// Key sets a slot listens to: in one-human modes, slot 0 accepts both.
 function bindsFor(slot) {
-  if (JOINED) { const j = JOINED[slot]; return j && j.keys != null ? [BINDS[j.keys]] : []; }
-  return humanCount() <= 1 && slot === 0 ? BINDS : [BINDS[slot]].filter(Boolean);
+  const S = keySets();
+  if (JOINED) { const j = JOINED[slot]; return j && j.keys != null ? [S[j.keys]] : []; }
+  return humanCount() <= 1 && slot === 0 ? S : [S[slot]].filter(Boolean);
 }
 const keySlots = () => JOINED ? JOINED.map((_, i) => i) : [0, 1];
 const humansIn = slot => F.filter(f => f.ctrl === 'human' && !f.autopilot && f.slot === slot);
-// Short label of the key for an action (shown on HUD skill icons).
-function keyHint(slot, action) { const b = BINDS[slot]; return b ? keyLabel(b[action], true) : ''; }
+// Short label for an action (HUD skill icons, full super meter) in the player's device: key, pad button, none on touch.
+// A Simple player's skill button fires the full super: the meter names it and the skill icon's label gets a star.
+function keyHint(slot, action) {
+  const name = hintNamer(slot);
+  if (!name) return '';
+  if (!simpleOn(slot)) return name(action);
+  if (SIMPLE_OFF.has(action)) return '';
+  const skill = name('skill1'), f = humansIn(slot)[0];
+  return action === 'super' ? skill : action === 'skill1' && f && f.super >= 100 ? '★' + skill : name(action);
+}
+// Names actions by the slot's keys or pad buttons (94's ctlDevices); null on the touch screen.
+function hintNamer(slot) {
+  const d = typeof ctlDevices === 'function' ? ctlDevices(slot) : { keys: true }, b = keySets()[JOINED ? (JOINED[slot] || {}).keys : slot];
+  if (d.touch) return null;
+  if (d.pad && !d.keys) return typeof padName === 'function' ? a => padName(padMapFor(slot)[a]) : null;
+  return b ? a => keyLabel(b[a], true) : null;
+}
 
 function togglePause() {
   if (G_STATE.state === 'play') setState('paused');
   else if (G_STATE.state === 'paused') setState('play');
 }
 
-// One-shot press of an action for every human fighter on that slot.
+// One-shot press of an action for every human fighter on that slot (a Simple player's off actions do nothing).
 function pressAction(slot, act) {
   if (slot < 0 || G_STATE.state !== 'play') return;   // slot -1: the touch screen drives nobody in this lobby
+  const simple = simpleOn(slot);
+  if (simple && SIMPLE_OFF.has(act)) return;
   if (act === 'left' || act === 'right') {   // double-tap a direction to dash
     for (const f of humansIn(slot)) if (f.heldBy) f.inp.mash = true;     // wiggling counts toward escaping a grab
     const t = TAPS[slot], now = performance.now(), dash = t.act === act && now - t.at < DOUBLE_TAP_MS;
@@ -102,15 +160,19 @@ function pressAction(slot, act) {
     if (act === 'left') f.inp.dash = -1;
     else if (act === 'right') f.inp.dash = 1;
     else if (act === 'dash') f.inp.dash = Math.sign(f.inp.mx) || f.face;
+    else if (simple && act === 'skill1' && f.super >= 100) f.inp.super = true;   // Simple's one skill button
     else if (act in f.inp) f.inp[act] = true;
   }
 }
 
-const GAME_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'Slash', 'Quote', 'Tab']);
+// Game keys never reach the browser in a fight (arrows scroll, Tab moves focus, letters start find-as-you-type); "/",
+// "'" and "." (Firefox quick find) are held back everywhere outside text fields.
+const GAME_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'Tab']), FIND_KEYS = new Set(['Slash', 'Quote', 'Period']);
+const keyBound = code => keySets().some(b => BIND_ACTIONS.some(a => b[a] === code));
 function onKeyDown(e) {
   if (KEY_CAPTURE) { e.preventDefault(); const cb = KEY_CAPTURE; KEY_CAPTURE = null; cb(e.code); return; }
-  const typing = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
-  if (GAME_KEYS.has(e.code) && !typing && G_STATE.state === 'play') e.preventDefault();
+  const typing = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName), plain = !e.ctrlKey && !e.metaKey && !e.altKey;
+  if (!typing && plain && (FIND_KEYS.has(e.code) || G_STATE.state === 'play' && (GAME_KEYS.has(e.code) || keyBound(e.code)))) e.preventDefault();
   if (e.repeat) return;              // before pause/mute: holding Esc or M must not toggle them on and off
   if (e.code === 'Escape' || (e.code === 'KeyP' && !typing)) {
     // Inside Settings/Controls opened from the pause menu, Esc goes back one level like the Back button does.
@@ -121,17 +183,17 @@ function onKeyDown(e) {
   if (e.code === 'KeyM' && !typing) { toggleMute(); return; }
   KEYS.add(e.code);
   if (G_STATE.state !== 'play') return;
-  for (const slot of keySlots()) for (const b of bindsFor(slot)) for (const a of BIND_ACTIONS) if (b[a] === e.code) pressAction(slot, a);
+  for (const slot of keySlots()) for (const b of bindsFor(slot)) for (const a of BIND_ACTIONS) if (b[a] === e.code) { SLOT_DEV[slot] = 'key'; pressAction(slot, a); }
 }
 addEventListener('keydown', onKeyDown);
 addEventListener('keyup', e => KEYS.delete(e.code));
-addEventListener('blur', () => { KEYS.clear(); TOUCH.clear(); TOUCH_AXIS.mx = 0; });
+addEventListener('blur', () => { KEYS.clear(); touchClear(); });
 // Switching tabs mid-fight pauses instead of letting the CPU win while you're away.
 document.addEventListener('visibilitychange', () => { if (document.hidden && G_STATE.state === 'play' && humanCount() > 0) setState('paused'); });
 
 function heldAction(slot, act) {
   if (bindsFor(slot).some(b => b[act] && KEYS.has(b[act]))) return true;
-  if (slot === TOUCH_SLOT && TOUCH.has(act)) return true;
+  if (TSETS.some(s => s.slot === slot && s.held.has(act))) return true;
   return PADS.some(p => p.slot === slot && p.held[act]);
 }
 
@@ -139,12 +201,34 @@ function heldAction(slot, act) {
 function readHuman(f) {
   let mx = (heldAction(f.slot, 'right') ? 1 : 0) - (heldAction(f.slot, 'left') ? 1 : 0);
   for (const p of PADS) if (p.slot === f.slot && Math.abs(p.axis) > .3 && !mx) mx = p.axis;
-  if (f.slot === TOUCH_SLOT && !mx) mx = TOUCH_AXIS.mx;
+  for (const s of TSETS) if (s.slot === f.slot && !mx) mx = s.mx;
   f.inp.mx = clamp(mx, -1, 1);
   f.inp.jumpHeld = heldAction(f.slot, 'jump');
   f.inp.attackHeld = heldAction(f.slot, 'attack');
   f.inp.blockHeld = heldAction(f.slot, 'block');
+  if (simpleOn(f.slot)) simpleDrive(f);
   if (oneButtonOn(f.slot)) oneButtonDrive(f);   // 92-access: auto-move, the one button attacks / blocks / skills
+}
+
+// Simple: holding back from an attacking foe raises the guard (grounded); an attack drops it, so block + attack never
+// grabs. In play the fighter keeps one skill and no throwables, so the HUD shows only what works.
+function simpleDrive(f) {
+  const inp = f.inp;
+  if (G_STATE.state === 'play' && (f.skills[1] || f.throws[0] || f.throws[1])) {
+    if (!f.skills[0]) { f.skills[0] = f.skills[1]; f.skillCd[0] = f.skillCd[1]; }
+    f.skills[1] = null; f.throws = [null, null]; f.throwN = [0, 0];
+  }
+  if (!inp.blockHeld && f.grounded && Math.abs(inp.mx) > .3) inp.blockHeld = simpleThreat(f, Math.sign(inp.mx));
+  if (inp.attack) inp.blockHeld = false;
+}
+const SIMPLE_ATK = new WeakMap();  // fighter -> game time of its last attack
+on('attack', f => SIMPLE_ATK.set(f, G_STATE.t));
+// An attack coming from behind the way the fighter walks (dir): a foe in reach that just swung or fired, an ultimate,
+// or a shot flying at it.
+function simpleThreat(f, dir) {
+  const x = f.P[2].x, y = f.P[2].y, near = (ox, oy, r) => (ox - x) * dir < 0 && Math.abs(ox - x) < r && Math.abs(oy - y) < 160;
+  for (const o of F) if (o.alive && o.team !== f.team && near(o.P[2].x, o.P[2].y, 280) && (o.ult || G_STATE.t - (SIMPLE_ATK.get(o) ?? -9) < .45)) return true;
+  return PROJ.some(p => p.owner && p.team !== f.team && p.dmg > 0 && near(p.x, p.y, 360) && p.vx * (x - p.x) > 0);
 }
 
 // ---------- gamepads ----------
@@ -201,7 +285,7 @@ function pollPads() {
       held[a] = padButtonDown(gp, a, Math.max(slot, 0));
       if (held[a] && !old[a] && !changed) {
         if (a === 'pause') togglePause();
-        else if (slot >= 0) pressAction(slot, a);
+        else if (slot >= 0) { SLOT_DEV[slot] = 'pad'; pressAction(slot, a); }
         emit('pad', a, slot);      // lets menus react to gamepad buttons
       }
     }
@@ -263,7 +347,7 @@ function nativeHaptic(style) {
 function feel(f, strength, ms, style) {
   if (!f || G_STATE.sim || G_STATE.demo || f.ctrl !== 'human' || f.autopilot) return;
   padRumble(f, strength, ms);
-  if (style && f.slot === TOUCH_SLOT) nativeHaptic(style);
+  if (style && TSETS.some(s => s.slot === f.slot)) nativeHaptic(style);   // whichever touch player it was
 }
 on('damage', (B, amt, o) => {
   if (!o || o.small) return;
@@ -286,40 +370,42 @@ const TOUCH_EL = document.getElementById('touch');
 const IS_TOUCH = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 let TOUCH_KEYBOARD = false;          // fallback without 92-device: a hardware key was pressed, hide the buttons
 
-function touchButton(act) { return TOUCH_EL && TOUCH_EL.querySelector(`button[data-act="${act}"]`); }
+// Holds a touch action of set s while it is pressed (presses once on the way down). Shared with the stick and swipes.
+function touchHold(s, act) { if (!s.held.has(act)) { s.held.add(act); pressAction(s.slot, act); } }
+function touchRelease(s, act) { s.held.delete(act); }
+// Points the touch sets at their players (93-pads, at match start): set 1 only drives someone in table mode.
+function touchSeats(a, b) { TOUCH_SLOT = TSETS[0].slot = a; TSETS[1].slot = b; }
+// Lets go of everything on the touch sets (or only set i): hidden controls never keep a finger down.
+function touchClear(i) {
+  for (const s of TSETS.filter(t => i == null || t.i === i)) {
+    s.held.clear(); s.mx = 0;
+    if (s.stick) { Object.assign(s.stick, { id: null, up: false, down: null }); s.swipe.clear(); }
+    if (s.box) for (const b of s.box.querySelectorAll('.on, .live')) b.classList.remove('on', 'live');
+  }
+}
 
-// Holds a touch action while it is pressed (presses once on the way down). Shared with the stick and swipes.
-function touchHold(act) { if (!TOUCH.has(act)) { TOUCH.add(act); pressAction(TOUCH_SLOT, act); } }
-function touchRelease(act) { TOUCH.delete(act); }
-
-function bindTouchButton(btn) {
+function bindTouchButton(btn, s) {
   const act = btn.dataset.act;
   let held = false;                  // one finger per button: the button is held until that finger lifts
-  const release = () => { if (!held) return; held = false; touchRelease(act); btn.classList.remove('on'); };
+  const release = () => { if (!held) return; held = false; touchRelease(s, act); btn.classList.remove('on'); };
   btn.addEventListener('pointerdown', e => {
     e.preventDefault();
     initAudio();
     if (typeof inputSeen === 'function') inputSeen('touch');   // 92-device: the player is on the touch screen
     if (act === 'pause') { togglePause(); return; }
     held = true; btn.classList.add('on');
-    touchHold(act);
+    touchHold(s, act);
     nativeHaptic('selection');
   });
   for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) btn.addEventListener(ev, release);
 }
 
-function bindTouch() {
-  if (!TOUCH_EL) return;
-  for (const btn of TOUCH_EL.querySelectorAll('button[data-act]')) bindTouchButton(btn);
-}
-bindTouch();
-
 function updateTouchUI() {
   if (!TOUCH_EL) return;
   const want = typeof touchWanted === 'function' ? touchWanted() : IS_TOUCH && !TOUCH_KEYBOARD;
   TOUCH_EL.hidden = !(want && TOUCH_SLOT >= 0 && G_STATE.state === 'play' && humanCount() > 0);
-  if (TOUCH_EL.hidden) { TOUCH.clear(); TOUCH_AXIS.mx = 0; for (const b of TOUCH_EL.querySelectorAll('.on')) b.classList.remove('on'); }
-  touchLayout();                     // 91-touch: size, opacity and the thumb arc for the current screen
+  if (TOUCH_EL.hidden) touchClear();
+  touchLayout();                     // 91-touch: sets, size, opacity and the thumb arc for the current screen
 }
 on('state', updateTouchUI);
 
@@ -346,25 +432,32 @@ if (ROTATE_EL) {
   if (PORTRAIT && PORTRAIT.addEventListener) PORTRAIT.addEventListener('change', updateRotatePrompt);
 }
 
-// Skill buttons show P1's skill icons and fill up as the cooldown runs (CSS reads --cd and --sc).
+// Skill buttons show their player's skill icons and fill up as the cooldown runs (CSS reads --cd and --sc); a Simple
+// player's skill button is the super (★, glowing) while the meter is full.
 function updateTouchSkills() {
   if (!TOUCH_EL || TOUCH_EL.hidden) return;
-  const f = F.find(x => x.ctrl === 'human' && !x.autopilot && x.slot === TOUCH_SLOT);
+  for (const s of TSETS) if (s.box && s.box.isConnected) touchSkillsOf(s);
+}
+function touchSkillsOf(s) {
+  const f = F.find(x => x.ctrl === 'human' && !x.autopilot && x.slot === s.slot), btn = a => s.box.querySelector(`button[data-act="${a}"]`);
+  const sup = !!f && simpleOn(s.slot) && f.super >= 100;
   for (let k = 0; k < 2; k++) {
-    const btn = touchButton('skill' + (k + 1)), def = f && SKILLS[f.skills[k]];
-    if (!btn) continue;
-    btn.hidden = !def;
-    if (!def) continue;
-    if (btn.textContent !== def.icon) btn.textContent = def.icon;
-    btn.style.setProperty('--sc', def.color);
-    btn.style.setProperty('--cd', clamp(f.skillCd[k] / def.cd, 0, 1).toFixed(3));
-    btn.setAttribute('aria-label', def.name);
+    const b = btn('skill' + (k + 1)), def = f && SKILLS[f.skills[k]], star = sup && !k;
+    if (!b) continue;
+    b.hidden = !def && !star;
+    b.classList.toggle('ready', star);
+    if (!def && !star) continue;
+    const icon = star ? '★' : def.icon;
+    if (b.textContent !== icon) b.textContent = icon;
+    b.style.setProperty('--sc', star ? '#ffd84a' : def.color);
+    b.style.setProperty('--cd', star ? 0 : clamp(f.skillCd[k] / def.cd, 0, 1).toFixed(3));
+    b.setAttribute('aria-label', star ? 'Super' : def.name);
   }
-  updateTouchV3(f);
+  updateTouchV3(f, btn);
 }
 // Super lights up when the meter is full; the throwable button shows the next throwable and how many are left.
-function updateTouchV3(f) {
-  const sup = touchButton('super'), thr = touchButton('throw');
+function updateTouchV3(f, btn) {
+  const sup = btn('super'), thr = btn('throw');
   if (sup) sup.classList.toggle('ready', !!f && f.super >= 100);
   if (!thr) return;
   const slot = f ? (f.throwN[0] > 0 ? 0 : f.throwN[1] > 0 ? 1 : -1) : -1, def = f && THROWABLES[f.throws[slot < 0 ? 0 : slot]];

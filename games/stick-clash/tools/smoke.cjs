@@ -305,13 +305,17 @@ async function testV3Registry(page) {
       const ok = !r.errors.length && !r.nan && r.dmg > 0 && f.clsKey === k && f.maxHp === Math.max(1, Math.round(100 * c.hp)) && f.maxStamina === Math.round(100 * c.stamina);
       out.push({ kind: 'class', key: k, ok, rounds: r.rounds, avgT: r.avgT, hits: r.hits, dmg: r.dmg, upright: r.upright, note: `hp ${f.maxHp} stamina ${f.maxStamina}`, errors: r.errors });
     }
-    // Throwables: thrown at a foe 300 px away must hurt or affect it (the mine needs the foe to walk onto it).
+    // Throwables: thrown at a foe 300 px away must hurt or affect it (the mine needs the foe to walk onto it). Any
+    // status during the window counts (v4: the smoke cloud's cover is gone by the end, and the old pass came from the
+    // foe walking into the thrower's blade for 1 damage, which v4's faster Blade no longer happens to do).
     for (const k of Object.keys(SC.reg.THROWABLES)) {
       const e0 = SC.errors.length, [A, B] = __V.duel({ gap: 300, throws: [[k, k], ['none', 'none']] }), hp0 = B.hp;
+      let touched = false; const offStatus = on('status', f => { if (f === A || f === B) touched = true; });
       SC.press(0, 'throw'); SC.sim(.05);
       const thrown = A.throwN[0] === 0 && A.stats.thrown === 1;
       SC.sim(1.2); SC.move(1, -1); SC.sim(2.5); SC.move(1, 0);
-      const hit = B.hp < hp0 || Object.keys(B.status).length > 0 || Object.keys(A.status).length > 0;
+      offStatus();
+      const hit = B.hp < hp0 || touched || Object.keys(B.status).length > 0 || Object.keys(A.status).length > 0;
       SC.press(0, 'throw'); SC.sim(.05); const second = A.throwN[1] === 0;
       SC.render(); SC.sim(2); SC.render();
       const errors = __V.errs(e0);
@@ -322,7 +326,8 @@ async function testV3Registry(page) {
     for (const k of Object.keys(SC.reg.MOUNTS)) {
       const e0 = SC.errors.length, [A, B] = __V.duel({ gap: 220 }), hp0 = B.hp, y0 = A.P[2].y, def = SC.reg.MOUNTS[k];
       const m = mount(A, k);
-      A.inp.jumpHeld = true; A.inp.attackHeld = true; SC.move(0, 1); SC.press(0, 'jump');   // take off (jetpack)
+      A.inp.jumpHeld = true; A.inp.attackHeld = true; SC.move(0, 1);
+      if (def.fly) SC.press(0, 'jump');   // take off (jetpack). v4: ground mounts ride straight in (a jump sailed over the foe)
       let top = y0;
       for (let t = 0; t < 2.5; t += .25) { SC.press(0, 'attack'); SC.sim(.25); top = Math.min(top, A.P[2].y); SC.render(); }
       const effect = def.fly ? top < y0 - 120 : B.hp < hp0;   // flyers must fly, ground mounts must hurt the foe
@@ -638,7 +643,7 @@ async function testTouch(browser) {
   await page.goto('file://' + path.join(ROOT, 'dist', 'stick-clash.html'));
   await page.waitForFunction(() => window.SC && SC.G.state === 'menu');
   await page.screenshot({ path: path.join(SHOTS, 'touch-menu.png') });
-  await page.evaluate(() => { MENU.map = 'dojo'; MENU.mode = 'versus'; });
+  await page.evaluate(() => { MENU.map = 'dojo'; MENU.mode = 'versus'; CTL.schemes.fill('advanced'); });   // every button (a fresh save is Simple)
   await page.tap('#menu .go');
   await page.evaluate(CALM_CPUS);
   await page.waitForTimeout(1500);
@@ -670,6 +675,7 @@ async function testTouch(browser) {
 
 async function testUI(browser) {
   const { page, errors } = await newPage(browser);
+  await page.evaluate(() => CTL.schemes.fill('advanced'));   // v4: a fresh save starts on Simple; these checks use every action
   const step = async (name, fn) => { try { const ok = await fn(); check(ok, `ui ${name}: failed`); rows.push({ kind: 'ui', key: name, ok: !!ok }); } catch (e) { check(false, `ui ${name}: ${e.message}`); rows.push({ kind: 'ui', key: name, ok: false }); } };
   await step('menu visible', async () => page.isVisible('#menu .go'));
   await page.screenshot({ path: path.join(SHOTS, 'ui-menu.png') });
@@ -802,7 +808,7 @@ function summary(r) {
     await testV3Core(page);
     await testPartyModes(page);
     await require('./smoke-quest.cjs').run(page, browser, { check, rows, SHOTS, newPage });   // campaign nodes + challenges + their screens
-    await require('./smoke-progress.cjs').run(page, browser, { check, rows, SHOTS, newPage });   // outfits, pets, mutators, track, quests, codex
+    await require('./smoke-progress.cjs').run(page, browser, { check, rows, SHOTS, newPage });   // outfits, pets, mutators, codex, no economy, save migration, weapon picker
     if (errors.length) failures.push('console: ' + [...new Set(errors)].join(' | '));
     await page.close();
     await testUI(browser);
@@ -812,7 +818,12 @@ function summary(r) {
     await require('./smoke-fx.cjs').run(browser, { check, rows, SHOTS });
     await require('./smoke-access.cjs').run(browser, { check, rows, SHOTS });   // touch stick, pads, accessibility, save codes   // announcer, crowd, music, bloom, photo mode, highlights
     if (fs.existsSync(path.join(__dirname, 'smoke-ipad.cjs'))) await require('./smoke-ipad.cjs').run(browser, { check, rows, SHOTS });   // iPad layout, touch mode, fullscreen, performance
-    await require('./smoke-world.cjs').run(browser, { check, rows, SHOTS });   // HUD band + camera, sky fill, codex code entry, practice rewards, lore, asteroid ground, vines, TOO BIG
+    if (fs.existsSync(path.join(__dirname, 'smoke-controls.cjs'))) await require('./smoke-controls.cjs').run(browser, { check, rows, SHOTS });   // v4 controls: Simple/Advanced, Compact 2P, key strips, controls card, table mode
+    await require('./smoke-world.cjs').run(browser, { check, rows, SHOTS });   // HUD band + camera, sky fill, codex code entry, practice-speed results, lore, asteroid ground, vines, TOO BIG
+    if (fs.existsSync(path.join(__dirname, 'smoke-styles.cjs'))) await require('./smoke-styles.cjs').run(browser, { check, rows, SHOTS });   // v4 arena art styles: styled arenas x2/x8, pixel layer, Arena art setting, kill-cam + photo, render time
+    if (fs.existsSync(path.join(__dirname, 'smoke-feel.cjs'))) await require('./smoke-feel.cjs').run(browser, { check, rows });   // v4 feel: silly bodies upright, hit-stop + knockback, guns vs melee, distinct blades, CPU slips + ladder
+    if (fs.existsSync(path.join(__dirname, 'smoke-2p.cjs'))) await require('./smoke-2p.cjs').run(browser, { check, rows, SHOTS });   // v4 two players: rivalry, handicap, quick rematch, co-op waves + quest, silly vote, tag team, round length
+    if (fs.existsSync(path.join(__dirname, 'smoke-sound.cjs'))) await require('./smoke-sound.cjs').run(browser, { check, rows, SHOTS });   // v4 sound: per-weapon sounds, grunts + limits, lead melodies, voice settings, no-audio match, voice cap
   } catch (e) {
     failures.push('smoke crashed: ' + (e.stack || e.message));
   } finally {

@@ -2,7 +2,8 @@
 // hazards, platforms, orbs, fighters, weapons, projectiles, effects) and the HUD (health, skills, ammo, statuses,
 // round pips) plus big banners. Everything is drawn in arena units (1280x720) and scaled to fit the window.
 
-const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const cv = document.getElementById('c'), CTX_MAIN = cv.getContext('2d');
+let ctx = CTX_MAIN;   // the world pass points it at the art style's proxy (59-styles)
 // VIEW: s = arena px -> canvas px; (vx, vy, vw, vh) = the world viewport on the canvas; (ox, oy) = where the 1280x720
 // "screen" of overlays and banners sits (centred in the viewport); hv = viewport height in arena units; zMin = the
 // least camera zoom that keeps the view inside the arena; hudK = extra HUD scale so its text stays readable; hudY = top
@@ -95,9 +96,10 @@ on('boot', () => {
 function focusCamera(x, y, seconds = 1.1) { CAM.fx = x; CAM.fy = y; CAM.focusT = seconds; }
 
 // Frames every living fighter, zooming in gently when they are close together.
+const CAM_OUT = .94;   // the zoom-out allowed below zMin: backdrops paint about 40 px past each side
 function updateCamera(dt) {
   if (photoCamera()) return;   // photo mode's free camera (86)
-  let tx = W / 2, ty = H / 2, tz = 1, boxTop = null;
+  let tx = W / 2, ty = H / 2, tz = 1, boxTop = null, feetY = null, zFloor = VIEW.zMin;
   const live = F.filter(f => f.alive);
   if (CAM.follow && live.length) {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -105,29 +107,36 @@ function updateCamera(dt) {
       const p = f.P[j];
       x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y);
     }
+    const top = y0 - 30, usable = VIEW.hv - VIEW.hudOver / VIEW.s, fit = usable / (y1 + 16 - top);
+    feetY = y1 + 16;                                 // the lowest feet always stay on screen (below)
     x0 -= 240; x1 += 240; y0 -= 200; y1 += 110;
     // The strip of the viewport under the HUD (hudOver) is not usable height.
-    tz = clamp(Math.min(W / (x1 - x0), (VIEW.hv - VIEW.hudOver / VIEW.s) / (y1 - y0)), VIEW.zMin, Math.max(CAM.maxZoom, VIEW.zMin * 1.12));
+    tz = clamp(Math.min(W / (x1 - x0), usable / (y1 - y0)), VIEW.zMin, Math.max(CAM.maxZoom, VIEW.zMin * 1.12));
     tx = (x0 + x1) / 2; ty = (y0 + y1) / 2;
     boxTop = y0;
+    // A high fighter and the floor that won't both fit under the HUD: zoom out a little rather than drop the floor.
+    if (fit < VIEW.zMin) { tz = zFloor = Math.max(fit, VIEW.zMin * CAM_OUT); ty = (top + feetY) / 2 - VIEW.hudOver / (2 * VIEW.s * tz); }
   }
-  if (CAM.focusT > 0 && CAM.follow) { CAM.focusT -= dt; tz = Math.max(tz, 1.3 * VIEW.zMin); tx = CAM.fx; ty = CAM.fy; }
-  tz = Math.max(tz, VIEW.zMin);
+  if (CAM.focusT > 0 && CAM.follow) { CAM.focusT -= dt; tz = Math.max(tz, 1.3 * VIEW.zMin); tx = CAM.fx; ty = CAM.fy; feetY = null; }
+  tz = Math.max(tz, zFloor);
   const k = 1 - Math.exp(-dt * 3.5), kz = 1 - Math.exp(-dt * 2.4);
   CAM.z += (tz - CAM.z) * kz; CAM.x += (tx - CAM.x) * k; CAM.y += (ty - CAM.y) * k;
-  CAM.z = Math.max(CAM.z, VIEW.zMin);
+  CAM.z = Math.max(CAM.z, VIEW.zMin * CAM_OUT);
   CAM.punch *= Math.exp(-dt * 9);
-  const hw = W / (2 * CAM.z), hh = VIEW.hv / (2 * CAM.z);   // never show outside the arena...
+  const hw = W / (2 * CAM.z), hh = VIEW.hv / (2 * CAM.z);   // never show outside the arena (bar CAM_OUT's sliver)...
   // ...except above it, as far as the physics ceiling plus the strip the HUD covers (topPad), and only as high as
   // the fighters need: they then sit under the HUD instead of behind it (the Asteroid's top planet, the Kitchen shelf).
   const topPad = VIEW.hudOver / (VIEW.s * CAM.z);
   const minY = boxTop == null ? hh : clamp(boxTop + hh - topPad, hh - topPad + CEILING, hh);
-  CAM.x = clamp(CAM.x, hw, W - hw); CAM.y = clamp(CAM.y, minY, H - hh);
+  // That rise never pushes the lowest feet below the view, not even during a punch-zoom (87).
+  const lowY = feetY == null ? minY : Math.max(minY, feetY - hh / (1 + CAM.punch));
+  CAM.x = hw >= W / 2 ? W / 2 : clamp(CAM.x, hw, W - hw); CAM.y = clamp(CAM.y, Math.min(lowY, H - hh), H - hh);
 }
 
 function setWorldTransform(sx = 0, sy = 0) {
-  const s = VIEW.s * CAM.z * (1 + CAM.punch);
-  ctx.setTransform(s, 0, 0, s, VIEW.cx - CAM.x * s + sx, VIEW.cy - CAM.y * s + sy);
+  const s = VIEW.s * CAM.z * (1 + CAM.punch), e = VIEW.cx - CAM.x * s + sx, f = VIEW.cy - CAM.y * s + sy, L = ART.layerOn;
+  if (!L) return ctx.setTransform(s, 0, 0, s, e, f);
+  ctx.setTransform(s * L.q, 0, 0, s * L.q, Math.round((e - VIEW.vx) * L.q), Math.round((f - VIEW.vy) * L.q));   // pixel layer (59)
 }
 function setArenaTransform() { ctx.setTransform(VIEW.s, 0, 0, VIEW.s, VIEW.ox, VIEW.oy); }
 // CSS pixel -> arena coordinates through the current camera (for pointer features).
@@ -138,6 +147,8 @@ function screenToWorld(px, py) {
 
 // ---------- map drawing ----------
 function glowLine(c2, x1, y1, x2, y2, color, width = 3) {
+  const st = artNow();
+  if (st.edge) return st.edge(artRaw(c2), x1, y1, x2, y2, color, width);   // ink, paper or chalk (59-styles)
   glow(c2, color, 12, () => lineXY(c2, x1, y1, x2, y2, color, width));
 }
 
@@ -350,11 +361,14 @@ function drawFighter(f) {
   }
   const look = lookOf(f), hm = f.headMul || 1;      // 78-outfits: outfit, weapon skins; 79: big-heads mutator
   outfitDraw(ctx, f, look, 'back', G_STATE.t);
-  glow(ctx, auraColor(f), f.alive ? (f.status.rage ? 22 : 10) : 0, () => drawBody(f, bodyColor(f), 7 * sc));
+  artBody(f, bodyColor(f), sc);                    // in the arena's art style (59)
   outfitDraw(ctx, f, look, 'front', G_STATE.t);
   circle(ctx, P[0].x + f.face * 6 * sc * hm, P[0].y - 2 * sc * hm, (f.alive ? 3 : 1.5) * sc * hm, '#0b0c18');   // eye
   drawHat(f);
-  for (const rig of rigsOf(f)) if (f.P[rig.hand] && f.P[rig.tip]) skinDrawWeapon(ctx, f, rig, weaponView(f, rig), look);   // a rig can outlive its points (replay ghosts)
+  for (const rig of rigsOf(f)) if (f.P[rig.hand] && f.P[rig.tip]) {   // a rig can outlive its points (replay ghosts)
+    const view = weaponView(f, rig);
+    artWeaponShadow(f, rig, view); skinDrawWeapon(ctx, f, rig, view, look);   // paper: a shadow first (59)
+  }
   drawStatusOverlays(f);
   for (const key of f.skills) if (key && SKILLS[key] && SKILLS[key].draw) hook(SKILLS[key], 'draw', ctx, f);
   drawFighterOver(f);                              // v3: guard arc, element glow, Lv3 trail, mech/jetpack, ultimates
@@ -522,6 +536,7 @@ function drawCard(f, x, y, w, right) {
   hudTextShadow(false);
   if (f.lvl > 1) drawLevelTag(f, ax + dir * wlEnd, y - 13, dir);
   aiPersonaHudTag(f, ax + dir * (wlEnd + (f.lvl > 1 ? 34 : 2)), y - 13, dir);   // the CPU rival's title (67)
+  if (f.hcap) duoBadge(f, ax + dir * (wlEnd + (f.lvl > 1 ? 34 : 2)), y - 13, dir);   // handicap (73)
   ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x - 3, y - 3, w + 6, 24);
   ctx.fillStyle = 'rgba(255,255,255,.45)'; fillBar(x, y, w, 18, f.hpShow / f.maxHp, right);
   ctx.fillStyle = f.alive ? f.color : '#444a66'; fillBar(x, y, w, 18, frac, right);
@@ -567,7 +582,8 @@ function drawMeters(f, x, y, w, right, h) {
   else { ctx.fillStyle = '#c9a43a'; fillBar(x, sy, w, h + 1, f.super / 100, right); }
   if (full && h >= 4 && f.ctrl === 'human' && !f.autopilot && typeof keyHint === 'function') {
     ctx.font = `10px ${FONT_DISPLAY}`; ctx.fillStyle = '#07080f'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-    ctx.fillText(`SUPER · ${keyHint(f.slot, 'super')}`, x + w / 2, sy + 3);
+    const k = keyHint(f.slot, 'super');   // '' on the touch screen
+    ctx.fillText(k ? 'SUPER · ' + k : 'SUPER', x + w / 2, sy + 3);
   }
 }
 // The two throwables with how many are left.
@@ -686,6 +702,24 @@ function drawHUD() {
 // Big centred text: `a` first, then `b` (e.g. "ROUND 2" then "FIGHT!").
 function banner(a, b = '', len = 1.6, color = null) { BANNER = { a, b, t: 0, len, color }; }
 
+// Lines stay whole (long names, mini-game rules): shrunk to fit W - 80, or a subtitle under BANNER_MIN px split in two.
+const BANNER_PX = 84, BANNER_MIN = 56;
+function bannerFit(txt, wrap) {
+  ctx.font = `${BANNER_PX}px ${FONT_DISPLAY}`;
+  const fit = lines => {
+    const w = Math.max(...lines.map(s => ctx.measureText(s).width)), px = Math.floor(BANNER_PX * Math.min(1, (W - 80) / w));
+    return { lines, px, w: w * px / BANNER_PX };
+  };
+  const words = txt.split(' ');
+  let best = fit([txt]);
+  if (wrap && best.px < BANNER_MIN) for (let i = 1; i < words.length; i++) {
+    const two = fit([words.slice(0, i).join(' '), words.slice(i).join(' ')]);
+    if (two.px > best.px) best = two;
+  }
+  return best;
+}
+const BANNER_CALM = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+
 function drawBanner(dt) {
   const B = BANNER;
   if (!B || G_STATE.demo) return;
@@ -693,20 +727,25 @@ function drawBanner(dt) {
   if (B.t > B.len) { BANNER = null; return; }
   const half = B.b ? B.len * .55 : B.len, second = B.t >= half, txt = second ? B.b : B.a;
   if (!txt) return;
-  const local = second ? B.t - half : B.t, sc = 1 + Math.max(0, .35 - local) * 1.5;
+  const fit = (B.fit || (B.fit = []))[+second] || (B.fit[+second] = bannerFit(txt, second));
+  // The pop-in never pushes a long line off screen; reduced motion (setting or system) skips it.
+  const calm = SETTINGS.reduceFlash || (BANNER_CALM && BANNER_CALM.matches);
+  const local = second ? B.t - half : B.t, sc = calm ? 1 : Math.min(1 + Math.max(0, .35 - local) * 1.5, (W - 40) / fit.w);
+  const color = B.color || (txt === 'K.O.' ? '#ff4a6a' : '#ffd84a'), ys = fit.lines.map((s, i) => (i - (fit.lines.length - 1) / 2) * fit.px * 1.1);
   ctx.save();
   ctx.globalAlpha = clamp((B.len - B.t) * 5, 0, 1);
   ctx.translate(W / 2, H / 2 - 60); ctx.scale(sc, sc);
-  ctx.font = `84px ${FONT_DISPLAY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
-  ctx.lineWidth = 12; ctx.strokeStyle = '#07080f'; ctx.strokeText(txt, 0, 0);
-  ctx.fillStyle = B.color || (txt === 'K.O.' ? '#ff4a6a' : '#ffd84a');
-  glow(ctx, ctx.fillStyle, 26, () => ctx.fillText(txt, 0, 0));
+  ctx.font = `${fit.px}px ${FONT_DISPLAY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  ctx.lineWidth = 12 * fit.px / BANNER_PX; ctx.strokeStyle = '#07080f';
+  fit.lines.forEach((s, i) => ctx.strokeText(s, 0, ys[i]));
+  ctx.fillStyle = color;
+  glow(ctx, color, 26, () => fit.lines.forEach((s, i) => ctx.fillText(s, 0, ys[i])));
   ctx.restore();
 }
 
 // The colour of the sky at the arena's top edge: what shows above y = 0 when the camera rises past it. Maps that draw
 // with mapSky (60) record their live top colour; the others name a skyTop; the palette is the fallback.
-const mapSkyTop = m => (m && (m.skyTopLive || m.skyTop || (m.palette && m.palette.sky1))) || '#05060c';
+const mapSkyTop = m => (m && ((artStyleOf(m).key !== 'neon' && m.art && m.art.top) || m.skyTopLive || m.skyTop || (m.palette && m.palette.sky1))) || '#05060c';
 on('boot', () => { if (window.SC) SC.view = { VIEW, CAM }; });   // layout + camera for the smoke tests
 
 // ---------- frame ----------
@@ -718,29 +757,22 @@ function drawScreenOverlays(dt) {
     ctx.globalAlpha = FX.flashA; ctx.fillStyle = FX.flash; ctx.fillRect(0, y0, W, vh); ctx.globalAlpha = 1;
     FX.flashA = Math.max(0, FX.flashA - dt * 1.8);
   }
-  if (!VIGNETTE) {
+  const edge = (ART.style && ART.style.vignette) || 'rgba(0,0,0,.38)';   // per art style (59)
+  if (!VIGNETTE || VIGNETTE.edge !== edge) {
     VIGNETTE = ctx.createRadialGradient(W / 2, H / 2, H * .45, W / 2, H / 2, H * .95);
-    VIGNETTE.addColorStop(0, 'rgba(0,0,0,0)'); VIGNETTE.addColorStop(1, 'rgba(0,0,0,.38)');
+    VIGNETTE.addColorStop(0, 'rgba(0,0,0,0)'); VIGNETTE.addColorStop(1, edge); VIGNETTE.edge = edge;
   }
   ctx.fillStyle = VIGNETTE; ctx.fillRect(0, y0, W, vh);
 }
 
-function render(dt) {
-  if (!ctx) return;                                // no 2D context (WebKit out of canvas memory): nothing to draw with
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = '#05060c'; ctx.fillRect(0, 0, cv.width, cv.height);
-  if (!MAP) return;
-  kcRecord();   // kill-cam snapshot of this frame (88)
-  updateCamera(dt);
-  const t = G_STATE.t, sh = FX.shake * VIEW.s;
-  FX.shake = FX.shake > .2 ? FX.shake * Math.pow(.86, dt * 60) : 0;
-  ctx.save();
-  ctx.beginPath(); ctx.rect(VIEW.vx, VIEW.vy, VIEW.vw, VIEW.vh); ctx.clip();
-  ctx.fillStyle = mapSkyTop(MAP); ctx.fillRect(VIEW.vx, VIEW.vy, VIEW.vw, VIEW.vh);   // sky above the arena when the camera rises past it
-  setWorldTransform((Math.random() - .5) * sh, (Math.random() - .5) * sh);
+// The arena and everything in it, in world coordinates.
+function drawWorld(dt, t, sx, sy) {
+  setWorldTransform(sx, sy);
   if (typeof MAP.drawBg === 'function') hook(MAP, 'drawBg', ctx, t); else drawStdBackground(ctx, MAP, t);
+  artSurfaces(ctx, true);    // paper: card shadows
   for (const hz of MAP.hazards) drawHazard(ctx, hz, MAP, t);
   for (const s of MAP.solids) drawSolid(ctx, s, MAP, t);
+  artSurfaces(ctx, false);
   drawOrbs();
   juiceDrawWorld(ctx, dt);   // landing dust, speed streaks (87)
   if (dt > 0) for (const f of F) recordTrail(f);
@@ -749,12 +781,29 @@ function render(dt) {
   shatterDraw(ctx);          // neon limbs of K.O.'d fighters (36)
   koFxDraw(ctx); petsDraw(ctx); miniDrawWorld(ctx);   // K.O. effects, pets (78), mini-game props (79)
   drawProjectiles();
-  drawFx(ctx);
+  ART.dots = 1; drawFx(ctx); ART.dots = 0;   // particles in the art style's shape (59)
   hook(MAP, 'drawFg', ctx, t);
   worldDrawTop(ctx, t);      // weather, darkness and lights (58)
   postfxDrawWorld(ctx);      // dynamic lights, impact sparks and flashes (84)
   hook(G_STATE.mode, 'drawWorld', ctx);
-  if (!photoHidesHud()) aiTalkDraw(ctx);   // CPU speech bubbles (67), hidden with the HUD in photo mode
+}
+
+function render(dt) {
+  if (!CTX_MAIN) return;                           // no 2D context (WebKit out of canvas memory): nothing to draw with
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = (MAP && artStyleOf(MAP).frame) || '#05060c'; ctx.fillRect(0, 0, cv.width, cv.height);   // letterbox: the art style's frame (59)
+  if (!MAP) return;
+  kcRecord();   // kill-cam snapshot of this frame (88)
+  updateCamera(dt);
+  const t = G_STATE.t, sh = FX.shake * VIEW.s;
+  FX.shake = FX.shake > .2 ? FX.shake * Math.pow(.86, dt * 60) : 0;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(VIEW.vx, VIEW.vy, VIEW.vw, VIEW.vh); ctx.clip();
+  ctx.fillStyle = mapSkyTop(MAP); ctx.fillRect(VIEW.vx, VIEW.vy, VIEW.vw, VIEW.vh);   // sky above the arena when the camera rises past it
+  const sx = (Math.random() - .5) * sh, sy = (Math.random() - .5) * sh;
+  artWorld(() => drawWorld(dt, t, sx, sy));     // in the arena's art style (59-styles)
+  setWorldTransform(sx, sy);
+  if (!photoHidesHud()) aiTalkDraw(ctx);   // CPU speech bubbles (67), unstyled, hidden with the HUD in photo mode
   setArenaTransform();
   drawScreenOverlays(dt);
   juiceDrawScreen(ctx, dt);   // K.O. chroma/vignette, low-health heartbeat (87)

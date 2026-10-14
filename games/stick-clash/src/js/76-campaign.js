@@ -26,9 +26,10 @@ function questMap(want, fallback) {
   return randomKey(MAPS);
 }
 
-// The player: their own menu loadout with the trial's overrides.
-function questHero(cfg, me = {}) {
-  const r = humanEntry(cfg, 0, 0, 0, 'YOU');
+// The player: their own menu loadout with the trial's overrides (cfg.coop: Player 2 is hero 1).
+function questHero(cfg, me = {}, i = 0) {
+  const r = humanEntry(cfg, i, i, 0, cfg.coop ? duoName(i) : 'YOU');
+  if (i) r.spawn = 4;
   if (me.weapon && WEAPONS[me.weapon]) r.weapon = me.weapon;
   if (me.skills) r.skills = questSkills(me.skills);
   if (me.cls) r.cls = me.cls;
@@ -36,15 +37,25 @@ function questHero(cfg, me = {}) {
   if (me.hp) r.hpMul = me.hp;
   return r;
 }
+// Against two heroes a lone foe gets QUEST_COOP_HP × health and a group one more member.
+const QUEST_COOP_HP = 1.4;
+function questCoopFoes(foes) {
+  const [name, weapon, level, o = {}] = foes[0];
+  return foes.length > 1 ? foes.concat([foes[foes.length - 1]]) : [[name, weapon, level, Object.assign({}, o, { hp: (o.hp || 1) * QUEST_COOP_HP })]];
+}
+const questHeroes = () => F.filter(f => f.team === 0 && !f.summon && (G_STATE.roster[f.id] || {}).ctrl === 'human');
+const questLead = () => questHeroes().find(f => f.alive) || modePlayer();   // a hero still standing
+// Foe i stands at spawn i + 1, skipping spawn 4: the co-op Player 2's spot (questHero), beside the hero's.
 function questFoe([name, weapon, level, o = {}], i, color, shift) {
   const scale = o.scale || 1;
   return modeEntry({ team: 1, name: name.toUpperCase(), weapon: modeWeapon([weapon], o.cats), skills: questSkills(o.skills),
     color: o.color || color, hat: o.hat || 'none', scale, hpMul: o.hp || 1, aiLevel: aiShift(level || 'normal', shift || 0),
-    spawn: i + 1, cls: o.cls || (scale > 1.05 ? 'none' : 'random'), throws: o.throws || ['random', 'random'], isBoss: !!o.boss, qKb: o.kb, qBehave: o.behave, qRing: o.ringSave, qDmg: o.dmg });
+    spawn: i < 3 ? i + 1 : i + 2, cls: o.cls || (scale > 1.05 ? 'none' : 'random'), throws: o.throws || ['random', 'random'], isBoss: !!o.boss, qKb: o.kb, qBehave: o.behave, qRing: o.ringSave, qDmg: o.dmg });
 }
 function questRoster(cfg, spec, color) {
-  const shift = DIFF_SHIFT[cfg.diff] || 0;
-  return [questHero(cfg, spec.me), ...spec.foes.map((f, i) => questFoe(f, i, color, shift))];
+  const shift = DIFF_SHIFT[cfg.diff] || 0, heroes = [questHero(cfg, spec.me)];
+  if (cfg.coop) heroes.push(questHero(cfg, spec.me, 1));
+  return [...heroes, ...(cfg.coop ? questCoopFoes(spec.foes) : spec.foes).map((f, i) => questFoe(f, i, color, shift))];
 }
 function questNewRun(spec, kind, id) { return { spec, kind, id, t: 0, count: {}, taken: 0, dead: {}, broke: null, force: false }; }
 
@@ -70,11 +81,13 @@ function questRoundStart() {
   if (!run) return;
   Object.assign(run, { t: 0, count: {}, taken: 0, dead: {}, broke: null, force: false });
   for (const f of F) questTag(f);
-  const me = modePlayer(), m = run.spec.me || {};
-  if (me && m.throwN) me.throwN = me.throws.map(k => k ? m.throwN : 0);
-  if (me && m.super) me.super = m.super;
-  if (me && m.ringSave) { run.saves = m.ringSave; me.ringSave = questHeroSave; }
-  if (me && m.superMul) me.superMul = (me.superMul || 1) * m.superMul;
+  const m = run.spec.me || {};
+  for (const me of questHeroes()) {
+    if (m.throwN) me.throwN = me.throws.map(k => k ? m.throwN : 0);
+    if (m.super) me.super = m.super;
+    if (m.ringSave) { run.saves = m.ringSave; me.ringSave = questHeroSave; }
+    if (m.superMul) me.superMul = (me.superMul || 1) * m.superMul;
+  }
   for (const k of run.spec.mods || []) if (QUEST_MODS[k] && QUEST_MODS[k].start) QUEST_MODS[k].start(run);
 }
 // Bosses come back from the roster (fresh fighters after a respawn too).
@@ -116,7 +129,7 @@ function questLift(f, share, title, sub) {
 }
 
 function questStep(dt) {
-  const run = questRun(), me = modePlayer();
+  const run = questRun(), me = questLead();
   if (!run || G_STATE.lock > 0 || G_STATE.ending) return;
   run.t += dt;
   for (const k of run.spec.mods || []) if (QUEST_MODS[k] && QUEST_MODS[k].step) QUEST_MODS[k].step(run, dt);
@@ -193,7 +206,7 @@ const questStarText = ([kind, v]) => kind === 'hp' ? `Finish with ${Math.round(v
 const questStarStr = n => '★'.repeat(n) + '☆'.repeat(Math.max(0, 3 - n));
 // Outcome of the finished match: won, health left, time, stars.
 function questOutcome(run) {
-  const me = modePlayer(), won = G_STATE.winner === 0, hp = me && me.alive ? me.hp / me.maxHp : 0;
+  const won = G_STATE.winner === 0, hp = Math.max(0, ...questHeroes().filter(f => f.alive).map(f => f.hp / f.maxHp));
   const met = questStarRules(run.spec.st).filter(([k, v]) => k === 'hp' ? hp >= v - 1e-6 : run.t <= v).length;
   return { won, hp, t: run.t, stars: won ? Math.min(3, 1 + met) : 0 };
 }
@@ -507,8 +520,8 @@ defMode('campaign', Object.assign({}, QUEST_MODE, {
   roundLabel() { const n = CAMP_BY_ID[modeRun().id]; return n ? n.name.toUpperCase() : ''; },
   onRoundStart() {
     questRoundStart();
-    const node = CAMP_BY_ID[modeRun().id], me = modePlayer();
-    if (me) campApplyTree(me);
+    const node = CAMP_BY_ID[modeRun().id];
+    for (const me of questHeroes()) campApplyTree(me);
     const bosses = F.filter(f => f.isBoss);
     if (bosses.length && QUEST_PHASES[node.phases]) bossPhases(bosses, QUEST_PHASES[node.phases]);
     banner(node.name.toUpperCase(), `${CAMP_REALMS[node.r].name.toUpperCase()} · ${CAMP_KINDS[node.kind].label.toUpperCase()}`, 2, CAMP_REALMS[node.r].color);

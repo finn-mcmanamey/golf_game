@@ -50,7 +50,7 @@ function startMatch(cfg) {
   G_STATE.teams = Math.max(...G_STATE.roster.map(r => r.team)) + 1;
   G_STATE.score = Array(G_STATE.teams).fill(0);
   G_STATE.winScore = cfg.winScore || info.winScore || mode.winScore || 5;
-  G_STATE.roundLimit = info.roundLimit || mode.roundLimit || TUNE.roundLimit;
+  G_STATE.roundLimit = (info.roundLimit || mode.roundLimit || TUNE.roundLimit) * roundLenMul();   // 73
   clearFx(); BANNER = null;
   setState(cfg.demo ? 'menu' : 'play');
   newRound();
@@ -185,7 +185,7 @@ function endMatch() {
 function defaultResults() {
   const best = G_STATE.score.indexOf(Math.max(...G_STATE.score));
   return { title: teamName(best) + (teamMembers(best).length > 1 ? ' win!' : ' wins!'), color: teamColor(best),
-    lines: [`Final score ${G_STATE.score.join(' – ')} after ${G_STATE.round} rounds.`] };
+    lines: [`Final score ${G_STATE.score.join(' – ')} after ${roundsText(G_STATE.round)}.`] };
 }
 
 // ---------- world step ----------

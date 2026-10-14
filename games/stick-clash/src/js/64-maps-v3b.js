@@ -400,7 +400,7 @@ const KITCHEN_LANE = { x0: 330, x1: 975 };
 
 defMap('kitchen', {
   name: "Giant's Kitchen", desc: 'Tiny fighters on a giant countertop. The toaster pops you skyward, the blender whirls when its light turns red, and runaway fruit rolls across.', order: 270,
-  floor: 650, gravity: 2200, weather: ['night'], skyTop: '#b8a68a',   // the wall tiles continue above the arena
+  floor: 650, gravity: 2200, weather: ['night'], skyTop: '#b8a68a', style: 'paper',   // the wall tiles continue above the arena
   palette: { sky1: '#f0e0c8', sky2: '#d8c0a0', ground: '#e8e4dc', line: '#ff8a5a', accent: '#5ab0ff', solid: '#c89a6a' },
   solids: [
     { x: 100, y: 520, w: 220, h: 144, oneWay: false, toaster: true },
@@ -431,7 +431,11 @@ defMap('kitchen', {
     });
     kitchenRollFruit(this);
   },
-  drawBg(ctx, t) { kitchenDrawBg(ctx, this, t); },
+  // Paper: the kitchen cut from card; the steam still curls.
+  art: { top: '#c9b598',
+    bg(g, m) { paperBackdrop(g, p => kitchenDrawBg(p, m, 0, false)); },
+    live(c, m, t) { kitchenSteam(c, t); } },
+  drawBg(ctx, t) { if (!artBg(ctx, this, t)) kitchenDrawBg(ctx, this, t, true); },
   drawFg(ctx, t) {
     const w = this.hazards.find(h => h.trap === 'roll' && h.role === 'warn');
     if (w && w.st === 'warn' && (SETTINGS.reduceFlash || Math.sin(t * 18) > -.2)) {
@@ -496,7 +500,10 @@ function kitchenDrawSolid(ctx, s, m, t) {
   glowLine(ctx, s.x, s.y, s.x + s.w, s.y, look[1], 2);
 }
 
-function kitchenDrawBg(ctx, m, t) {
+function kitchenSteam(ctx, t) {
+  for (let k = 0; k < 3; k++) { ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(380 + k * 15, 350); ctx.quadraticCurveTo(370 + k * 15 + Math.sin(t * 2 + k) * 10, 320, 385 + k * 15, 290); ctx.stroke(); }
+}
+function kitchenDrawBg(ctx, m, t, steam) {
   const fl = m.floor;
   ctx.fillStyle = '#b8a68a'; ctx.fillRect(-40, -40, W + 80, fl + 40);
   ctx.strokeStyle = 'rgba(90,74,54,.35)'; ctx.lineWidth = 3; ctx.beginPath();        // giant wall tiles
@@ -509,7 +516,7 @@ function kitchenDrawBg(ctx, m, t) {
   for (const x of [100, 330, 1000, 1180]) circle(ctx, x, 60, 8, '#e8c87a');
   ctx.fillStyle = '#c84a3a'; ctx.beginPath(); ctx.roundRect(360, 360, 70, 290, 16); ctx.fill();          // a giant mug behind the board
   ctx.strokeStyle = '#c84a3a'; ctx.lineWidth = 14; ctx.beginPath(); ctx.arc(430, 470, 46, -1.2, 1.2); ctx.stroke();
-  for (let k = 0; k < 3; k++) { ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(380 + k * 15, 350); ctx.quadraticCurveTo(370 + k * 15 + Math.sin(t * 2 + k) * 10, 320, 385 + k * 15, 290); ctx.stroke(); }
+  if (steam) kitchenSteam(ctx, t);
   const g = ctx.createLinearGradient(0, fl, 0, H);                                   // marble countertop
   g.addColorStop(0, '#f4f0e8'); g.addColorStop(1, '#c8c0b0');
   ctx.fillStyle = g; ctx.fillRect(-40, fl, W + 80, H - fl + 40);

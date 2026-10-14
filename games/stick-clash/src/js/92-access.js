@@ -107,7 +107,7 @@ applySettings = function () {
 };
 
 // ---------- practice speed ----------
-// The slowest speed used during this match: coins and XP scale by it (accessRewardMul, read by 75/79).
+// The slowest speed used during this match (the practice-speed checks in tools/smoke-world read it).
 const ACCESS_MATCH = { minSpeed: 1 };
 on('matchStart', () => { ACCESS_MATCH.minSpeed = 1; });
 // Read by advance() (99-main) on top of the menu's game speed. Solo play only (one human), never Ranked or the demo.
@@ -118,8 +118,6 @@ function accessSpeedMul() {
   if (m < ACCESS_MATCH.minSpeed) ACCESS_MATCH.minSpeed = m;
   return m;
 }
-// A slowed-down match still earns something: 20% at quarter speed, the full reward at normal speed.
-function accessRewardMul() { return .2 + .8 * clamp(ACCESS_MATCH.minSpeed, 0, 1); }
 
 // ---------- one-button mode ----------
 const ONE = Array.from({ length: MAX_FIGHTERS }, () => ({ held: false, downAt: 0, upAt: 0, taps: 0, jumpUntil: 0, stuck: 0 }));

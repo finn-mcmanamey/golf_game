@@ -1,11 +1,7 @@
-/* 95-ui.css: menus, loadout, shop, trophies, results and toasts (owned by the UI slices 95–97). Builds on style.css. */
+/* 95-ui.css: menus, loadout, trophies, results and toasts (owned by the UI slices 95–97). Builds on style.css. */
 
 /* ---------- shared bits ---------- */
 #ui canvas { position: static; inset: auto; touch-action: auto; }   /* style.css pins every canvas full-screen for the arena */
-.coins { display: inline-flex; align-items: center; gap: 7px; font: 400 16px var(--display); color: var(--gold); white-space: nowrap;
-  font-variant-numeric: tabular-nums; }
-.coins i { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff3b0, #ffd84a 45%, #b8860b);
-  box-shadow: 0 0 10px rgba(255, 216, 74, .5), inset 0 0 0 2px rgba(120, 80, 0, .35); }
 button { touch-action: manipulation; }
 button:focus-visible, input:focus-visible, [tabindex="0"]:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 button.link { border: 0; padding: 6px 4px; color: var(--p1); text-decoration: underline; text-underline-offset: 3px; background: none; }
@@ -18,7 +14,7 @@ h4 { margin: 4px 0 0; font: 600 12px var(--body); letter-spacing: .1em; text-tra
 .title-wrap { height: 100%; overflow: auto; display: flex; align-items: safe center; padding: 24px clamp(16px, 6vw, 96px); }
 /* margin: auto centres the column where `safe center` is unknown (older WebKit) and still lets a short viewport start
    at the top and scroll instead of clipping the logo. */
-.title-col { width: min(430px, 100%); display: grid; gap: 16px; animation: pop-in .3s ease-out; margin: auto 0; }
+.title-col { width: min(480px, 100%); display: grid; gap: 16px; animation: pop-in .3s ease-out; margin: auto 0; }
 .logo { font-size: clamp(56px, 8.5vw, 108px); line-height: .86; transform: skewX(-6deg); display: grid; }
 .logo .a { color: var(--p1); text-shadow: 0 0 22px rgba(46, 230, 255, .55), 4px 4px 0 rgba(46, 230, 255, .18); }
 .logo .b { color: var(--p2); text-shadow: 0 0 22px rgba(255, 138, 46, .55), 4px 4px 0 rgba(255, 138, 46, .18); margin-left: .5em; }
@@ -36,7 +32,12 @@ h4 { margin: 4px 0 0; font: 600 12px var(--body); letter-spacing: .1em; text-tra
 .menu-item.go small { color: rgba(26, 20, 0, .72); }
 .menu-item.go:focus-visible { background: #ffe27a; border-left-color: #fff; box-shadow: 0 0 28px rgba(255, 216, 74, .4); }
 @media (hover: hover) { .menu-item.go:hover { background: #ffe27a; border-left-color: #fff; box-shadow: 0 0 28px rgba(255, 216, 74, .4); } }
-.title-foot { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.title-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+/* Two columns under Quick Fight; the JS-made .menu-pair rows dissolve into them, so no entry sits alone on a row. */
+.title-col .menu-list { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.title-col .menu-list > .go { grid-column: 1 / -1; }
+.title-col .menu-pair { display: contents; }
+.title-col .menu-item small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- full-screen sheets ---------- */
 .still { animation: none !important; }
@@ -105,6 +106,9 @@ h4 { margin: 4px 0 0; font: 600 12px var(--body); letter-spacing: .1em; text-tra
 .slider output { min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; color: var(--dim); }
 .set-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; align-items: start; }
 .set-group { border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 16px; background: rgba(0, 0, 0, .16); }
+/* Settings flows in columns, not rows: a tall group (Controls, Touch) no longer leaves holes beside short ones. */
+#settings .set-grid { display: block; columns: 300px; column-gap: 14px; }
+#settings .set-group { break-inside: avoid; margin-bottom: 14px; }
 .set-group > h3 { color: var(--fg); font-size: 16px; }
 .binds .key { min-width: 0; }
 .pad-map { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; margin: 0; font-size: 14px; align-items: center; }
@@ -152,10 +156,6 @@ h4 { margin: 4px 0 0; font: 600 12px var(--body); letter-spacing: .1em; text-tra
   background: rgba(255, 255, 255, .06); }
 .tile.random { min-height: 88px; }
 .tile .big-icon { font-size: 30px; min-height: 54px; display: grid; place-items: center; }
-.tile.locked canvas, .tile.locked .swatches { opacity: .45; filter: grayscale(.5); }
-.tile .price { font: 600 12px var(--body); font-style: normal; color: var(--gold); }
-.tile.asking { border-color: var(--gold); animation: ask-pulse .9s ease-in-out infinite alternate; }
-@keyframes ask-pulse { to { box-shadow: 0 0 22px -2px rgba(255, 216, 74, .65); } }
 .hats { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
 .hats canvas { max-width: 84px; }
 .skill-slots { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
@@ -181,35 +181,24 @@ h4 { margin: 4px 0 0; font: 600 12px var(--body); letter-spacing: .1em; text-tra
 .skill-tile:focus-visible { border-color: var(--sc); }
 @media (hover: hover) { .skill-tile:hover { border-color: var(--sc); } }
 .packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
-.pack-row { display: grid; gap: 6px; }
+.pack-row { display: grid; gap: 6px; align-content: start; }
 .pack-row small { font-size: 12px; color: var(--dim); }
-.pack-row.locked small { color: var(--gold); }
-.swatches { display: flex; gap: 6px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }   /* the 8-colour Neon pack wraps inside its column */
 .swatch { width: 36px; height: 36px; padding: 0; border-radius: 50%; background: var(--c); border: 2px solid rgba(0, 0, 0, .35);
   display: grid; place-items: center; font-size: 13px; box-shadow: 0 0 10px -2px var(--c); }
 @media (hover: hover) { .swatch:hover { background: var(--c); transform: scale(1.08); } }
 .swatch.sel { outline: 3px solid #fff; outline-offset: 2px; }
-.pack-row.locked .swatch { opacity: .45; box-shadow: none; }
-
-/* ---------- shop ---------- */
-.shop-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
-.shop-tile canvas { max-width: 110px; }
-.shop-tile.owned .price { color: var(--p3); }
-.pack-tile { padding: 14px 8px; gap: 8px; }
-.pack-tile .swatches i { width: 26px; height: 26px; border-radius: 50%; display: block; box-shadow: 0 0 8px -2px rgba(255, 255, 255, .4); }
 
 /* ---------- trophies and stats ---------- */
 .trophy-sum { color: var(--dim); } .trophy-sum b { color: var(--gold); font: 400 20px var(--display); }
 .trophy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; margin-top: 10px; }
-.trophy { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px; border-radius: 12px;
+.trophy { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 12px; align-items: center; padding: 12px; border-radius: 12px;
   border: 1px solid var(--line); background: rgba(0, 0, 0, .18); }
 .trophy .tr-icon { font-size: 26px; text-align: center; filter: grayscale(1) opacity(.45); }
 .trophy strong { font-size: 14px; display: block; } .trophy small { font-size: 12px; color: var(--dim); display: block; }
 .trophy em { font-size: 11px; color: var(--p3); font-style: normal; }
 .trophy.got { border-color: rgba(255, 216, 74, .55); background: linear-gradient(120deg, rgba(255, 216, 74, .09), rgba(0, 0, 0, .1)); }
 .trophy.got .tr-icon { filter: drop-shadow(0 0 8px rgba(255, 216, 74, .6)); }
-.tr-coins { font: 400 13px var(--display); color: var(--gold); }
-.trophy:not(.got) .tr-coins { opacity: .5; }
 .tr-prog { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
 .tr-prog b { flex: 1; height: 5px; border-radius: 99px; background: rgba(255, 255, 255, .08); position: relative; overflow: hidden; }
 .tr-prog b::after { content: ''; position: absolute; inset: 0 auto 0 0; width: var(--v); background: var(--p1); }
@@ -254,14 +243,9 @@ h3.sub { margin-top: 18px; color: var(--fg); }
 .mvp { font: 400 10px var(--display); color: #1a1400; background: var(--gold); padding: 2px 6px; border-radius: 4px; }
 .reward { border: 1px solid rgba(255, 216, 74, .45); border-radius: 14px; padding: 12px 16px; text-align: left; display: grid; gap: 8px;
   background: linear-gradient(120deg, rgba(255, 216, 74, .08), rgba(0, 0, 0, .15)); animation: pop-in .4s .15s both ease-out; }
-.reward-total { display: flex; align-items: center; gap: 10px; color: var(--dim); }
-.reward-total b { font: 400 28px var(--display); color: var(--gold); }
-.reward-total .coins { margin-left: auto; }
-.coin-big { width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff3b0, #ffd84a 45%, #b8860b);
-  box-shadow: 0 0 14px rgba(255, 216, 74, .6); }
 .reward ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 13px; color: var(--dim); }
-.reward li { display: flex; justify-content: space-between; gap: 12px; }
-.reward li span { color: var(--gold); font-variant-numeric: tabular-nums; }
+.reward li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; }
+.reward li span { color: var(--dim); }
 .reward li.ach { color: var(--fg); }
 
 /* ---------- toasts ---------- */
@@ -270,6 +254,7 @@ h3.sub { margin-top: 18px; color: var(--fg); }
 .toast { --tc: var(--gold); display: flex; gap: 12px; align-items: center; padding: 10px 14px; border-radius: 12px; background: rgba(12, 14, 30, .96);
   border: 1px solid var(--tc); box-shadow: 0 10px 30px rgba(0, 0, 0, .5), 0 0 24px -6px var(--tc); animation: toast-in .35s cubic-bezier(.2, 1.4, .4, 1);
   transition: opacity .4s, transform .4s; }
+.toasts.top { top: calc(8px + env(safe-area-inset-top)); bottom: auto; } .toasts.top .toast:not(:last-child) { display: none; }
 .toast.out { opacity: 0; transform: translateY(10px); }
 .toast-icon { font-size: 26px; }
 .toast strong { display: block; font-size: 14px; color: var(--tc); }
@@ -301,8 +286,9 @@ h3.sub { margin-top: 18px; color: var(--fg); }
   .res-table { font-size: 13px; }
   .res-table th, .res-table td { padding: 6px 4px; }
 }
-/* Laptop heights (1280x720, 1366x768 with browser chrome): a tighter title menu and a shorter loadout preview. */
-@media (max-height: 820px) {
+/* Laptop and iPad heights (1280x720, 1366x768 with browser chrome, 1194x834): a tighter title menu and a shorter
+   loadout preview, so the whole title menu fits without scrolling. */
+@media (max-height: 860px) {
   .title-wrap { padding-top: 16px; padding-bottom: 16px; }
   .title-col { gap: 10px; }
   .logo { font-size: clamp(52px, 9vh, 76px); }
@@ -338,22 +324,29 @@ h3.sub { margin-top: 18px; color: var(--fg); }
   .title-col { width: min(640px, 100%); }
   .logo { display: flex; gap: .3em; }
   .logo .b { margin-left: 0; }
-  /* Landscape phones: every entry in one wrapping strip (rows of three), so the whole menu and the badges fit. */
+  /* Landscape phones: Quick Fight and the ten entries in four columns (three rows), so the menu and the badges fit. */
   .title-wrap { padding-top: 8px; padding-bottom: 8px; }
   .title-col { width: min(760px, 100%); gap: 6px; }
   .logo { font-size: 38px; }
   .title-col .tag { display: none; }
-  .menu-list { display: flex; flex-wrap: wrap; gap: 5px; }
-  .menu-pair { display: contents; }
-  .menu-item { flex: 1 1 28%; min-width: 0; padding: 5px 10px; }
-  .menu-list .menu-item .mi-label, .menu-list .menu-trio .mi-label { font-size: 14px; white-space: nowrap; }
-  .menu-item.go { flex-basis: 100%; padding: 7px 12px; }
+  .title-col .menu-list { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+  .title-col .menu-list > .go { grid-column: span 2; }
+  .menu-item { min-width: 0; padding: 5px 10px; }
+  .menu-list .menu-item .mi-label { font-size: 14px; white-space: nowrap; }
+  .menu-item.go { padding: 7px 12px; }
   .menu-item.go .mi-label { font-size: 18px; }
   .title-foot { gap: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .title-col, .sheet, .toast, .reward, .tile.asking { animation: none; }
+  .title-col, .sheet, .toast, .reward { animation: none; }
   .menu-item, .tile, .mode-card, .map-card { transition: none; }
+}
+/* Touch screens: every target at least 44 px (Apple's minimum); the P1-P8 scheme toggles (94-controls) are .seg too. */
+@media (pointer: coarse) {
+  .seg button, .stepper button, .switch, .menu-item, .title-foot button, .sheet-head .back, .sheet-foot > button, .set-group button,
+  .pause-card button { min-height: 44px; }
+  .seg button, .stepper button { min-width: 44px; }
+  .slider input { height: 44px; }
 }
 .join-status { font-size: 14px; color: var(--fg); margin: 10px 0 12px; padding: 10px 14px; border-radius: 10px; background: rgba(255, 216, 74, .08); border: 1px solid rgba(255, 216, 74, .35); }
 .join-status.ok { background: rgba(94, 242, 255, .07); border-color: rgba(94, 242, 255, .35); }

@@ -1,21 +1,21 @@
-// 98-ui-progress.js: screens for the v3 customisation and progression: the loadout's Look tab (outfit, weapon skin,
-// pet, K.O. effect, victory pose), preset chips, the Fighter Creator, Track & Quests, the Codex, mutators on the
-// arena screen, the mini-game setting, XP on the results card, title-screen menu items and cheat-code typing.
-// Look fields live flat on each menu loadout (lo.outfit, lo.skins = { cat: key }, lo.ko, lo.pet, lo.pose).
+// 98-ui-progress.js: screens for the v3 customisation: the loadout's Look tab (outfit, weapon skin, pet, K.O. effect,
+// victory pose), preset chips, the Fighter Creator (with the title picker), the Codex, mutators on the arena screen,
+// the mini-game setting, title-screen menu items and cheat-code typing. v4: every look is free from the start; the
+// secret ones appear once found. Look fields live flat on each menu loadout (lo.outfit, lo.skins = { cat: key }, ...).
 
 const LOOK_DEFAULT = { outfit: 'none', ko: 'none', pet: 'none', pose: 'cheer' };
 const LOOK_TAB = { cat: null };
 
 // ---------- loadout -> match look ----------
-// Humans wear only what they own; a CPU picker may leave the outfit on 'random'.
+// Unknown (or still secret) looks fall back to the default; a CPU picker may leave the outfit on 'random'.
 function lookForMatch(lo, cpu) {
   const out = { skins: {} };
   for (const kind in LOOK_DEFAULT) {
-    const v = lo[kind] || (cpu && kind === 'outfit' ? 'random' : LOOK_DEFAULT[kind]), reg = LOOKS[kind];
-    if (v === 'random') out[kind] = randomKey(reg, d => d.key !== 'none');
-    else out[kind] = reg[v] && (cpu || lookOwned(kind, v)) ? v : LOOK_DEFAULT[kind];
+    const v = lo[kind] || (cpu && kind === 'outfit' ? 'random' : LOOK_DEFAULT[kind]);
+    if (v === 'random') out[kind] = randomKey(LOOKS[kind], d => d.key !== 'none');
+    else out[kind] = lookUsable(kind, v) ? v : LOOK_DEFAULT[kind];
   }
-  for (const cat in lo.skins || {}) if (WSKINS[lo.skins[cat]] && (cpu || lookOwned('skin', lo.skins[cat]))) out.skins[cat] = lo.skins[cat];
+  for (const cat in lo.skins || {}) if (lookUsable('skin', lo.skins[cat])) out.skins[cat] = lo.skins[cat];
   return out;
 }
 const lookForPreview = lo => lookForMatch(Object.assign({}, lo, { outfit: lo.outfit === 'random' ? 'none' : lo.outfit }), false);
@@ -30,22 +30,14 @@ on('matchStart', () => {
 });
 
 // ---------- tiles ----------
-const trackLevelOf = (kind, key) => { const t = TRACK_ITEMS.find(([, k, v]) => k === kind && v === key); return t ? t[0] : null; };
-function lookLockText(kind, key) {
-  const lvl = trackLevelOf(kind, key);
-  return lvl ? `🔒 Lv ${lvl}` : '🔒 Secret';
-}
-function lookTile(kind, def, selected, onpick, cpu) {
-  const owned = cpu || lookOwned(kind, def.key);
-  return el('button', { class: 'tile look-tile' + (selected ? ' sel' : '') + (owned ? '' : ' locked'), 'data-key': `${kind}-${def.key}`, title: def.desc || def.name,
-    onclick: () => { if (!owned) { uiSfx('deny'); toast(def.name, `Unlocks on the progression track (${lookLockText(kind, def.key).slice(3)}).`, def.icon, '#5ef2ff'); return; } onpick(def.key); } },
-  el('span', { class: 'big-icon', text: def.icon }), el('span', { text: def.name }),
-  owned ? null : el('em', { class: 'price', text: lookLockText(kind, def.key) }));
+function lookTile(kind, def, selected, onpick) {
+  return el('button', { class: 'tile look-tile' + (selected ? ' sel' : ''), 'data-key': `${kind}-${def.key}`, title: def.desc || def.name, onclick: () => onpick(def.key) },
+    el('span', { class: 'big-icon', text: def.icon }), el('span', { text: def.name }));
 }
 function lookSection(title, kind, lo, cpu, extra) {
   const set = v => { lo[kind] = v; saveMenu(); uiSfx('click'); refreshScreen(); };
   const cur = lo[kind] || (cpu && kind === 'outfit' ? 'random' : LOOK_DEFAULT[kind]);
-  const tiles = listOf(LOOKS[kind]).map(d => lookTile(kind, d, cur === d.key, set, cpu));
+  const tiles = listOf(LOOKS[kind]).map(d => lookTile(kind, d, cur === d.key, set));
   if (cpu && kind === 'outfit') tiles.unshift(el('button', { class: 'tile look-tile' + (cur === 'random' ? ' sel' : ''), 'data-key': 'outfit-random', onclick: () => set('random') },
     el('span', { class: 'big-icon', text: '🎲' }), el('span', { text: 'Random' })));
   return [el('h4', { text: title }), extra || null, el('div', { class: 'tile-grid look-grid' }, tiles)];
@@ -59,12 +51,12 @@ function skinSection(lo, cpu) {
     onclick: () => { LOOK_TAB.cat = c; uiSfx('click'); refreshScreen(); } }, `${CAT_ICONS[c] || ''} ${CAT_NAMES[c] || c}${lo.skins[c] && lo.skins[c] !== 'none' ? ' ✓' : ''}`)));
   const set = v => { lo.skins[cat] = v; saveMenu(); uiSfx('click'); refreshScreen(); };
   return [el('h4', { text: `Weapon skin · ${CAT_NAMES[cat] || cat}` }), chips,
-    el('div', { class: 'tile-grid look-grid' }, listOf(WSKINS).map(d => lookTile('skin', d, (lo.skins[cat] || 'none') === d.key, set, cpu)))];
+    el('div', { class: 'tile-grid look-grid' }, listOf(WSKINS).map(d => lookTile('skin', d, (lo.skins[cat] || 'none') === d.key, set)))];
 }
 function lookTab(i, lo) {
   const cpu = isCpuPicker(i);
   return el('div', { class: 'tab-body' },
-    el('p', { class: 'hint', text: 'Outfits sway with real cloth physics. Earn more on the progression track (Track & Quests).' }),
+    el('p', { class: 'hint', text: 'Outfits sway with real cloth physics. Every look is yours to mix and match; secret ones appear once found.' }),
     lookSection('Outfit', 'outfit', lo, cpu), skinSection(lo, cpu),
     lookSection('Pet', 'pet', lo, cpu, el('p', { class: 'hint', text: 'Pets help a little on a cooldown. They sit out Ranked and One-Hit.' })),
     lookSection('K.O. effect', 'ko', lo, cpu), lookSection('Victory pose', 'pose', lo, cpu));
@@ -88,7 +80,7 @@ SCREENS.creator = () => {
     oninput: e => { CREATOR.name = e.target.value; } });
   const save = (idx) => {
     if (!presetSave(CREATOR.name.trim() || 'Fighter', lo, idx)) { uiSfx('deny'); toast('Preset slots full', `Delete one first (max ${PRESET_MAX}).`, '💾', '#ff8a2e'); return; }
-    lo.preset = CREATOR.name.trim() || 'Fighter'; saveMenu(); uiSfx('coin'); toast('Preset saved', lo.preset, '💾', '#5dff9a'); refreshScreen();
+    lo.preset = CREATOR.name.trim() || 'Fighter'; saveMenu(); uiSfx('chime'); toast('Preset saved', lo.preset, '💾', '#5dff9a'); refreshScreen();
   };
   const at = list.findIndex(p => p.name === lo.preset);
   const pane = el('div', { class: 'lo-preview cr-pane' },
@@ -109,55 +101,11 @@ function presetCard(p, k, lo) {
     uiButton('Use', () => { presetApply(k, lo); CREATOR.name = p.name; saveMenu(); refreshScreen(); }, 'go', { 'data-key': 'cr-use-' + k }),
     uiButton('✕', () => { presetDelete(k); refreshScreen(); }, 'cr-del', { 'aria-label': 'Delete ' + p.name, 'data-key': 'cr-del-' + k }));
 }
+// Every title is free; the two secret ones join the list once found. The title-screen badge shows the one worn.
 function titlePicker() {
-  const owned = listOf(TITLES).filter(t => lookOwned('title', t.key));
-  return segFieldWrap('Title', owned.map(t => [t.key, t.name]), PROG.title, v => { PROG.title = v; progSave(); });
+  return segFieldWrap('Title', listOf(TITLES).map(t => [t.key, t.name]), PROG.title, v => { PROG.title = v; progSave(); });
 }
 const segFieldWrap = (...a) => { const f = segField(...a); f.classList.add('wrap-seg'); return f; };
-
-// ---------- Track & Quests ----------
-const PROG_TAB = { tab: 'track' };
-SCREENS.progress = () => {
-  const tabs = el('div', { class: 'seg sub-tabs', role: 'tablist' }, [['track', 'Track'], ['quests', 'Quests']].map(([k, t]) =>
-    el('button', { 'aria-pressed': String(PROG_TAB.tab === k), 'data-key': 'pg-' + k, onclick: () => { PROG_TAB.tab = k; uiSfx('click'); refreshScreen(); } }, t)));
-  return sheet('Track & Quests', [levelBar(), tabs, PROG_TAB.tab === 'track' ? trackGrid() : questLists()], null);
-};
-function levelBar() {
-  const L = trackLevel(PROG.xp), pct = L.need ? L.into / L.need * 100 : 100;
-  return el('div', { class: 'lvl-bar' }, el('b', { class: 'lvl-num', text: `Lv ${L.lvl}` }),
-    el('div', { class: 'lvl-track' }, el('i', { style: { width: pct.toFixed(1) + '%' } })),
-    el('span', { text: L.need ? `${L.into} / ${L.need} XP` : 'MAX' }),
-    el('em', { text: TITLES[PROG.title] ? TITLES[PROG.title].name : '' }));
-}
-function trackGrid() {
-  const L = trackLevel(PROG.xp).lvl;
-  const tiles = [];
-  for (let l = 2; l <= TRACK_MAX; l++) {
-    const r = TRACK[l], got = l <= L, cls = 'tile track-tile' + (got ? ' got' : '') + (l === L + 1 ? ' next' : '') + (r.kind !== 'coins' ? ' item' : '');
-    tiles.push(el('div', { class: cls, tabindex: '0', 'data-key': 'lvl-' + l }, el('small', { text: 'Lv ' + l }),
-      el('span', { class: 'big-icon', text: trackIcon(r) }), el('span', { text: trackRewardName(r).split(' · ')[0] })));
-  }
-  return el('div', {}, el('p', { class: 'hint', text: 'XP comes from every match, the Mythic Quest, challenges and quests. Every level pays out. The Shop still sells hats and colours for coins.' }),
-    el('div', { class: 'tile-grid track-grid' }, tiles));
-}
-function questLists() {
-  const s = tasksNow(), reroll = taskCanReroll();
-  const card = (t, kind, k) => el('div', { class: 'trophy quest-card' + (t.done ? ' got' : ''), tabindex: '0' },
-    el('span', { class: 'tr-icon', text: t.done ? '✅' : kind === 'daily' ? '📜' : '🗓' }),
-    el('div', {}, el('strong', { text: taskText(t) }),
-      el('div', { class: 'tr-prog' }, el('b', { style: { '--v': (t.n / t.need * 100).toFixed(0) + '%' } }), el('span', { text: `${t.n}/${t.need}` }))),
-    el('div', { class: 'q-side' }, el('span', { class: 'tr-coins', text: `+${TASK_REWARD[kind].xp} XP` }),
-      kind === 'daily' && !t.done && reroll ? uiButton('↻ Reroll', () => { taskReroll(k); refreshScreen(); }, 'q-reroll', { 'data-key': 'reroll-' + k }) : null));
-  const until = d => { const h = Math.ceil((d - Date.now()) / 36e5); return h > 24 ? `${Math.ceil(h / 24)} days` : `${h} h`; };
-  const now = new Date(), tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7 - (now.getDay() + 6) % 7);
-  return el('div', { class: 'quest-wrap' },
-    el('h4', { text: `Daily quests · new in ${until(tomorrow)}` + (reroll ? ' · one reroll left today' : '') }),
-    el('div', { class: 'trophy-grid' }, s.daily.map((t, k) => card(t, 'daily', k))),
-    el('h4', { text: `Weekly quests · new in ${until(monday)}` }),
-    el('div', { class: 'trophy-grid' }, s.weekly.map((t, k) => card(t, 'weekly', k))),
-    el('p', { class: 'hint', text: `Daily: +${TASK_REWARD.daily.xp} XP and ${TASK_REWARD.daily.coins} coins. Weekly: +${TASK_REWARD.weekly.xp} XP and ${TASK_REWARD.weekly.coins} coins. Only real matches count.` }));
-}
 
 // ---------- Codex ----------
 const CODEX_TAB = { tab: 'w' };
@@ -255,51 +203,34 @@ function miniSettingField() {
   return segField('Party mini-games', [['auto', 'Party modes'], ['on', 'Always'], ['off', 'Off']], SETTINGS.minigames || 'auto', v => setSetting('minigames', v));
 }
 
-// ---------- results: XP and levels ----------
-function xpBox() {
-  if (!PROG_MATCH.done || !PROG_MATCH.xp) return null;
-  const L = trackLevel(PROG.xp);
-  return el('div', { class: 'reward xp-box' },
-    el('div', { class: 'reward-total' }, el('b', { text: `+${PROG_MATCH.xp}` }), ' XP', el('span', { class: 'xp-lvl', text: `Lv ${L.lvl}` })),
-    PROG_MATCH.mul < 1 ? el('p', { class: 'reward-mul', text: `× ${PROG_MATCH.mul} at practice speed` }) : null,
-    el('div', { class: 'lvl-track' }, el('i', { style: { width: (L.need ? L.into / L.need * 100 : 100).toFixed(1) + '%' } })),
-    el('ul', {}, PROG_MATCH.lines.map(([why, n]) => el('li', {}, why, el('span', { text: `+${n}` }))),
-      PROG_MATCH.ups.map(l => el('li', { class: 'ach' }, `${trackIcon(TRACK[l])} Level ${l}: ${trackRewardName(TRACK[l])}`, el('span', { text: '★' })))));
-}
-on('state', now => {
-  if (now !== 'over' || !PANELS.over) return;
-  progSettle();
-  const card = PANELS.over.querySelector('.results-card'), row = card && card.querySelector(':scope > .row'), box = xpBox();
-  if (card && box) card.insertBefore(box, row);
-});
-
-// ---------- title screen: menu items, level badge, cheat codes ----------
-// The new items join existing rows (the title menu must still fit 720 px): Shop | Creator | Track, How to Play | Codex.
+// ---------- title screen: menu items, title badge, cheat codes ----------
+// The Fighter Creator gets its own row above Trophies & Stats and the Codex sits beside How to Play, so the title menu
+// keeps its rows (it must still fit a 720 px screen).
 function progMenuItems(list) {
   const item = (label, sub, onclick) => el('button', { class: 'menu-item', 'data-key': 'mi-' + label, onclick: () => { uiSfx('click'); onclick(); } },
     el('span', { class: 'mi-label', text: label }), el('small', { text: sub }));
-  const s = tasksNow(), done = s.daily.filter(t => t.done).length;
-  progMenuJoin(list, /^Shop/, [item('Creator', `${presetList().length} presets`, () => { CREATOR.picker = 0; CREATOR.name = ''; openScreen('creator', 'menu'); }),
-    item('Track', `Lv ${trackLevel(PROG.xp).lvl} · ${done}/3 daily`, () => openScreen('progress', 'menu'))]);
-  progMenuJoin(list, /^How to Play/, [item('Codex', `${Object.keys(PROG.secrets).length}/${Object.keys(SECRETS).length} secrets`, () => openScreen('codex', 'menu'))]);
+  const creator = item('Fighter Creator', `${presetList().length}/${PRESET_MAX} presets · outfits, pets, titles`, () => { CREATOR.picker = 0; CREATOR.name = ''; openScreen('creator', 'menu'); });
+  const trophies = progMenuRow(list, /^Trophies/);
+  if (trophies) trophies.before(creator); else list.append(creator);
+  const howto = progMenuRow(list, /^How to Play/), codex = item('Codex', `${Object.keys(PROG.secrets).length}/${Object.keys(SECRETS).length} secrets`, () => openScreen('codex', 'menu'));
+  if (!howto) { list.append(codex); return; }
+  const pair = howto.classList.contains('menu-pair') ? howto : el('div', { class: 'menu-pair' });
+  if (pair !== howto) { howto.replaceWith(pair); pair.append(howto); }
+  pair.append(codex);
 }
-// Puts items beside the menu item whose label matches (in its row, or a new row at the end of the list).
-function progMenuJoin(list, re, items) {
+// The row holding the menu item whose label matches: its pair, or the item itself.
+function progMenuRow(list, re) {
   const label = [...list.querySelectorAll('.mi-label')].find(l => re.test(l.textContent)), host = label && label.closest('.menu-item');
-  if (!host) { list.append(...items); return; }
-  let row = host.parentNode;
-  if (!row.classList.contains('menu-pair')) { row = el('div', { class: 'menu-pair' }); host.replaceWith(row); row.append(host); }
-  row.append(...items);
-  if (row.children.length > 2) row.classList.add('menu-trio');
+  return host && host.parentNode.classList.contains('menu-pair') ? host.parentNode : host;
 }
 on('boot', () => {
   const wrap = (name, fn) => { const build = SCREENS[name]; SCREENS[name] = () => { const node = build(); try { fn(node); } catch (e) { report(e, 'progress ui ' + name); } return node; }; };
   wrap('menu', node => {
     const list = node.querySelector('.menu-list');
     if (list) progMenuItems(list);
-    const foot = node.querySelector('.title-foot');
-    if (foot) foot.insertBefore(el('button', { class: 'lvl-badge', 'data-key': 'lvl-badge', onclick: () => openScreen('progress', 'menu') },
-      el('b', { text: 'Lv ' + trackLevel(PROG.xp).lvl }), el('span', { text: TITLES[PROG.title] ? TITLES[PROG.title].name : '' })), foot.children[1] || null);
+    const foot = node.querySelector('.title-foot'), title = TITLES[PROG.title];
+    if (foot && title && !title.hidden) foot.insertBefore(el('button', { class: 'title-badge', 'data-key': 'title-badge', title: 'Your title: change it in the Fighter Creator',
+      onclick: () => { uiSfx('click'); CREATOR.picker = 0; CREATOR.name = ''; openScreen('creator', 'menu'); } }, el('span', { 'aria-hidden': 'true', text: title.icon }), el('b', { text: title.name })), foot.children[1] || null);
   });
   wrap('maps', node => { const body = node.querySelector('.sheet-body'); if (body) body.prepend(mutatorPanel()); });   // above the arenas: easy to find on phones
   wrap('settings', node => { const g = [...node.querySelectorAll('.set-group')].find(x => /Match/.test(x.querySelector('h3').textContent)); if (g) g.insertBefore(miniSettingField(), g.lastChild); });

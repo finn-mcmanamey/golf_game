@@ -76,6 +76,8 @@ function mapRidge(ctx, yBase, amp, freq, phase, color, bottom = H) {
 
 // A platform slab with a neon top edge (the house style); fill/edge colours per arena.
 function mapSlab(ctx, s, fill, edge, alpha = 1) {
+  const st = artNow();
+  if (st.slab) return st.slab(artRaw(ctx), s, fill, edge, alpha);   // ink, paper or chalk (59-styles)
   const h = s.oneWay ? Math.min(s.h, 14) : s.h;
   ctx.globalAlpha = alpha;
   ctx.fillStyle = fill; ctx.fillRect(s.x, s.y, s.w, h);
@@ -122,16 +124,18 @@ function mapStepTraps(m, id, dt, o) {
   });
 }
 
-// Generic warning marker: a tinted column that flashes faster as the strike nears, and a target on the ground.
-function mapDrawWarn(ctx, hz, t) {
+// Generic warning marker: a tinted column that flashes faster as the strike nears, and a target on the ground. Art
+// styles draw it unmapped in their own warning colour, so it reads as clearly as on neon.
+function mapDrawWarn(c2, hz, t) {
   if (mapParked(hz) || hz.st !== 'warn') return;
-  const k = 1 - hz.tt / hz.max, on = SETTINGS.reduceFlash || Math.sin(t * (12 + k * 34)) > -.2, col = hz.warnColor || '#ffd84a';
+  const st = artNow(), ctx = artRaw(c2), k = 1 - hz.tt / hz.max, on = SETTINGS.reduceFlash || Math.sin(t * (12 + k * 34)) > -.2;
+  const col = st.warn || hz.warnColor || '#ffd84a';
   const bx = hz.x + hz.w / 2, by = hz.y + hz.h;
   ctx.fillStyle = rgba(col, .05 + .12 * k); ctx.fillRect(hz.x, hz.y, hz.w, hz.h);
   if (on) {
     ctx.strokeStyle = rgba(col, .35 + .4 * k); ctx.lineWidth = 2; ctx.setLineDash([10, 8]); ctx.lineDashOffset = -t * 60;
     ctx.strokeRect(hz.x, hz.y, hz.w, hz.h); ctx.setLineDash([]);
-    glow(ctx, col, 16, () => {
+    glow(c2, col, 16, () => {   // c2: the style scales or drops the glow
       ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.beginPath();
       ctx.ellipse(bx, by - 3, hz.w * .5 * (1.3 - k * .3), 9, 0, 0, TAU); ctx.stroke();
       ctx.fillStyle = col; ctx.font = `28px ${FONT_DISPLAY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
@@ -272,10 +276,24 @@ defMap('neon', {
 
 defMap('dojo', {
   name: 'Dojo Courtyard', desc: 'Open boards, no ledges, no power-ups. A pure duel of footwork and timing.', order: 15,
-  floor: 640, orbs: false,
+  floor: 640, orbs: false, style: 'ink',
   spawns: [[420, 640], [860, 640], [270, 640], [1010, 640]],
   palette: { sky1: '#1b0b30', sky2: '#ff6a5a', ground: '#2a1410', line: '#ff7ab8', accent: '#ffcf6b', solid: '#3a1c14' },
+  // Ink: a vermilion sun behind the torii, washed hills, pagodas in grey wash; the lanterns still swing.
+  art: { top: ART_PAPER,
+    bg(g, m) {
+      const fl = m.floor, wash = artMono(g, 'rgba(30,25,21,.45)');
+      inkPaper(g, 11);
+      inkSun(g, 640, 360, 165, '#cf3b2b');
+      inkWash(g, 560, 120, .006, 1.2, .12, fl); inkWash(g, 600, 70, .011, 4, .22, fl);
+      m.drawPagoda(wash, 150, fl, 1); m.drawPagoda(wash, 1130, fl, .8);
+      m.drawTorii(artMono(g, ART_INK), 640, fl);
+      for (const [x, y, s] of [[300, 150, 1], [345, 128, .7], [930, 210, .8]]) inkStroke(g, [[x - 14 * s, y - 4 * s], [x, y + 3 * s], [x + 14 * s, y - 5 * s]], 1.8 * s, .5);   // birds
+      inkGround(g, fl, 31);
+    },
+    live(c, m, t) { for (let k = 0; k < 7; k++) m.drawLantern(c, 120 + k * 173, 40 + (k % 2) * 26, t, k); } },
   drawBg(ctx, t) {
+    if (artBg(ctx, this, t)) return;
     const fl = this.floor;
     mapSky(ctx, fl, ['#12082a', '#4a1450', '#c23a5a', '#ff9a5a']);
     // Banded setting sun.
@@ -433,7 +451,7 @@ defMap('frost', {
 
 defMap('moon', {
   name: 'Moon Base', desc: 'Low gravity: huge floaty jumps, long knockbacks, and lazy grenades.', order: 50,
-  floor: 650, gravity: 1350,
+  floor: 650, gravity: 1350, style: 'pixel',
   palette: { sky1: '#000006', sky2: '#0a0a1e', ground: '#6a6a7a', line: '#b6c3ff', accent: '#5ef2ff', solid: '#3a3d55' },
   solids: [{ x: 110, y: 410, w: 230 }, { x: 940, y: 410, w: 230 }, { x: 520, y: 230, w: 240 }, { x: 570, y: 500, w: 140, move: { dx: 0, dy: 60, period: 6 } }],
   spawns: [[330, 650], [950, 650], [225, 410], [1055, 410]],

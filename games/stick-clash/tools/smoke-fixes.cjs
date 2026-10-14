@@ -152,12 +152,13 @@ async function run(_page, browser, { check, rows }) {
       out.speed = SETTINGS.speed; out.rounds = SETTINGS.rounds; out.master = SETTINGS.master;
       store.set('presets', 'x'); out.presets = presetList().length;
       store.set('highlights', [1, 'x']); out.hl = typeof store.getArr === 'function' && store.getArr('highlights').length;
-      store.set('profile', { coins: 'lots', stats: { cpuWins: null } }); const p = loadProfile(); out.coins = p.coins; out.cpuWins = typeof p.stats.cpuWins;
-      try { saveShapeCheck('stickclash.v2.profile', { coins: 'lots' }); out.code = 'accepted'; } catch (e) { out.code = 'refused'; }
+      store.set('profile', { ach: [], stats: { cpuWins: null } }); const p = loadProfile(); out.ach = Array.isArray(p.ach) ? 'array' : typeof p.ach; out.cpuWins = typeof p.stats.cpuWins;
+      try { saveShapeCheck('stickclash.v2.profile', { stats: [] }); out.code = 'accepted'; } catch (e) { out.code = 'refused'; }
+      try { saveShapeCheck('stickclash.v2.ranked', { pts: 'lots' }); out.rank = 'accepted'; } catch (e) { out.rank = 'refused'; }
       store.set('presets', []); store.set('highlights', []); store.set('profile', JSON.parse(JSON.stringify(PROFILE)));
       return out;
     });
-    return { ok: r.speed === 1 && r.rounds === 9 && r.master === .9 && r.presets === 0 && r.coins === 0 && r.cpuWins === 'object' && r.code === 'refused', note: JSON.stringify(r) };
+    return { ok: r.speed === 1 && r.rounds === 9 && r.master === .9 && r.presets === 0 && r.ach === 'object' && r.cpuWins === 'object' && r.code === 'refused' && r.rank === 'refused', note: JSON.stringify(r) };
   });
   // Contrast: the faint text colour reads at 4.5:1 or better on the panel background.
   await step('faint text contrast >= 4.5', async () => {

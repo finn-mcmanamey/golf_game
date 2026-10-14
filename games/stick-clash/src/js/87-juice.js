@@ -34,7 +34,7 @@ on('damage', (B, amt, o) => {
 
 on('ko', victim => {
   if (G_STATE.sim || victim.summon) return;
-  const deciding = aliveTeams().length <= 1;
+  const deciding = koDecides(victim);   // 30
   if (!G_STATE.demo) {                    // the attract demo behind the menus stays calm (and cheap)
     const fl = fxFlashMul();              // juice level and reduced flashing (84)
     JUICE.chroma = (deciding ? 1 : .55) * (SETTINGS.reduceFlash ? 0 : fl);

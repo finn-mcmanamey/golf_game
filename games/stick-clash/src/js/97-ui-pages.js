@@ -1,5 +1,5 @@
-// 97-ui-pages.js: settings, controls (key rebinding + gamepad help), how to play, shop, trophies & stats, the pause
-// menu and the results screen, plus the wiring that shows the right panel for each game state.
+// 97-ui-pages.js: settings, controls (key rebinding + gamepad help), how to play, trophies & stats, the pause menu and
+// the results screen, plus the wiring that shows the right panel for each game state.
 
 // ---------- settings ----------
 // Changes made from the pause menu also reach the running match where that makes sense (speed, items, kill-cam).
@@ -101,7 +101,7 @@ addEventListener('pointerdown', e => { if (KEY_CAPTURE && !(e.target.closest && 
 
 // ---------- how to play ----------
 SCREENS.howto = () => {
-  const k = (s, a) => el('kbd', { text: keyLabel(BINDS[s][a]) });
+  const k = (s, a) => { const c = keySets()[s][a]; return c ? el('kbd', { text: keyLabel(c) }) : null; };   // the keys in use (Compact 2P too)
   const card = (icon, title, ...kids) => el('section', { class: 'help-card' }, el('h3', {}, el('span', { text: icon }), title), kids);
   const orbs = listOf(ORBS).map(o => el('li', {}, el('b', { style: { color: o.color, borderColor: o.color }, text: o.icon }), el('span', {}, el('strong', { text: o.name }), ' ' + (o.desc || ''))));
   const body = el('div', { class: 'help-grid' },
@@ -143,35 +143,8 @@ SCREENS.howto = () => {
       el('li', { text: 'Jump and swing: an airborne spin carries extra speed.' }),
       el('li', { text: 'Dash out of trouble, then turn and strike while they recover.' }),
       el('li', { text: 'Heavy weapons hit hard but swing slowly. Light ones combo.' }),
-      el('li', { text: 'Coins from every match buy hats and colours in the Shop.' }))));
+      el('li', { text: 'Every hat, colour, outfit and pet is yours from the start: dress up in Loadout → Style and Look.' }))));
   return sheet('How to play', body, [el('button', { class: 'go', onclick: () => { uiSfx('click'); goBack(); } }, 'Got it')]);
-};
-
-// ---------- shop ----------
-const SHOP = { tab: 'hats' };
-SCREENS.shop = () => {
-  const lo = menuLoadout(0);
-  const tabs = el('div', { class: 'seg sub-tabs', role: 'tablist' }, [['hats', 'Hats'], ['colors', 'Colour packs']].map(([k, t]) =>
-    el('button', { 'aria-pressed': String(SHOP.tab === k), 'data-key': 'shop-' + k, onclick: () => { SHOP.tab = k; uiSfx('click'); refreshScreen(); } }, t)));
-  const wear = key => { lo.hat = key; saveMenu(); uiSfx('click'); refreshScreen(); };
-  const hats = listOf(HATS).filter(h => h.key !== 'none').sort((a, b) => (a.price || 0) - (b.price || 0) || a.order - b.order).map(h => {
-    const owned = ownsHat(h.key), c = uiCanvas(110, 96), asking = LO.confirm === 'hat:' + h.key, worn = lo.hat === h.key;
-    drawHatIcon(c, h.key, lo.color);
-    return el('button', { class: 'tile shop-tile' + (owned ? ' owned' : ' locked') + (worn ? ' sel' : '') + (asking ? ' asking' : ''), 'data-key': 'hat-' + h.key,
-      onclick: () => owned ? wear(worn ? 'none' : h.key) : tryBuy('hat', h.key, () => wear(h.key)) },
-    c, el('span', { text: h.name }),
-    el('em', { class: 'price', text: owned ? (worn ? 'Wearing' : 'Owned · wear') : asking ? `Buy for ${h.price}?` : `🪙 ${h.price}` }));
-  });
-  const packs = COLOR_PACKS.filter(p => p.price > 0).map(p => {
-    const owned = ownsPack(p.key), asking = LO.confirm === 'pack:' + p.key;
-    return el('button', { class: 'tile pack-tile' + (owned ? ' owned' : ' locked') + (asking ? ' asking' : ''), 'data-key': 'pack-' + p.key,
-      onclick: () => owned ? (uiSfx('click'), toast(p.name + ' is yours', 'Pick its colours in Loadout → Style.', '🎨', p.colors[0])) : tryBuy('pack', p.key) },
-    el('span', { class: 'swatches' }, p.colors.map(c => el('i', { style: { background: c } }))),
-    el('span', { text: p.name }),
-    el('em', { class: 'price', text: owned ? 'Owned' : asking ? `Buy for ${p.price}?` : `🪙 ${p.price}` }));
-  });
-  const intro = el('p', { class: 'hint', text: 'Earn coins by playing: more for wins, harder CPUs, tournaments and trophies. Every weapon, skill and arena is free; the shop is just for style.' });
-  return sheet('Shop', [intro, tabs, el('div', { class: 'tile-grid shop-grid' }, SHOP.tab === 'hats' ? hats : packs)], null);
 };
 
 // ---------- trophies and stats ----------
@@ -179,9 +152,9 @@ const STATS_TAB = { tab: 'trophies' };
 function fmtTime(s) { const m = Math.floor(s / 60); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m ${Math.floor(s % 60)}s`; }
 
 SCREENS.stats = () => {
-  const tabs = el('div', { class: 'seg sub-tabs', role: 'tablist' }, [['trophies', 'Trophies'], ['stats', 'Stats']].map(([k, t]) =>
+  const tabs = el('div', { class: 'seg sub-tabs', role: 'tablist' }, [['trophies', 'Trophies'], ['stats', 'Stats'], ['rivals', 'Rivals']].map(([k, t]) =>
     el('button', { 'aria-pressed': String(STATS_TAB.tab === k), 'data-key': 'st-' + k, onclick: () => { STATS_TAB.tab = k; uiSfx('click'); refreshScreen(); } }, t)));
-  return sheet('Trophies & Stats', [tabs, STATS_TAB.tab === 'trophies' ? trophyGrid() : statsGrid()], null);
+  return sheet('Trophies & Stats', [tabs, STATS_TAB.tab === 'trophies' ? trophyGrid() : STATS_TAB.tab === 'rivals' ? duoRivalsTab() : statsGrid()], null);
 };
 
 function trophyGrid() {
@@ -195,8 +168,7 @@ function trophyGrid() {
         el('span', { class: 'tr-icon', text: a.icon }),
         el('div', {}, el('strong', { text: a.name }), el('small', { text: a.desc }),
           got ? el('em', { text: `Unlocked ${new Date(PROFILE.ach[a.key]).toLocaleDateString()}` })
-            : el('div', { class: 'tr-prog' }, el('b', { style: { '--v': (cur / need * 100).toFixed(0) + '%' } }), el('span', { text: need > 1 ? `${Math.floor(cur)}/${need}` : '' }))),
-        el('span', { class: 'tr-coins', text: `+${a.coins}` }));
+            : el('div', { class: 'tr-prog' }, el('b', { style: { '--v': (cur / need * 100).toFixed(0) + '%' } }), el('span', { text: need > 1 ? `${Math.floor(cur)}/${need}` : '' }))));
     })));
 }
 
@@ -210,7 +182,7 @@ function statsGrid() {
       tile('K.O.s', s.kos), tile('Ring-outs', s.ringouts), tile('Damage dealt', s.dmg.toLocaleString()), tile('Hits', s.hits.toLocaleString()),
       tile('Head hits', s.headHits), tile('Best combo', s.bestCombo), tile('Biggest hit', s.bigHit), tile('Skills used', s.skills),
       tile('Orbs grabbed', s.orbs), tile('Tournaments', s.tourneys), tile('Best wave', s.bestWave), tile('Time fighting', fmtTime(s.playTime)),
-      tile('Coins earned', PROFILE.earned.toLocaleString()), tile('Favourite weapon', fav && WEAPONS[fav[0]] ? WEAPONS[fav[0]].name : '–')),
+      tile('Rounds played', s.roundsPlayed), tile('Favourite weapon', fav && WEAPONS[fav[0]] ? WEAPONS[fav[0]].name : '–')),
     el('h3', { class: 'sub', text: 'Wins against the CPU' }),
     el('div', { class: 'stat-grid' }, Object.keys(AI_LEVELS).map(k => tile(capital(k), s.cpuWins[k] || 0))));
 }
@@ -256,15 +228,13 @@ function resultsTable() {
       el('td', { text: r.big || '–' }))))));
 }
 
-function rewardBox() {
-  const rw = settleMatch();
-  if (!rw) return null;
-  const unlocked = MATCH_TRACK.unlocked.map(k => ACHIEVEMENTS[k]).filter(Boolean);
-  return el('div', { class: 'reward' },
-    el('div', { class: 'reward-total' }, el('span', { class: 'coin-big', 'aria-hidden': 'true' }), el('b', { text: `+${rw.coins}` }), ' coins', coinBadge()),
-    rw.mul < 1 ? el('p', { class: 'reward-mul', text: `× ${rw.mul} at practice speed` }) : null,   // slowed solo play pays less (75, 92-access)
-    el('ul', {}, rw.lines.map(([why, n]) => el('li', {}, why, el('span', { text: `+${n}` }))),
-      unlocked.map(a => el('li', { class: 'ach' }, `${a.icon} Trophy: ${a.name}`, el('span', { text: `+${a.coins}` })))));
+// Trophies unlocked during this match (toasts stay off the results screen). recordMatch counts the match first, since
+// the card is built before matchOver fires.
+function trophyBox() {
+  recordMatch();
+  const got = MATCH_TRACK.unlocked.map(k => ACHIEVEMENTS[k]).filter(Boolean);
+  if (!got.length) return null;
+  return el('div', { class: 'reward' }, el('ul', {}, got.map(a => el('li', { class: 'ach' }, `${a.icon} Trophy unlocked: ${a.name}`, el('span', { text: a.desc })))));
 }
 
 function scoreLine() {
@@ -279,12 +249,14 @@ function buildResults() {
   return el('div', { class: 'card wide results-card', style: { '--rc': color } },
     el('h2', { style: { color }, text: res.title }),
     scoreLine(),
+    duoResultsLine(),                                 // 73: the pair's record
     (res.lines || []).length ? el('div', { class: 'results-lines' }, res.lines.map(t => el('span', { text: t }))) : null,
     resultsTable(),
-    rewardBox(),
+    trophyBox(),
     el('div', { class: 'row' },
       el('button', { class: 'go', onclick: () => { uiSfx('fight'); startMatch(G_STATE.cfg); } }, 'Rematch'),
       uiButton('Menu', toMenu),
+      quickRematchButton(),                           // 73 (CSS shows it second)
       changeSetupButton()));
 }
 // Modes without loadout pickers (Weapon Roulette rolls everything) offer the arena screen instead.
@@ -307,3 +279,19 @@ function syncPanels(state) {
 }
 on('state', syncPanels);
 on('boot', () => syncPanels(G_STATE.state));
+
+// On the results card a toast shows only above it, else waits for it to close (the card lists the trophies anyway).
+const RES_HELD = [];
+function resToastClear() {   // offsetTop: the card's top without its pop-in transform
+  const card = PANELS.over.querySelector('.results-card');
+  return !card || PANELS.over.hidden || TOASTS.getBoundingClientRect().bottom + 6 <= card.offsetTop;
+}
+const toastNow = toast;
+toast = (...args) => {
+  toastNow(...args);
+  if (G_STATE.state === 'over' && !resToastClear()) { TOASTS.lastElementChild.remove(); RES_HELD.push(args); }
+};
+on('state', now => {
+  if (now === 'over') { while (TOASTS.lastElementChild && !resToastClear()) TOASTS.lastElementChild.remove(); }   // the fight's
+  else for (const a of RES_HELD.splice(0)) toastNow(...a);
+});

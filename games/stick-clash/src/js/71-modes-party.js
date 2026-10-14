@@ -64,12 +64,14 @@ function partyRespawn(old, x, y, over = {}) {
   const f = makeFighter(Object.assign({}, r, { id: old.id, x, y, face: x < W / 2 ? 1 : -1, weapon: resolveWeapon(r.weapon),
     skills: old.skills, autopilot: old.autopilot, cls: resolveClass(r.cls || 'none'), throws: resolveThrows(r.throws) }, over));
   f.inv = 1.2;                                                      // brief spawn protection
-  applyMatchHp(f);                                                  // the Settings health multiplier (75)
+  partyEnterRules(f);
   F = F.map(o => o === old ? f : o);
   const c = chest(f);
   ring(c.x, c.y, 80, f.color, .4, 5); burst(c.x, c.y, f.color, 20, 300);
   return f;
 }
+// What roundStart gave the first fighters, for one entering mid-round: health (75, 73), mutators and silly rule (79).
+function partyEnterRules(f) { applyMatchHp(f); duoHpApply(f); mutFighter(f); sillyFighter(f); }
 // Counts down run.dead[id] and calls spawn(old) when a fighter's timer runs out.
 function partyTickRespawns(run, dt, spawn) {
   for (const id in run.dead) {
@@ -270,7 +272,7 @@ defMode('soccer', {
     const run = modeRun();
     if (!run.ball || G_STATE.state === 'over') return;
     if (G_STATE.lock > 0 || G_STATE.ending) return;
-    partyTickRespawns(run, dt, old => { const [x, y] = partySideSpot(old.team, old.id); const f = partyRespawn(old, x, y); f.dmgTakenMul = .6; });
+    partyTickRespawns(run, dt, old => { const [x, y] = partySideSpot(old.team, old.id); const f = partyRespawn(old, x, y); f.dmgTakenMul = (f.dmgTakenMul || 1) * .6; });   // on top of a mutator
     socStepBall(run, dt);
     socCpuTouches(run);
     socCheckGoal(run);

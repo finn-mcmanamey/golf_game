@@ -107,10 +107,12 @@ function annSynth(phon) {
   ANN.synthAt = t + .08;
 }
 
-function annVowel(bus, t, dur, pitch, formants) {
+// from/to: the pitch glide (83b's grunts bend it more).
+function annVowel(bus, t, dur, pitch, formants, from = 1.06, to = .9) {
+  if (audioBusy()) return;
   const src = AC.createOscillator(), env = AC.createGain();
   src.type = 'sawtooth';
-  src.frequency.setValueAtTime(pitch * 1.06, t); src.frequency.exponentialRampToValueAtTime(pitch * .9, t + dur);
+  src.frequency.setValueAtTime(pitch * from, t); src.frequency.exponentialRampToValueAtTime(pitch * to, t + dur);
   env.gain.setValueAtTime(0, t); env.gain.linearRampToValueAtTime(.5, t + .015);
   env.gain.setValueAtTime(.5, t + dur * .7); env.gain.exponentialRampToValueAtTime(.001, t + dur);
   env.connect(bus);
@@ -124,6 +126,7 @@ function annVowel(bus, t, dur, pitch, formants) {
 }
 
 function annClick(bus, t, hiss) {
+  if (audioBusy()) return;
   const s = AC.createBufferSource(), fl = AC.createBiquadFilter(), g = AC.createGain();
   s.buffer = NOISE; fl.type = 'highpass'; fl.frequency.value = hiss ? 4000 : 1500;
   g.gain.setValueAtTime(hiss ? .2 : .35, t); g.gain.exponentialRampToValueAtTime(.001, t + (hiss ? .08 : .03));
@@ -207,8 +210,9 @@ on('roundEnd', (winner, reason) => {
 });
 
 on('ko', (victim, killer, o) => {
-  if (!annOn() || victim.summon || aliveTeams().length <= 1) return;   // the round-ending K.O. is called by roundEnd
+  if (!annOn() || victim.summon || koDecides(victim)) return;   // the round-ending K.O. is called by roundEnd
   if (o && o.kind === 'ringout') announce('Ring out!', 1);
+  else if (aliveTeams().length <= 1) announce('K.O.!', 2);      // the last one up on its side, but a partner tags in (74)
 });
 on('ultimate', () => announce('Ultimate!', 2));
 on('parry', (B, A) => {

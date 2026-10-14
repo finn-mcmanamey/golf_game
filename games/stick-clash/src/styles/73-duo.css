@@ -1,0 +1,26 @@
+/* 73-duo.css: 2-player setup, rivalry, quick rematch, vote (79). --pc: player colour */
+.duo-panel { order: -1; display: grid; gap: 10px; }
+.duo-names { display: flex; align-items: center; gap: 12px; font: 20px var(--display); color: var(--gold); }
+.duo-name { flex: 1; min-width: 0; font: inherit; color: var(--pc); background: var(--panel2); border: 0; border-bottom: 3px solid var(--pc); border-radius: 8px; padding: 8px 12px; }
+.duo-rec, .duo-res { margin: 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; font-weight: 600; }
+.duo-opts { display: flex; flex-wrap: wrap; gap: 10px 28px; }
+.duo-dots i { display: inline-block; width: 10px; height: 10px; margin: 0 2px; border-radius: 50%; background: var(--line2); }
+.duo-rivals { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.results-card .row > .go { order: -2; }
+.results-card .row > .quick-rm { order: -1; border-color: var(--gold); color: var(--gold); }
+.vote { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 16px; pointer-events: none; }
+.vote-card { pointer-events: auto; width: min(940px, 100%); display: grid; gap: 12px; padding: 14px; border-radius: 16px; background: rgba(8, 9, 22, .88); border: 1px solid var(--gold); }
+.vote-head { display: flex; align-items: center; gap: 14px; font: 22px var(--display); color: var(--gold); }
+.vote-head i { flex: 1; height: 12px; border-radius: 9px; background: linear-gradient(90deg, var(--gold) calc(var(--t) * 100%), var(--line) 0); }
+.vote-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.vote-side { display: grid; gap: 8px; padding: 10px; border-top: 3px solid var(--pc); text-align: center; color: var(--faint); }
+.vote-side h3 { color: var(--pc); font: 18px var(--display); }
+.vote-opt { display: grid; grid-template-columns: auto 1fr; gap: 0 10px; text-align: left; }
+.vote-opt span { grid-row: span 2; font-size: 26px; }
+.vote-opt.cur { border-color: var(--pc); box-shadow: 0 0 0 1px var(--pc); }
+.vote-opt.picked { background: var(--pc); color: #0b0c18; }
+.vote-side > small, .vote-how { font: 600 14px var(--body); color: var(--fg); }
+.table .vote-sides { grid-template-columns: 1fr; }
+.table .vote-side { grid-template-columns: repeat(3, 1fr); } .table .vote-side > :not(.vote-opt) { grid-column: 1 / -1; }   /* fits under the HUD */
+.table .flip { order: -1; transform: rotate(180deg); }
+.ci-coop { justify-self: start; padding: 4px 10px; font-size: 13px; }

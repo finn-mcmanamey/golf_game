@@ -113,6 +113,108 @@ return typeof SC;
 ERRS = "return (window.__wk ? __wk.errs : []).concat(typeof SC === 'object' ? SC.errors.map(e => e.msg) : ['no SC'])"
 
 
+# v4: synthetic touch and key events (WebKitGTK's driver has no touch actions; the game reads untrusted events too).
+TAP_JS = """
+const tap = (el, x, y, id) => { const o = { pointerType: 'touch', clientX: x, clientY: y, isPrimary: id === 1, bubbles: true, pointerId: id };
+  el.dispatchEvent(new PointerEvent('pointerdown', o)); return () => el.dispatchEvent(new PointerEvent('pointerup', o)); };
+const key = (type, code) => dispatchEvent(new KeyboardEvent(type, { code, bubbles: true }));
+const shown = e => !!e && !e.hidden && e.getClientRects().length > 0 && +getComputedStyle(e).opacity > .05;
+"""
+
+
+def v4_checks(d, check):
+    """Arena art styles, iPad table mode, the Compact 2P laptop layout, the controls card and the rule vote in WebKit."""
+    # Every art style renders with 8 fighters; the pixel layer is scaled up without smoothing.
+    d.inner_size(1194, 834)
+    styles = d.run("resize(); const by = {}; for (const k of Object.keys(SC.reg.MAPS)) { const s = SC.styles.of(k); if (!by[s]) by[s] = k; } return by;")
+    for style, key in sorted(styles.items()):
+        r = d.run("""
+          const key = arguments[0], e0 = SC.errors.length; let err = '';
+          try { toMenu(); SC.start({ mode: 'ffa', fighters: 8, map: key }); SC.G.lock = 0; SC.sim(2.5); for (let i = 0; i < 20; i++) SC.render(1 / 60); }
+          catch (e) { err = e.message; }
+          if (SC.errors.length > e0) err = err || SC.errors[SC.errors.length - 1].msg;
+          return { err, layer: SC.styles.layer() || null, nan: SC.F.some(f => f.P.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y))) };
+        """, key)
+        ok = not r['err'] and not r['nan'] and (style != 'pixel' or (r['layer'] or {}).get('smooth') is False)
+        check('art style %s (%s) renders' % (style, key), ok, json.dumps(r))
+        d.screenshot('style-%s-1194x834' % style)
+
+    # iPad table mode: two touch sets (P2's turned 180°), Advanced buttons >= 44 px and not touching, clear of the HUD,
+    # and P2's own attack button attacks with P2 only.
+    for (w, h) in [(1194, 834), (1366, 1024)]:
+        d.inner_size(w, h)
+        d.run(TAP_JS + """
+          resize(); toMenu(); ROTATE_SKIPPED = true; setScheme(0, 'advanced'); setScheme(1, 'advanced'); SETTINGS.tableMode = true;
+          SC.start({ mode: 'pvp', map: 'dojo', silly: 'off', minigames: false }); SC.G.lock = 0;
+          tap(document.elementFromPoint(innerWidth / 2, innerHeight / 2) || document.body, innerWidth / 2, innerHeight / 2, 1)();
+        """)
+        time.sleep(.6)
+        r = d.run(TAP_JS + """
+          const sets = [...document.querySelectorAll('#touch .tset')].filter(shown), btns = s => [...s.querySelectorAll('.tarc button')].filter(shown);
+          const out = { table: tableActive(), touch: !TOUCH_EL.hidden, sets: sets.length, turned: sets[1] ? getComputedStyle(sets[1]).transform : 'none' };
+          let minSize = 1e9, minGap = 1e9;
+          for (const s of sets) {
+            const bs = btns(s).map(b => b.getBoundingClientRect());
+            for (const b of bs) minSize = Math.min(minSize, b.width, b.height);
+            for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
+              const a = bs[i], c = bs[j];
+              minGap = Math.min(minGap, Math.hypot(a.left + a.width / 2 - c.left - c.width / 2, a.top + a.height / 2 - c.top - c.height / 2) - (a.width + c.width) / 2);
+            }
+          }
+          Object.assign(out, { minSize: Math.round(minSize), minGap: Math.round(minGap) });
+          const V = SC.view.VIEW, top = V.hudY / V.dpr, bottom = (V.hudY + V.hudH) / V.dpr, all = sets.flatMap(btns).map(b => b.getBoundingClientRect());
+          out.overHud = sets[1] ? btns(sets[1]).map(b => b.getBoundingClientRect()).filter(b => b.top < bottom && b.bottom > top).length : -1;
+          out.offScreen = all.filter(b => b.left < -1 || b.top < -1 || b.right > innerWidth + 1 || b.bottom > innerHeight + 1).length;
+          window.__atk = []; on('attack', f => __atk.push(f.slot)); SC.F[1].atkCd = 0;
+          const btn = document.querySelector('#touch .tset2 [data-act="attack"]'), b = btn.getBoundingClientRect();
+          const up = tap(btn, b.left + b.width / 2, b.top + b.height / 2, 2); SC.sim(.15); up(); SC.sim(.05);
+          out.attacks = [...new Set(__atk)].join();
+          return out;
+        """)
+        check('table mode %dx%d: two sets, P2 turned' % (w, h), r['table'] and r['touch'] and r['sets'] == 2 and r['turned'].startswith('matrix(-1'), json.dumps(r))
+        check('table mode %dx%d: buttons >= 44 px, apart, clear of the HUD' % (w, h),
+              r['minSize'] >= 44 and r['minGap'] >= 4 and r['overHud'] == 0 and r['offScreen'] == 0, json.dumps(r))
+        check('table mode %dx%d: P2 attack button attacks with P2' % (w, h), r['attacks'] == '1', json.dumps(r))
+        d.screenshot('table-%dx%d' % (w, h))
+    d.run("SETTINGS.tableMode = false; toMenu();")
+
+    # Laptop: Compact 2P keys, both key strips on screen, and each player's attack key attacks with that player only.
+    d.inner_size(1280, 720)
+    d.run(TAP_JS + """
+      resize(); toMenu(); setKeyLayout('compact'); setScheme(0, 'simple'); setScheme(1, 'simple');
+      SC.start({ mode: 'pvp', map: 'neon', silly: 'off', minigames: false }); SC.G.lock = 0;
+      for (const c of ['KeyA', 'ArrowLeft']) { key('keydown', c); key('keyup', c); }   // both players last used keys
+      SC.sim(.1); for (let i = 0; i < 5; i++) SC.render(1 / 60);
+    """)
+    time.sleep(.6)
+    r = d.run(TAP_JS + """
+      const ks = keySets(), out = { p1: ks[0].attack, p2: ks[1].attack, skill2: ks[1].skill2, strips: [...document.querySelectorAll('.kstrip')].filter(shown).length };
+      window.__atk = []; on('attack', f => __atk.push(f.slot));
+      SC.F[0].atkCd = SC.F[1].atkCd = 0; key('keydown', out.p1); SC.sim(.15); key('keyup', out.p1); SC.sim(.4);
+      out.first = [...new Set(__atk)].join(); __atk.length = 0;
+      SC.F[1].atkCd = 0; key('keydown', out.p2); SC.sim(.15); key('keyup', out.p2); SC.sim(.05);
+      out.second = [...new Set(__atk)].join();
+      return out;
+    """)
+    check('compact 2P: keys and both key strips', r['p1'] == 'KeyF' and r['p2'] == 'Period' and r['strips'] == 2, json.dumps(r))
+    check('compact 2P: each attack key drives its own player', r['first'] == '0' and r['second'] == '1', json.dumps(r))
+    d.screenshot('compact-1280x720')
+    d.run("setKeyLayout('standard'); toMenu();")
+
+    # The controls card, then the rule vote (2-player duel), both drawn by this engine.
+    r = d.run(TAP_JS + """
+      toMenu(); SC.start({ mode: 'pvp', map: 'dojo', silly: 'vote', minigames: false }); SC.controls.card(true);
+      return { card: SC.controls.cardOpen(), sections: document.querySelectorAll('.cc-sec').length };
+    """)
+    time.sleep(.5)   # the card ignores input for 350 ms, so the press that opened it can't close it
+    r.update(d.run(TAP_JS + "key('keydown', 'KeyK'); key('keyup', 'KeyK'); return { closed: !SC.controls.cardOpen() };"))
+    time.sleep(.8)
+    r.update(d.run(TAP_JS + "for (let i = 0; i < 3; i++) SC.render(1 / 60); const v = document.querySelector('.vote'); return { vote: shown(v), sides: v ? v.querySelectorAll('.vote-sides > *').length : 0 };"))
+    check('controls card and rule vote', r['card'] and r['sections'] >= 2 and r['closed'] and r['vote'] and r['sides'] == 2, json.dumps(r))
+    d.screenshot('vote-1280x720')
+    d.run("toMenu();")
+
+
 def main():
     keep = '--keep' in sys.argv
     os.makedirs(OUT, exist_ok=True)
@@ -302,6 +404,7 @@ def main():
             ok = abs(r['iw'] - w) <= 2 and abs(r['ih'] - h) <= 2 and r['hudH'] > 0
             check('layout %dx%d' % (w, h), ok, json.dumps(r))
             d.screenshot('play-%dx%d' % (w, h))
+        v4_checks(d, check)
         check('final: no errors', not d.run(ERRS), d.run(ERRS))
     except SystemExit:
         pass

@@ -151,7 +151,7 @@ async function testSaveCodes(page, SHOTS) {
     let bad = '';
     try { await readSaveCode(code.slice(0, -12) + 'AAAA' + code.slice(-8)); } catch (e) { bad = e.message; }
     const p = JSON.parse(localStorage.getItem('stickclash.v2.profile') || '{}');
-    p.coins = 4321;
+    p.stats = Object.assign({}, p.stats, { matches: 4321 });           // shown in the preview's Matches line
     const k = Object.assign({}, back.k, { 'stickclash.v2.profile': JSON.stringify(p) });
     const json = JSON.stringify({ v: 1, t: Date.now(), k });
     window.__code = `SC1p.${toB64u(new TextEncoder().encode(json))}.${fnv1a(json)}`;
@@ -166,14 +166,14 @@ async function testSaveCodes(page, SHOTS) {
   r.preview = await page.evaluate(() => /4321/.test(document.querySelector('.xfer-facts').textContent));
   await Promise.all([page.waitForEvent('load'), page.click('[data-key="xfer-confirm"]')]);
   await page.waitForFunction(() => window.SC && SC.G.state === 'menu');
-  r.imported = await page.evaluate(() => PROFILE.coins === 4321);
+  r.imported = await page.evaluate(() => PROFILE.stats.matches === 4321);
   return r;
 }
 
 // Touch: the stick moves P1, flicking up jumps, a tap on the right attacks, taunt has a button.
 async function testTouch(browser, SHOTS, w, h) {
   const { ctx, page, errors } = await open(browser, { viewport: { width: w, height: h }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
-  await page.evaluate(() => { ROTATE_SKIPPED = true; MENU.map = 'dojo'; MENU.mode = 'versus'; startFromMenu(); });
+  await page.evaluate(() => { ROTATE_SKIPPED = true; MENU.map = 'dojo'; MENU.mode = 'versus'; CTL.schemes.fill('advanced'); startFromMenu(); });   // Advanced: the taunt button
   await page.evaluate(CALM);
   await page.evaluate(() => { window.__atk = 0; on('attack', f => { if (f === SC.F[0]) __atk++; }); });
   await page.waitForTimeout(1500);

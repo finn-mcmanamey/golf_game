@@ -7,6 +7,8 @@ const BODY_POSE = [[0, -152], [0, -130], [0, -80], [-8, -106], [-12, -84], [12, 
 const HEAD_R = 14, LIMB_R = 6;
 // Hurt shapes: the head circle plus a capsule per limb (radii scale with the fighter).
 const HIT_SHAPES = [{ a: 0, b: 0, r: HEAD_R, head: true }, ...BODY_LINKS.map(([a, b]) => ({ a, b, r: LIMB_R }))];
+// A hurt shape's radius; f.headHit (79-silly's Giant Heads) grows the head's with its drawing.
+const hurtR = (B, T) => T.r * B.scale * (T.head && B.headHit || 1);
 const UPPER_BODY = [0, 1, 2, 3, 4], KNEES = [7, 9];
 
 // ---------- building ----------
@@ -27,10 +29,10 @@ function makeFighter(o) {
     inp: { mx: 0, my: 0, jump: false, jumpHeld: false, attack: false, attackHeld: false, skill1: false, skill2: false, dash: 0,
       blockHeld: false, block: false, grab: false, throw: false, super: false, mash: false, taunt: false },   // v3 actions (22-moves)
     ai: {}, stats: { dmgDealt: 0, dmgTaken: 0, hits: 0, kos: 0, skills: 0, jumps: 0, shots: 0, dashes: 0 },
-    trail: [], upT: 0, aliveT: 0,
+    trail: [], upT: 0, aliveT: 0, tumble: 0, flailA: 0,
   };
   BODY_LINKS.forEach(([a, b]) => addLink(f, a, b));
-  addLink(f, 0, 2);                                        // rigid spine
+  f.spine = addLink(f, 0, 2);                              // head-hip link: its stiffness (TUNE.spineK) sets the neck's bobble
   addLink(f, 2, 8, { min: true, r: dist(f.P[2], f.P[8]) * .93 });   // legs can't fold flat
   addLink(f, 2, 10, { min: true, r: dist(f.P[2], f.P[10]) * .93 });
   addLink(f, 8, 10, { min: true, r: 14 * scale });                  // feet don't merge
@@ -215,13 +217,20 @@ function updateFacing(f) {
 }
 
 // The body hangs like a puppet between a lifted head and weighted feet, so it stays upright but wobbles.
+// The TUNE silly profile sets how floppy: lifts, the head's pull over the hip, the neck's bobble and tumbles.
 function driveBody(f, dt, grounded, locked) {
   if (f.status.ragdoll || f.heldBy) return;      // limp: thrown or held fighters just fall (22-moves moves held ones)
-  const P = f.P, [head, neck, hip] = P, G = PHYS.gravity, s = f.scale, face = f.face;
-  const up = (grounded ? 1 : .55) * (f.status.stun ? .45 : 1) * (f.stagger > 0 ? .75 : 1);
-  head.fy -= G * 3.4 * up; neck.fy -= G * 2.2 * up; hip.fy -= G * 1.2 * up; P[8].fy += G; P[10].fy += G;
+  const P = f.P, [head, neck, hip] = P, G = PHYS.gravity, s = f.scale, face = f.face, tumbling = f.tumble > 0;
+  // Sitting or kneeling (hip or a knee on the floor, feet maybe in the air) is not flying: lift as on the ground, and
+  // treat it like lying down, so the fighter springs back up instead of staying folded on its hip.
+  const seated = !grounded && (hip.g || P[7].g || P[9].g), floor = grounded || seated;
+  const sunk = hip.y > Math.max(P[8].y, P[10].y) - 35 * s;
+  const down = floor && !tumbling && (seated || sunk || head.y > hip.y - 25 * s);
+  const up = (floor ? 1 : .55) * (f.status.stun ? .45 : 1) * (f.stagger > 0 ? .75 : 1) * (tumbling ? TUNE.tumbleLift : 1) * (down ? TUNE.getUp : 1);
+  head.fy -= G * TUNE.headLift * up; neck.fy -= G * TUNE.neckLift * up; hip.fy -= G * TUNE.hipLift * up; P[8].fy += G; P[10].fy += G;
+  if (f.spine) f.spine.k = TUNE.spineK;
   // Keep the head over the hip, but not when upside down: that would balance the body on its head.
-  if (head.y < hip.y - 10 * s) head.fx += (hip.x + face * 3 * s - head.x) * 120;
+  if (head.y < hip.y - 10 * s) head.fx += (hip.x + face * 3 * s - head.x) * TUNE.headSpring * (tumbling ? .15 : 1);
   else head.fx += (head.x < hip.x ? -1 : 1) * G * 1.5;     // tip over so the lift can stand us back up
   const mx = locked ? 0 : clamp(f.inp.mx, -1, 1), speed = TUNE.speed * moveMul(f);
   let k = grounded ? TUNE.accelGround : TUNE.accelAir;
@@ -237,14 +246,16 @@ function driveBody(f, dt, grounded, locked) {
   const hipVx = vx(hip);
   // Legs pointing up (lying on the back): the foot springs would balance them there, so topple them away from the head.
   const legsUp = P[8].y < hip.y - 20 * s && P[10].y < hip.y - 20 * s;
-  if (legsUp) { const away = hip.x >= head.x ? 1 : -1; P[8].fx += away * G * 1.5; P[10].fx += away * G * 1.5; }
+  if (legsUp && seated && head.y < hip.y - 10 * s) { P[8].fy += G * 1.5; P[10].fy += G * 1.5; }   // sat up with legs raised: put them down
+  else if (legsUp) { const away = hip.x >= head.x ? 1 : -1; P[8].fx += away * G * 1.5; P[10].fx += away * G * 1.5; }
+  else if (!grounded && TUNE.legScramble > 0 && (tumbling || f.stagger > .12)) scrambleLegs(f, dt);
   else {
     footSpring(P[8], hip.x - face * 11 * s + sw, walking && lift > 0, hipVx);
     footSpring(P[10], hip.x + face * 11 * s - sw, walking && lift < 0, hipVx);
   }
   // Snappier arcs: extra gravity when falling, and when rising with the jump key released (tap = short hop).
   // Only for an upright body: a knocked-down fighter getting back up must not be pulled down.
-  if (grounded) f.rising = false;
+  if (floor) f.rising = false;
   else if (!f.status.freeze && head.y < hip.y - 20 * s && !(f.mount && f.mount.carried)) {
     const hipVy = vy(hip);
     if (hipVy > 0) f.rising = false;
@@ -253,33 +264,60 @@ function driveBody(f, dt, grounded, locked) {
   }
 }
 
+// Cartoon legs: launched or tumbling through the air, the feet keep running in circles under the hip. The hip takes
+// the opposite push, so the scramble moves the legs without lifting or steering the body.
+function scrambleLegs(f, dt) {
+  const P = f.P, hip = P[2], s = f.scale, r = 22 * s, hvx = vx(hip), hvy = vy(hip);
+  f.phase += dt * 26 * TUNE.legScramble;
+  for (let k = 0; k < 2; k++) {
+    const p = P[k ? 10 : 8], a = f.phase + k * Math.PI;
+    const fx = (hip.x + Math.cos(a) * r - p.x) * 110 - (vx(p) - hvx) * 9, fy = (hip.y + 44 * s + Math.sin(a) * r - p.y) * 110 - (vy(p) - hvy) * 9;
+    p.fx += fx; p.fy += fy; hip.fx -= fx; hip.fy -= fy;
+  }
+}
+
 function driveArms(f) {
   if (f.blocking && guardPose(f)) return;          // 22-moves: weapon raised as a guard
   const P = f.P, neck = P[1], s = f.scale, face = f.face, G = PHYS.gravity;
   const guard = f.off && f.off.w.block > 0;      // a shield is held out in front, the weapon hand a little behind it
+  const hold = f.tumble > 0 ? 1 - TUNE.armTrail : 1;   // a tumbling fighter's weapon arm flops and trails
   if (f.w.ranged) aimRanged(f);
-  else spring(P[6], neck.x + face * (guard ? 28 : 36) * s, neck.y + 10 * s, 110, 8);
+  else spring(P[6], neck.x + face * (guard ? 28 : 36) * s, neck.y + 10 * s, 110 * hold, 8 * hold);
   if (f.w.twoHanded) {   // back hand grips the shaft a little way up from the main hand
     const h = P[f.main.hand], t = P[f.tip], L = Math.hypot(t.x - h.x, t.y - h.y) || 1;
     spring(P[4], h.x + (t.x - h.x) / L * 18 * s, h.y + (t.y - h.y) / L * 18 * s, 90, 7);
   } else if (guard) spring(P[4], neck.x + face * 44 * s, neck.y + 22 * s, 100, 8);
   else if (f.off) spring(P[4], neck.x + face * 24 * s, neck.y + 24 * s, 70, 6);
-  else spring(P[4], neck.x - face * 10 * s, neck.y + 44 * s, 25, 4);
+  else flailBackArm(f);
   if (!f.w.chain && !f.w.ranged) P[f.tip].fy -= G * f.w.lift;
   if (f.off && !f.off.w.chain) P[f.off.tip].fy -= G * f.off.w.lift;
 }
 
-// Ranged weapons point at the nearest visible enemy, with a little wobble so aim isn't perfect.
+// The free back hand dangles; on fast moves (running flat out, dashing, flying from a hit) it windmills round the
+// shoulder, faster the faster the body goes. Purely a pose: the hand carries no weapon.
+function flailBackArm(f) {
+  const P = f.P, neck = P[1], s = f.scale, sp = Math.hypot(vx(P[2]), vy(P[2]));
+  const k = TUNE.armFlail * clamp((sp - 380) / 500, 0, 1);
+  if (k <= 0) { spring(P[4], neck.x - f.face * 10 * s, neck.y + 44 * s, 25, 4); return; }
+  f.flailA += DT * (8 + sp / 60) * f.face;
+  const r = 40 * s, tx = lerp(neck.x - f.face * 10 * s, neck.x + Math.cos(f.flailA) * r, k), ty = lerp(neck.y + 44 * s, neck.y + Math.sin(f.flailA) * r, k);
+  spring(P[4], tx, ty, 25 + 45 * k, 4 + 2 * k);
+}
+
+// Ranged weapons point at the nearest visible enemy, with a little wobble so aim isn't perfect. v4: steadier (wobble
+// .05 -> .025 rad, faster tracking, a firmer arm) so the floppier body doesn't spoil the shot. 65-ai's aim bias
+// assumes the AIM_SMOOTH tracking.
+const AIM_SMOOTH = .25;
 function aimRanged(f) {
   const P = f.P, neck = P[1], s = f.scale, foe = nearestEnemy(f, true);
   let ang = foe ? angleTo(neck, chest(foe)) : (f.face > 0 ? -.15 : Math.PI + .15);
-  ang += Math.sin(G_STATE.t * 3.3 + f.id * 1.7) * (f.status.stun ? .5 : .05);
+  ang += Math.sin(G_STATE.t * 3.3 + f.id * 1.7) * (f.status.stun ? .5 : .025);
   let d = ang - f.aim;
   d = Math.atan2(Math.sin(d), Math.cos(d));
-  f.aim += d * .18;
+  f.aim += d * AIM_SMOOTH;
   const ux = Math.cos(f.aim), uy = Math.sin(f.aim), len = f.main.links[0].cur * (f.w.chain || 1);
-  spring(P[6], neck.x + ux * 38 * s, neck.y + 8 * s + uy * 34 * s, 120, 9);
-  spring(P[f.tip], P[6].x + ux * len, P[6].y + uy * len, 260, 12);
+  spring(P[6], neck.x + ux * 38 * s, neck.y + 8 * s + uy * 34 * s, 160, 11);
+  spring(P[f.tip], P[6].x + ux * len, P[6].y + uy * len, 340, 15);
 }
 
 function doJump(f, mul) {
@@ -305,8 +343,10 @@ function doDash(f) {
 
 // Default melee attack: swing the arm and weapon over the top toward the foe, with a lunge. A chain weapon whose
 // head hangs below the shoulder swings underhand instead, so the ball sweeps forward and up rather than backwards.
-function spinAttack(f, power = 1) {
-  const P = f.P, neck = P[1], face = f.face, k = 15 * power;
+// pivot: the body point the weapon wheels round: 1 the neck (overhead chop), 2 the hip (a wide low sweep), 5 the
+// weapon elbow (a quick forearm flick).
+function spinAttack(f, power = 1, pivot = 1) {
+  const P = f.P, neck = P[pivot], face = f.face, k = 15 * power * (pivot === 2 ? .8 : 1);
   const swing = (idx, dir) => { for (const j of idx) { const p = P[j]; kick(p, -(p.y - neck.y) * dir * k, (p.x - neck.x) * dir * k); } };
   const underhand = f.w.chain && P[f.tip].y > neck.y;
   swing([5, 6, ...f.main.pts.slice(1)], underhand ? -face : face);
@@ -402,7 +442,7 @@ function drive(f, dt) {
 function clearPresses(f) { const i = f.inp; i.jump = i.attack = i.skill1 = i.skill2 = i.block = i.grab = i.throw = i.super = i.mash = false; i.dash = 0; }
 
 function tickFighter(f, dt) {
-  for (const k of ['atkCd', 'atkBuf', 'jumpBuf', 'jumpCd', 'dashCd', 'dashT', 'stagger', 'flash', 'swingT', 'comboT', 'inv']) {
+  for (const k of ['atkCd', 'atkBuf', 'jumpBuf', 'jumpCd', 'dashCd', 'dashT', 'stagger', 'flash', 'swingT', 'comboT', 'inv', 'tumble']) {
     if (f[k] > 0) f[k] = Math.max(0, f[k] - dt);
   }
   for (let k = 0; k < 2; k++) { f.skillCd[k] = Math.max(0, f.skillCd[k] - dt); f.skillBuf[k] = Math.max(0, f.skillBuf[k] - dt); }

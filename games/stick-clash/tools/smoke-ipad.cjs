@@ -13,6 +13,8 @@
 //   time; 'gesture' only from pointerup/touchend/click/keydown and the announcer's warm-up retries; no page zoom
 //   (gesture events, pinch resizes); the stick ring under the thumb and the edge insets; Apple Pencil as touch; save
 //   codes without DecompressionStream (inflater vectors + fuzz); captureStream failing -> GIF; wake-lock toggle.
+// - v4 touch sets at 1024x768, 1194x834 and 1366x1024: Advanced buttons 44+ px (48+ on the inner ring), 6+ px apart and
+//   inside their set, alone and in table mode; P2's set below the HUD with its own (working) pause button.
 // Screenshots: tmp/smoke/ipad-*.png.
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -23,6 +25,7 @@ const DEVICES = {
   ipadPro11: ipad(1194, 834),
   ipad10: ipad(1180, 820),
   ipad129: ipad(1366, 1024),
+  ipad97: ipad(1024, 768),                                // the smallest 4:3 iPad screen
   portrait: ipad(834, 1194),
   splitView: ipad(507, 834, { screen: { width: 1194, height: 834 } }),
   trackpad: ipad(1194, 834, { isMobile: false }),
@@ -600,6 +603,7 @@ async function run(browser, { check, rows, SHOTS }) {
       const zip = async bytes => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer());
       const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
       const out = { vectors: vectors.map(v => dec.decode(inflate(Uint8Array.from(atob(v.b64), c => c.charCodeAt(0)))) === v.text).join() };
+      saveSettings();                                   // a fresh page has saved nothing yet (v4 writes no quests at boot)
       const real = enc.encode(JSON.stringify({ v: 1, t: Date.now(), k: saveKeysNow() }));
       out.real = real.length > 50 && same(inflate(await zip(real)), real);
       let seed = 20261014;
@@ -681,6 +685,40 @@ async function run(browser, { check, rows, SHOTS }) {
     const ok = r.meta === 'telephone=no' && r.sizeAdjust && r.drag && r.backdrop && r.select && r.colTop >= 0;
     return { ok, note: JSON.stringify(r) };
   }));
+
+  // (24) v4 thumb arc: Advanced buttons big enough and never touching, in one set and in table mode's two (whose top
+  // set starts below the HUD); P2's own pause button, turned with its set, pauses the fight.
+  for (const [device, size] of [['ipad97', '1024x768'], ['ipadPro11', '1194x834'], ['ipad129', '1366x1024']]) {
+    await step(`touch arc spacing ${size}`, () => withDevice(device, async ({ page, tap }) => {
+      const sets = {};
+      for (const table of [false, true]) sets[table ? 'table' : 'one'] = await page.evaluate(table => {
+        ROTATE_SKIPPED = true; SETTINGS.touchMode = 'on'; SETTINGS.tableMode = table; setScheme(0, 'advanced'); setScheme(1, 'advanced');
+        SC.start({ mode: 'pvp', map: 'dojo' }); SC.G.lock = 0;
+        if (table) touchSeats(0, 1);
+        updateTouchUI();
+        const V = SC.view.VIEW, hudB = (V.hudY + V.hudH) / V.dpr, vis = e => e.offsetParent !== null;
+        return [...document.querySelectorAll('#touch .tset')].filter(vis).map(box => {
+          const r = box.getBoundingClientRect(), b = [...box.querySelectorAll('.tarc button')].filter(vis).map(e => ({ act: e.dataset.act, q: e.getBoundingClientRect() }));
+          let gap = 1e9;
+          for (const x of b) for (const y of b) if (x !== y) gap = Math.min(gap, Math.hypot(x.q.x + x.q.width / 2 - y.q.x - y.q.width / 2, x.q.y + x.q.height / 2 - y.q.y - y.q.height / 2) - (x.q.width + y.q.width) / 2);
+          const p2 = box.querySelector('.tpause2');
+          return { n: b.length, gap: +gap.toFixed(1), small: Math.round(Math.min(...b.map(x => x.q.width))),
+            inner: Math.round(Math.min(...b.filter(x => /skill|dash|block/.test(x.act)).map(x => x.q.width))),
+            outside: b.filter(x => x.q.left < r.left - 1 || x.q.right > r.right + 1 || x.q.top < r.top - 1 || x.q.bottom > r.bottom + 1).map(x => x.act),
+            belowHud: r.top >= hudB, pause: p2 && vis(p2) ? (q => [q.x + q.width / 2, q.y + q.height / 2, q.top >= hudB])(p2.getBoundingClientRect()) : null };
+        });
+      }, table);
+      const p2 = sets.table[1] && sets.table[1].pause;
+      if (p2) await tap(Math.round(p2[0]), Math.round(p2[1]));
+      await page.waitForTimeout(150);
+      const paused = await page.evaluate(() => SC.G.state);
+      await page.screenshot({ path: shot(SHOTS, `touch-arc-${size}`) });
+      const all = sets.one.concat(sets.table);
+      const ok = sets.one.length === 1 && sets.table.length === 2 && all.every(t => t.n === 10 && t.gap >= 6 && t.small >= 44 && t.inner >= 48 && !t.outside.length)
+        && sets.table[1].belowHud && p2 && p2[2] && paused === 'paused';
+      return { ok, note: JSON.stringify({ sets, paused }) };
+    }));
+  }
 
   // (24) Nothing above logged an error in any context.
   await step('no console or page errors', async () => ({ ok: !allErrors.length, note: allErrors.join(' | ') }));

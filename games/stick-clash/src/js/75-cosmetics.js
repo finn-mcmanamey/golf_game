@@ -1,7 +1,7 @@
-// 75-cosmetics.js: hats, colour packs, player settings and progression (coins, shop, lifetime stats, achievements).
+// 75-cosmetics.js: hats, colour packs, player settings, the v4 save migration, lifetime stats and achievements.
 // A hat's draw(ctx, f, h) runs with the context already moved to the head centre and rotated so -y points out of the
 // top of the head; h = { r, face, scale, color }. Sizes are multiples of h.r so hats grow with bosses.
-// Every weapon, skill, map and mode is available from the start: hats and colours are what coins unlock.
+// v4: everything is free from the start (no coins or shop); a `hidden` hat is a secret until its code is found.
 
 // ---------- hat drawing helpers ----------
 function hatRect(ctx, x, y, w, h, fill, stroke, lw = 1.5) {
@@ -26,11 +26,11 @@ const hatLerp = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t)];
 const hatT = () => (typeof performance !== 'undefined' ? performance.now() / 1000 : G_STATE.t);
 const hatLw = h => 1.5 * h.scale;
 
-// ---------- hats (price in coins; 0 = owned from the start) ----------
-defHat('none', { name: 'None', order: 0, price: 0, draw() {} });
+// ---------- hats ----------
+defHat('none', { name: 'None', order: 0, draw() {} });
 
 defHat('band', {
-  name: 'Ninja Band', order: 1, price: 0,
+  name: 'Ninja Band', order: 1,
   draw(ctx, f, h) {
     const r = h.r;
     ctx.fillStyle = '#ff3d5a';
@@ -42,7 +42,7 @@ defHat('band', {
 });
 
 defHat('cap', {
-  name: 'Ball Cap', order: 2, price: 0,
+  name: 'Ball Cap', order: 2,
   draw(ctx, f, h) {
     const r = h.r, d = h.face;
     hatDome(ctx, -r * .35, r * 1.02, '#ff3d5a', '#7a1424', hatLw(h));
@@ -52,7 +52,7 @@ defHat('cap', {
 });
 
 defHat('beanie', {
-  name: 'Beanie', order: 3, price: 80,
+  name: 'Beanie', order: 3,
   draw(ctx, f, h) {
     const r = h.r;
     hatDome(ctx, -r * .3, r * 1.06, '#2ee6a0', '#138a60', hatLw(h));
@@ -62,7 +62,7 @@ defHat('beanie', {
 });
 
 defHat('sprout', {
-  name: 'Sprout', order: 4, price: 80,
+  name: 'Sprout', order: 4,
   draw(ctx, f, h) {
     const r = h.r, sway = Math.sin(hatT() * 2.5 + f.id) * r * .12;
     ctx.lineCap = 'round';
@@ -74,7 +74,7 @@ defHat('sprout', {
 });
 
 defHat('catears', {
-  name: 'Cat Ears', order: 5, price: 80,
+  name: 'Cat Ears', order: 5,
   draw(ctx, f, h) {
     const r = h.r;
     for (const s of [-1, 1]) {
@@ -85,7 +85,7 @@ defHat('catears', {
 });
 
 defHat('bunny', {
-  name: 'Bunny Ears', order: 6, price: 80,
+  name: 'Bunny Ears', order: 6,
   draw(ctx, f, h) {
     const r = h.r, wob = Math.sin(hatT() * 4 + f.id) * .07;
     for (const s of [-1, 1]) {
@@ -98,7 +98,7 @@ defHat('bunny', {
 });
 
 defHat('party', {
-  name: 'Party Hat', order: 7, price: 120,
+  name: 'Party Hat', order: 7,
   draw(ctx, f, h) {
     const r = h.r, L = [-r * .62, -r * .82], R = [r * .62, -r * .82], T = [r * .1 * h.face, -r * 2.5];
     poly(ctx, [L, R, T], '#ff5ad1', '#9c1f78', hatLw(h));
@@ -108,7 +108,7 @@ defHat('party', {
 });
 
 defHat('headphones', {
-  name: 'Headphones', order: 8, price: 120,
+  name: 'Headphones', order: 8,
   draw(ctx, f, h) {
     const r = h.r;
     ctx.beginPath(); ctx.arc(0, -r * .05, r * 1.22, Math.PI * 1.05, Math.PI * 1.95);
@@ -122,7 +122,7 @@ defHat('headphones', {
 });
 
 defHat('antennae', {
-  name: 'Antennae', order: 9, price: 120,
+  name: 'Antennae', order: 9,
   draw(ctx, f, h) {
     const r = h.r, t = hatT();
     ctx.lineCap = 'round';
@@ -136,7 +136,7 @@ defHat('antennae', {
 });
 
 defHat('bow', {
-  name: 'Big Bow', order: 10, price: 120,
+  name: 'Big Bow', order: 10,
   draw(ctx, f, h) {
     const r = h.r, x = -h.face * r * .25, y = -r * 1.08;
     for (const s of [-1, 1]) poly(ctx, [[x, y], [x + s * r * .9, y - r * .5], [x + s * r * .95, y + r * .35]], '#ff5ad1', '#9c1f78', hatLw(h));
@@ -145,7 +145,7 @@ defHat('bow', {
 });
 
 defHat('cone', {
-  name: 'Traffic Cone', order: 11, price: 120,
+  name: 'Traffic Cone', order: 11,
   draw(ctx, f, h) {
     const r = h.r, L = [-r * .7, -r * .8], R = [r * .7, -r * .8], TL = [-r * .16, -r * 2.45], TR = [r * .16, -r * 2.45];
     poly(ctx, [L, R, TR, TL], '#ff8a1e', '#a64b00', hatLw(h));
@@ -155,7 +155,7 @@ defHat('cone', {
 });
 
 defHat('fez', {
-  name: 'Fez', order: 12, price: 120,
+  name: 'Fez', order: 12,
   draw(ctx, f, h) {
     const r = h.r, d = h.face, sway = Math.sin(hatT() * 3 + f.id) * r * .1;
     poly(ctx, [[-r * .66, -r * .7], [-r * .5, -r * 1.75], [r * .5, -r * 1.75], [r * .66, -r * .7]], '#c8203a', '#7a1424', hatLw(h));
@@ -166,7 +166,7 @@ defHat('fez', {
 });
 
 defHat('chef', {
-  name: 'Chef Hat', order: 13, price: 180,
+  name: 'Chef Hat', order: 13,
   draw(ctx, f, h) {
     const r = h.r, lw = hatLw(h);
     for (const [x, y, rad] of [[-r * .55, -r * 1.6, r * .55], [r * .55, -r * 1.6, r * .55], [0, -r * 1.95, r * .66]]) circle(ctx, x, y, rad, '#f4f6ff', '#b9bfd6', lw);
@@ -175,7 +175,7 @@ defHat('chef', {
 });
 
 defHat('cowboy', {
-  name: 'Cowboy Hat', order: 14, price: 180,
+  name: 'Cowboy Hat', order: 14,
   draw(ctx, f, h) {
     const r = h.r, lw = hatLw(h);
     poly(ctx, [[-r * .72, -r * .9], [-r * .62, -r * 1.9], [0, -r * 1.62], [r * .62, -r * 1.9], [r * .72, -r * .9]], '#9c6b3c', '#5a3a1c', lw);
@@ -187,7 +187,7 @@ defHat('cowboy', {
 });
 
 defHat('pirate', {
-  name: 'Pirate Hat', order: 15, price: 180,
+  name: 'Pirate Hat', order: 15,
   draw(ctx, f, h) {
     const r = h.r;
     // A lifted dark felt with a lighter crown band so it reads as solid on dark skies and panels.
@@ -200,7 +200,7 @@ defHat('pirate', {
 });
 
 defHat('propeller', {
-  name: 'Propeller Cap', order: 16, price: 180,
+  name: 'Propeller Cap', order: 16,
   draw(ctx, f, h) {
     const r = h.r, cols = ['#ff3d5a', '#ffd84a', '#2ee6ff', '#9dff5a'];
     for (let k = 0; k < 4; k++) {
@@ -215,7 +215,7 @@ defHat('propeller', {
 });
 
 defHat('mohawk', {
-  name: 'Neon Mohawk', order: 17, price: 180,
+  name: 'Neon Mohawk', order: 17,
   draw(ctx, f, h) {
     const r = h.r, pts = [];
     for (let k = 0; k <= 6; k++) {
@@ -228,7 +228,7 @@ defHat('mohawk', {
 });
 
 defHat('flowers', {
-  name: 'Flower Crown', order: 18, price: 180,
+  name: 'Flower Crown', order: 18,
   draw(ctx, f, h) {
     const r = h.r, cols = ['#ff5ad1', '#ffd84a', '#5ef2ff', '#ff8a2e', '#b98cff'];
     for (let k = 0; k < 5; k++) {
@@ -240,7 +240,7 @@ defHat('flowers', {
 });
 
 defHat('gradcap', {
-  name: 'Grad Cap', order: 19, price: 180,
+  name: 'Grad Cap', order: 19,
   draw(ctx, f, h) {
     const r = h.r, d = h.face, sway = Math.sin(hatT() * 2 + f.id) * r * .12;
     hatRect(ctx, -r * .8, -r * 1.2, r * 1.6, r * .5, '#1b1c26', '#5d6290', hatLw(h));
@@ -253,7 +253,7 @@ defHat('gradcap', {
 });
 
 defHat('santa', {
-  name: 'Festive Hat', order: 20, price: 180,
+  name: 'Festive Hat', order: 20,
   draw(ctx, f, h) {
     const r = h.r, d = h.face, tx = -d * r * 1.55, ty = -r * 1.25 + Math.sin(hatT() * 3 + f.id) * r * .08;
     ctx.beginPath(); ctx.moveTo(d * r, -r * .75); ctx.quadraticCurveTo(d * r * .3, -r * 2.5, tx, ty);
@@ -265,7 +265,7 @@ defHat('santa', {
 });
 
 defHat('strawhat', {
-  name: 'Straw Hat', order: 21, price: 180,
+  name: 'Straw Hat', order: 21,
   draw(ctx, f, h) {
     const r = h.r;
     hatEllipse(ctx, 0, -r * .78, r * 2.0, r * .38, '#e8c873', '#a8862e', hatLw(h));
@@ -275,7 +275,7 @@ defHat('strawhat', {
 });
 
 defHat('tophat', {
-  name: 'Top Hat', order: 22, price: 250,
+  name: 'Top Hat', order: 22,
   draw(ctx, f, h) {
     const r = h.r, lw = hatLw(h);
     hatRect(ctx, -r * .78, -r * 2.55, r * 1.56, r * 1.65, '#3a3550', '#c9cfff', lw);   // lifted from near-black so it reads solid
@@ -286,7 +286,7 @@ defHat('tophat', {
 });
 
 defHat('wizard', {
-  name: 'Wizard Hat', order: 23, price: 250,
+  name: 'Wizard Hat', order: 23,
   draw(ctx, f, h) {
     const r = h.r, d = h.face, tipX = -d * r * .7 + Math.sin(hatT() * 2 + f.id) * r * .1;
     ctx.beginPath(); ctx.moveTo(-r * .85, -r * .9); ctx.quadraticCurveTo(-r * .3, -r * 2, tipX, -r * 3.0);
@@ -303,7 +303,7 @@ function hatStar(ctx, x, y, s, color) {
 }
 
 defHat('horns', {
-  name: 'Devil Horns', order: 24, price: 250,
+  name: 'Devil Horns', order: 24,
   draw(ctx, f, h) {
     const r = h.r;
     for (const s of [-1, 1]) {
@@ -316,7 +316,7 @@ defHat('horns', {
 });
 
 defHat('viking', {
-  name: 'Viking Helm', order: 25, price: 250,
+  name: 'Viking Helm', order: 25,
   draw(ctx, f, h) {
     const r = h.r, lw = hatLw(h);
     for (const s of [-1, 1]) {
@@ -332,7 +332,7 @@ defHat('viking', {
 });
 
 defHat('laurel', {
-  name: 'Golden Laurel', order: 26, price: 250,
+  name: 'Golden Laurel', order: 26,
   draw(ctx, f, h) {
     const r = h.r;
     for (let k = 0; k < 9; k++) {
@@ -343,7 +343,7 @@ defHat('laurel', {
 });
 
 defHat('helm', {
-  name: 'Knight Helm', order: 27, price: 250,
+  name: 'Knight Helm', order: 27,
   draw(ctx, f, h) {
     const r = h.r, d = h.face, lw = hatLw(h), sway = Math.sin(hatT() * 3 + f.id) * r * .1;
     ctx.beginPath(); ctx.moveTo(0, -r * 1.2); ctx.quadraticCurveTo(-d * r * .9, -r * 2.3, -d * r * 1.9, -r * 1.6 + sway);
@@ -356,7 +356,7 @@ defHat('helm', {
 });
 
 defHat('kabuto', {
-  name: 'Samurai Kabuto', order: 28, price: 350,
+  name: 'Samurai Kabuto', order: 28,
   draw(ctx, f, h) {
     const r = h.r, d = h.face, lw = hatLw(h);
     poly(ctx, [[-d * r * 1.1, -r * .3], [-d * r * 1.55, r * .55], [-d * r * .7, r * .45], [-d * r * .45, -r * .3]], '#3a1520', '#c9a14a', lw);
@@ -372,7 +372,7 @@ defHat('kabuto', {
 });
 
 defHat('unicorn', {
-  name: 'Unicorn Horn', order: 29, price: 350,
+  name: 'Unicorn Horn', order: 29,
   draw(ctx, f, h) {
     const r = h.r, d = h.face, b1 = [d * r * .2, -r * .8], b2 = [d * r * .7, -r * .6], tip = [d * r * 1.15, -r * 2.4];
     glow(ctx, '#ff8ae0', 10 * h.scale, () => poly(ctx, [b1, b2, tip], '#fff4d6', '#ffb3e6', hatLw(h)));
@@ -381,7 +381,7 @@ defHat('unicorn', {
 });
 
 defHat('bubble', {
-  name: 'Space Bubble', order: 30, price: 350,
+  name: 'Space Bubble', order: 30,
   draw(ctx, f, h) {
     const r = h.r;
     hatEllipse(ctx, 0, r * 1.45, r * 1.0, r * .3, '#c9cfff', '#7d84b8', hatLw(h));
@@ -392,7 +392,7 @@ defHat('bubble', {
 });
 
 defHat('halo', {
-  name: 'Halo', order: 31, price: 450,
+  name: 'Halo', order: 31,
   draw(ctx, f, h) {
     const r = h.r, bob = Math.sin(hatT() * 3 + f.id) * r * .12;
     glow(ctx, '#ffd84a', 14 * h.scale, () => hatEllipse(ctx, 0, -r * 1.75 + bob, r * .95, r * .3, null, '#ffe66b', r * .22));
@@ -400,7 +400,7 @@ defHat('halo', {
 });
 
 defHat('blaze', {
-  name: 'Blaze', order: 32, price: 450,
+  name: 'Blaze', order: 32,
   draw(ctx, f, h) {
     const r = h.r, t = hatT();
     glow(ctx, '#ff5a1e', 12 * h.scale, () => {
@@ -418,7 +418,7 @@ defHat('blaze', {
 });
 
 defHat('crown', {
-  name: 'Crown', order: 33, price: 600,
+  name: 'Crown', order: 33,
   draw(ctx, f, h) {
     const r = h.r, y = -r * .7;
     poly(ctx, [[-r * .9, y], [-r * .9, y - r * .8], [-r * .45, y - r * .35], [0, y - r * 1.05], [r * .45, y - r * .35], [r * .9, y - r * .8], [r * .9, y]],
@@ -427,19 +427,18 @@ defHat('crown', {
   },
 });
 
-// ---------- colour packs (each unlocks four fighter colours) ----------
+// ---------- colour packs (four fighter colours each, all free) ----------
 const COLOR_PACKS = [
-  { key: 'neon', name: 'Neon Classic', price: 0, colors: DEFAULT_COLORS.slice() },
-  { key: 'sunset', name: 'Sunset', price: 150, colors: ['#ff6b6b', '#ffa94d', '#ffd43b', '#f783ac'] },
-  { key: 'ocean', name: 'Deep Ocean', price: 150, colors: ['#3bc9db', '#4dabf7', '#38d9a9', '#91a7ff'] },
-  { key: 'toxic', name: 'Toxic', price: 200, colors: ['#a9e34b', '#69db7c', '#d8f55a', '#20c997'] },
-  { key: 'candy', name: 'Candy Shop', price: 200, colors: ['#ff9ff3', '#feca57', '#ff6b9d', '#c56cf0'] },
-  { key: 'ember', name: 'Ember', price: 250, colors: ['#ff4a1c', '#ff7b00', '#ffb703', '#e63946'] },
-  { key: 'frost', name: 'Frostbite', price: 250, colors: ['#e3fafc', '#a5d8ff', '#d0bfff', '#99e9f2'] },
-  { key: 'royal', name: 'Royal', price: 300, colors: ['#ffd84a', '#b197fc', '#e599f7', '#f8f9fa'] },
-  { key: 'mono', name: 'Chrome', price: 350, colors: ['#ced4da', '#adb5bd', '#f1f3f5', '#8ce0ff'] },
+  { key: 'neon', name: 'Neon Classic', colors: DEFAULT_COLORS.slice() },
+  { key: 'sunset', name: 'Sunset', colors: ['#ff6b6b', '#ffa94d', '#ffd43b', '#f783ac'] },
+  { key: 'ocean', name: 'Deep Ocean', colors: ['#3bc9db', '#4dabf7', '#38d9a9', '#91a7ff'] },
+  { key: 'toxic', name: 'Toxic', colors: ['#a9e34b', '#69db7c', '#d8f55a', '#20c997'] },
+  { key: 'candy', name: 'Candy Floss', colors: ['#ff9ff3', '#feca57', '#ff6b9d', '#c56cf0'] },
+  { key: 'ember', name: 'Ember', colors: ['#ff4a1c', '#ff7b00', '#ffb703', '#e63946'] },
+  { key: 'frost', name: 'Frostbite', colors: ['#e3fafc', '#a5d8ff', '#d0bfff', '#99e9f2'] },
+  { key: 'royal', name: 'Royal', colors: ['#ffd84a', '#b197fc', '#e599f7', '#f8f9fa'] },
+  { key: 'mono', name: 'Chrome', colors: ['#ced4da', '#adb5bd', '#f1f3f5', '#8ce0ff'] },
 ];
-const packOfColor = c => COLOR_PACKS.find(p => p.colors.includes(c));
 
 // ---------- settings (preferences shown on the Settings screen) ----------
 const SETTING_DEFAULTS = {
@@ -477,17 +476,53 @@ function applySettings() {
   }
 }
 
-// ---------- profile: coins, unlocks, lifetime stats ----------
+// ---------- v4 save migration ----------
+// v4 dropped coins, the shop, the 100-level track and the daily/weekly quests. A v3 save loses exactly those fields
+// (and its 'tasks' key); trophies, stats, ranked, campaign, codex, presets and settings stay as they were.
+// null = the whole key goes. 94-savecode strips imported codes the same way.
+const SAVE_V3_DROPS = { profile: ['coins', 'earned', 'hats', 'packs', 'stats.purchases'], prog: ['xp', 'own', 'seen'], tasks: null };
+// Deletes a field, or one level down for 'a.b'. True if it was there.
+function saveDropField(o, path) {
+  const [a, b] = path.split('.'), host = b ? o[a] : o, k = b || a;
+  return !!host && typeof host === 'object' && k in host && delete host[k];
+}
+// Strips the v3-only parts from a { 'stickclash.v2.<key>': json } map in place. Returns how many keys changed.
+function saveStripV3(keys) {
+  let changed = 0;
+  for (const short in SAVE_V3_DROPS) {
+    const full = STORE_PREFIX + short, fields = SAVE_V3_DROPS[short];
+    if (!(full in keys)) continue;
+    if (!fields) { delete keys[full]; changed++; continue; }
+    let v = null;
+    try { v = JSON.parse(keys[full]); } catch (e) { continue; }       // a broken save is left to the typed loaders
+    if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
+    if (fields.map(f => saveDropField(v, f)).some(Boolean)) { keys[full] = JSON.stringify(v); changed++; }
+  }
+  return changed;
+}
+// Runs once at load, before the profile and progress are read: rewrites the stored keys that held v3-only parts.
+function saveMigrateV4() {
+  try {
+    const keys = {};
+    for (const short in SAVE_V3_DROPS) { const raw = localStorage.getItem(STORE_PREFIX + short); if (raw != null) keys[STORE_PREFIX + short] = raw; }
+    const before = Object.assign({}, keys);
+    if (!saveStripV3(keys)) return false;
+    for (const k in before) { if (!(k in keys)) localStorage.removeItem(k); else if (keys[k] !== before[k]) localStorage.setItem(k, keys[k]); }
+    return true;
+  } catch (e) { return false; }   // no storage (private mode): nothing to migrate
+}
+const SAVE_MIGRATED = saveMigrateV4();
+
+// ---------- profile: lifetime stats and trophies ----------
 const PROFILE = loadProfile();
 let profileDirty = false;
 
 function loadProfile() {
   const p = store.getObj('profile'), obj = v => v && typeof v === 'object' && !Array.isArray(v) ? v : {};
-  const strings = v => Array.isArray(v) ? v.filter(x => typeof x === 'string') : [];
   const statDefaults = {
     matches: 0, wins: 0, losses: 0, roundsPlayed: 0, roundsWon: 0, kos: 0, ringouts: 0, dmg: 0, hits: 0, headHits: 0,
-    projHits: 0, bigHit: 0, bestCombo: 0, skills: 0, orbs: 0, jumps: 0, dashes: 0, shots: 0, playTime: 0, purchases: 0,
-    pvpWins: 0, tourneys: 0, bestWave: 0, cpuWins: {}, weaponUse: {}, weaponWins: {}, catWins: {}, mapWins: {},
+    projHits: 0, bigHit: 0, bestCombo: 0, skills: 0, orbs: 0, jumps: 0, dashes: 0, shots: 0, playTime: 0,
+    pvpWins: 0, tourneys: 0, bestWave: 0, cpuWins: {}, weaponUse: {}, weaponWins: {}, catWins: {}, mapWins: {}, modeWins: {},
   };
   // Each counter keeps the kind of value it starts as (a number, or a map); anything else in a save is dropped.
   const saved = obj(p.stats), stats = {};
@@ -496,47 +531,18 @@ function loadProfile() {
     stats[k] = typeof d === 'number' ? numOr(v, d) : obj(v);
   }
   for (const k in saved) if (!(k in stats) && (typeof saved[k] === 'number' ? Number.isFinite(saved[k]) : obj(saved[k]) === saved[k])) stats[k] = saved[k];
-  return {
-    coins: Math.max(0, numOr(p.coins)), earned: Math.max(0, numOr(p.earned)),
-    hats: strings(p.hats), packs: strings(p.packs), ach: obj(p.ach), flags: obj(p.flags), stats,
-  };
+  return { ach: obj(p.ach), flags: obj(p.flags), stats };
 }
 function saveProfile() { profileDirty = false; store.set('profile', PROFILE); }
 function markProfile() { profileDirty = true; }
 onFlush(() => { if (profileDirty) saveProfile(); });   // written on pagehide and on visibilitychange -> hidden (flushSaves, 99-main)
 
-const ownsHat = key => !HATS[key] || !(HATS[key].price > 0) || PROFILE.hats.includes(key);
-const ownsPack = key => { const p = COLOR_PACKS.find(c => c.key === key); return !p || !(p.price > 0) || PROFILE.packs.includes(key); };
-const ownsColor = c => { const p = packOfColor(c); return !p || ownsPack(p.key); };
-const ownedHats = () => listOf(HATS).filter(h => ownsHat(h.key));
-
-function addCoins(n) {
-  n = Math.max(0, Math.round(n));
-  if (!n) return;
-  PROFILE.coins += n; PROFILE.earned += n;
-  markProfile();
-  emit('coins', PROFILE.coins, n);
-}
-
-// Buys a hat or colour pack. Returns true on success (false if owned or too expensive).
-function buyItem(kind, key) {
-  const item = kind === 'hat' ? HATS[key] : COLOR_PACKS.find(p => p.key === key);
-  const owned = kind === 'hat' ? ownsHat(key) : ownsPack(key);
-  if (!item || owned || PROFILE.coins < item.price) return false;
-  PROFILE.coins -= item.price;
-  (kind === 'hat' ? PROFILE.hats : PROFILE.packs).push(key);
-  PROFILE.stats.purchases++;
-  saveProfile();
-  emit('coins', PROFILE.coins, -item.price);
-  checkAchievements();
-  return true;
-}
-
 // ---------- achievements ----------
-// defAchievement(key, { name, desc, icon, coins, need, progress(stats, profile) -> number }). Unlocks at progress >= need.
+// defAchievement(key, { name, desc, icon, need, progress(stats, profile) -> number }). Unlocks at progress >= need.
+// Every trophy is earned by playing (v4 replaced the shop, hat and coin ones with play-based ones).
 const ACHIEVEMENTS = {};
 function defAchievement(key, def) {
-  ACHIEVEMENTS[key] = Object.assign({ key, icon: '★', coins: 50, need: 1, order: Object.keys(ACHIEVEMENTS).length }, def);
+  ACHIEVEMENTS[key] = Object.assign({ key, icon: '★', need: 1, order: Object.keys(ACHIEVEMENTS).length }, def);
   return ACHIEVEMENTS[key];
 }
 const achFlag = name => s => PROFILE.flags[name] ? 1 : 0;
@@ -544,37 +550,41 @@ const achCount = o => Object.keys(o || {}).length;
 // Highest CPU level (the last key of AI_LEVELS, so a new "insane" level is picked up automatically).
 const hardestDiff = () => { const k = Object.keys(AI_LEVELS); return k[k.length - 1]; };
 
-defAchievement('first-win', { name: 'First Blood', icon: '🏆', desc: 'Win your first match against the CPU.', coins: 50, progress: s => s.wins });
-defAchievement('combo-10', { name: 'Combo Machine', icon: '⚡', desc: 'Land a 10-hit combo.', coins: 120, need: 10, progress: s => s.bestCombo });
-defAchievement('combo-5', { name: 'Chain Reaction', icon: '➰', desc: 'Land a 5-hit combo.', coins: 40, need: 5, progress: s => s.bestCombo });
-defAchievement('arsenal', { name: 'Arsenal', icon: '⚔', desc: 'Win a round with every weapon category.', coins: 250,
+// CPU wins only (2-player wins have Couch Champion); an unlocked trophy always stays.
+defAchievement('first-win', { name: 'First Blood', icon: '🏆', desc: 'Win your first match against the CPU.', progress: s => Object.values(s.cpuWins).reduce((a, n) => a + (+n || 0), 0) });
+defAchievement('combo-10', { name: 'Combo Machine', icon: '⚡', desc: 'Land a 10-hit combo.', need: 10, progress: s => s.bestCombo });
+defAchievement('combo-5', { name: 'Chain Reaction', icon: '➰', desc: 'Land a 5-hit combo.', need: 5, progress: s => s.bestCombo });
+defAchievement('arsenal', { name: 'Arsenal', icon: '⚔', desc: 'Win a round with every weapon category.',
   need: () => new Set(listOf(WEAPONS).map(w => w.cat)).size, progress: s => achCount(s.catWins) });
-defAchievement('weapon-10', { name: 'Weapon Collector', icon: '🗡', desc: 'Win rounds with 10 different weapons.', coins: 100, need: 10, progress: s => achCount(s.weaponWins) });
-defAchievement('beat-hardest', { name: 'Unstoppable', icon: '💀', desc: 'Win a match against the toughest CPU level.', coins: 200,
+defAchievement('weapon-10', { name: 'Weapon Collector', icon: '🗡', desc: 'Win rounds with 10 different weapons.', need: 10, progress: s => achCount(s.weaponWins) });
+defAchievement('beat-hardest', { name: 'Unstoppable', icon: '💀', desc: 'Win a match against the toughest CPU level.',
   progress: s => s.cpuWins[hardestDiff()] || 0 });
-defAchievement('beat-hard', { name: 'Hard Boiled', icon: '🔥', desc: 'Win a match against a Hard CPU.', coins: 100, progress: s => s.cpuWins.hard || 0 });
-defAchievement('tournament', { name: 'Champion', icon: '👑', desc: 'Clear a tournament.', coins: 250, progress: s => s.tourneys });
-defAchievement('waves-10', { name: 'Last One Standing', icon: '🌊', desc: 'Survive 10 waves.', coins: 200, need: 10, progress: s => s.bestWave });
-defAchievement('flawless', { name: 'Flawless', icon: '💎', desc: 'Win a round without taking any damage.', coins: 80, progress: achFlag('flawless') });
-defAchievement('shutout', { name: 'Shutout', icon: '🧱', desc: 'Win a match of 3+ rounds without losing a round.', coins: 120, progress: achFlag('shutout') });
-defAchievement('speedy', { name: 'Blink and Miss It', icon: '⏱', desc: 'Win a round by K.O. in under 5 seconds.', coins: 80, progress: achFlag('speedy') });
-defAchievement('close-call', { name: 'Close Call', icon: '❤', desc: 'Win a round with 10 HP or less left.', coins: 60, progress: achFlag('closeCall') });
-defAchievement('comeback', { name: 'Comeback Kid', icon: '↺', desc: 'Win a match after trailing by 2 rounds.', coins: 150, progress: achFlag('comeback') });
-defAchievement('ringout-10', { name: 'Ring Master', icon: '🌀', desc: 'Score 10 ring-out K.O.s.', coins: 100, need: 10, progress: s => s.ringouts });
-defAchievement('ko-50', { name: 'Knockout Artist', icon: '🥊', desc: 'Score 50 K.O.s.', coins: 150, need: 50, progress: s => s.kos });
-defAchievement('head-25', { name: 'Headhunter', icon: '🎯', desc: 'Land 25 head hits.', coins: 80, need: 25, progress: s => s.headHits });
-defAchievement('big-hit', { name: 'Heavy Hitter', icon: '💥', desc: 'Deal 25 damage with a single hit.', coins: 80, need: 25, progress: s => s.bigHit });
-defAchievement('sharpshooter', { name: 'Sharpshooter', icon: '🏹', desc: 'Land 100 projectile hits.', coins: 100, need: 100, progress: s => s.projHits });
-defAchievement('skills-100', { name: 'Spellslinger', icon: '✦', desc: 'Use skills 100 times.', coins: 80, need: 100, progress: s => s.skills });
-defAchievement('orbs-30', { name: 'Orb Hoarder', icon: '◉', desc: 'Grab 30 power-up orbs.', coins: 80, need: 30, progress: s => s.orbs });
-defAchievement('maps-8', { name: 'Globetrotter', icon: '🗺', desc: 'Win a round on 8 different arenas.', coins: 120,
+defAchievement('beat-hard', { name: 'Hard Boiled', icon: '🔥', desc: 'Win a match against a Hard CPU.', progress: s => s.cpuWins.hard || 0 });
+defAchievement('tournament', { name: 'Champion', icon: '👑', desc: 'Clear a tournament.', progress: s => s.tourneys });
+defAchievement('waves-10', { name: 'Last One Standing', icon: '🌊', desc: 'Survive 10 waves.', need: 10, progress: s => s.bestWave });
+defAchievement('flawless', { name: 'Flawless', icon: '💎', desc: 'Win a round without taking any damage.', progress: achFlag('flawless') });
+defAchievement('shutout', { name: 'Shutout', icon: '🧱', desc: 'Win a match of 3+ rounds without losing a round.', progress: achFlag('shutout') });
+defAchievement('speedy', { name: 'Blink and Miss It', icon: '⏱', desc: 'Win a round by K.O. in under 5 seconds.', progress: achFlag('speedy') });
+defAchievement('close-call', { name: 'Close Call', icon: '❤', desc: 'Win a round with 10 HP or less left.', progress: achFlag('closeCall') });
+defAchievement('comeback', { name: 'Comeback Kid', icon: '↺', desc: 'Win a match after trailing by 2 rounds.', progress: achFlag('comeback') });
+defAchievement('ringout-10', { name: 'Ring Master', icon: '🌀', desc: 'Score 10 ring-out K.O.s.', need: 10, progress: s => s.ringouts });
+defAchievement('ko-50', { name: 'Knockout Artist', icon: '🥊', desc: 'Score 50 K.O.s.', need: 50, progress: s => s.kos });
+defAchievement('head-25', { name: 'Headhunter', icon: '🎯', desc: 'Land 25 head hits.', need: 25, progress: s => s.headHits });
+defAchievement('big-hit', { name: 'Heavy Hitter', icon: '💥', desc: 'Deal 25 damage with a single hit.', need: 25, progress: s => s.bigHit });
+defAchievement('sharpshooter', { name: 'Sharpshooter', icon: '🏹', desc: 'Land 100 projectile hits.', need: 100, progress: s => s.projHits });
+defAchievement('skills-100', { name: 'Spellslinger', icon: '✦', desc: 'Use skills 100 times.', need: 100, progress: s => s.skills });
+defAchievement('orbs-30', { name: 'Orb Hoarder', icon: '◉', desc: 'Grab 30 power-up orbs.', need: 30, progress: s => s.orbs });
+defAchievement('maps-8', { name: 'Globetrotter', icon: '🗺', desc: 'Win a round on 8 different arenas.',
   need: () => Math.min(8, listOf(MAPS).length), progress: s => achCount(s.mapWins) });
-defAchievement('pvp', { name: 'Couch Champion', icon: '🎮', desc: 'Win a 2-player match.', coins: 50, progress: s => s.pvpWins });
-defAchievement('matches-25', { name: 'Regular', icon: '📅', desc: 'Play 25 matches.', coins: 120, need: 25, progress: s => s.matches });
-defAchievement('rounds-100', { name: 'Veteran', icon: '🎖', desc: 'Win 100 rounds.', coins: 200, need: 100, progress: s => s.roundsWon });
-defAchievement('shopper', { name: 'Fashion Victim', icon: '🛍', desc: 'Buy 5 items in the shop.', coins: 100, need: 5, progress: s => s.purchases });
-defAchievement('hats-15', { name: 'Hat Trick', icon: '🎩', desc: 'Own 15 hats.', coins: 200, need: 15, progress: () => ownedHats().length - 1 });
-defAchievement('rich', { name: 'High Roller', icon: '🪙', desc: 'Earn 2,000 coins in total.', coins: 150, need: 2000, progress: () => PROFILE.earned });
+defAchievement('pvp', { name: 'Couch Champion', icon: '🎮', desc: 'Win a 2-player match.', progress: s => s.pvpWins });
+defAchievement('matches-25', { name: 'Regular', icon: '📅', desc: 'Play 25 matches.', need: 25, progress: s => s.matches });
+defAchievement('rounds-100', { name: 'Veteran', icon: '🎖', desc: 'Win 100 rounds.', need: 100, progress: s => s.roundsWon });
+defAchievement('wins-25', { name: 'Seasoned', icon: '🥇', desc: 'Win 25 matches.', need: 25, progress: s => s.wins });
+defAchievement('combo-15', { name: 'Unbreakable', icon: '🌪', desc: 'Land a 15-hit combo.', need: 15, progress: s => s.bestCombo });
+defAchievement('weapon-25', { name: 'Armoury', icon: '🛡', desc: 'Win rounds with 25 different weapons.', need: 25, progress: s => achCount(s.weaponWins) });
+defAchievement('modes-5', { name: 'All-Rounder', icon: '🎲', desc: 'Win a match in 5 different modes.', need: 5, progress: s => achCount(s.modeWins) });
+defAchievement('maps-16', { name: 'World Tour', icon: '🧭', desc: 'Win a round on 16 different arenas.',
+  need: () => Math.min(16, listOf(MAPS).length), progress: s => achCount(s.mapWins) });
 
 const achNeed = a => typeof a.need === 'function' ? a.need() : a.need;
 const achProgress = a => { try { return a.progress(PROFILE.stats, PROFILE) || 0; } catch (e) { report(e, 'achievement ' + a.key); return 0; } };
@@ -585,7 +595,6 @@ function unlockAchievement(key) {
   if (!a || achDone(key)) return false;
   PROFILE.ach[key] = Date.now();
   if (MATCH_TRACK.active) MATCH_TRACK.unlocked.push(key);
-  addCoins(a.coins);
   saveProfile();
   emit('achievement', a);
   return true;
@@ -593,10 +602,17 @@ function unlockAchievement(key) {
 function checkAchievements() {
   for (const a of Object.values(ACHIEVEMENTS)) if (!achDone(a.key) && achProgress(a) >= achNeed(a)) unlockAchievement(a.key);
 }
+// At boot: trophies a save already qualifies for (new ones in v4, or stats carried over) unlock at once, and a migrated
+// v3 save is told where its coins went.
+on('boot', () => {
+  checkAchievements();
+  if (SAVE_MIGRATED && typeof toast === 'function') toast('Everything is unlocked', 'Every hat, colour and look is now free. Trophies and Ranked carry on.', '🎁', '#5dff9a');
+});
 
 // ---------- tracking (only real, human-driven matches count) ----------
-// MATCH_TRACK: per-match extras the results screen shows (best combo, biggest hit per roster slot, coins, unlocks).
-const MATCH_TRACK = { active: false, combo: [], bigHit: [], taken: [], unlocked: [], reward: null, trailed: false };
+// MATCH_TRACK: per-match extras the results screen shows (best combo, biggest hit per roster slot, new trophies) and
+// `result` ({ won }) once recordMatch has counted the match.
+const MATCH_TRACK = { active: false, combo: [], bigHit: [], taken: [], unlocked: [], result: null, trailed: false };
 const isRealPlayer = f => !!f && f.ctrl === 'human' && !f.autopilot && !f.summon;
 const trackingOn = () => !G_STATE.demo && !G_STATE.sim;
 const statsOn = () => MATCH_TRACK.active && !G_STATE.sim && !G_STATE.demo;   // this match counts toward lifetime stats
@@ -609,9 +625,9 @@ function bumpMap(key, sub) { const m = PROFILE.stats[key]; m[sub] = (m[sub] || 0
 function maxStat(key, v) { if (v > (PROFILE.stats[key] || 0)) { PROFILE.stats[key] = v; markProfile(); return true; } return false; }
 
 on('matchStart', () => {
-  // Practice modes (mode.practice, or the training dummy) earn nothing, so they can't be farmed.
+  // Practice modes (mode.practice, or the training dummy) count toward nothing, so trophies can't be farmed there.
   const practice = G_STATE.mode && (G_STATE.mode.practice || G_STATE.mode.key === 'training');
-  Object.assign(MATCH_TRACK, { active: trackingOn() && !practice, combo: [], bigHit: [], unlocked: [], reward: null, trailed: false });
+  Object.assign(MATCH_TRACK, { active: trackingOn() && !practice, combo: [], bigHit: [], unlocked: [], result: null, trailed: false });
   applySettings();
 });
 
@@ -691,47 +707,37 @@ function roundWon(winners, reason) {
   if (winners.some(f => f.alive && f.hp <= 10)) PROFILE.flags.closeCall = 1;
 }
 
-on('matchOver', () => settleMatch());
+on('matchOver', () => recordMatch());
 
-// Works out the match reward once (called by the results screen and by matchOver, whichever comes first).
-// Modes may help by returning { won, tournament, waves } from results(); otherwise the score and the mode's run
-// state (G_STATE.info.run: survival's `cleared`, tournament's `won` challengers) are read.
-function settleMatch() {
-  if (MATCH_TRACK.reward || !MATCH_TRACK.active) return MATCH_TRACK.reward;
+// Records a finished match in the lifetime stats once (the results screen and matchOver both ask, whichever comes
+// first) and returns { won }, or null when it doesn't count (the demo, practice, autopilot tests, no human).
+// Modes may help by returning { won, tournament, waves } from results(); otherwise the score and the mode's run state
+// (G_STATE.info.run: survival's `cleared` waves) decide.
+function recordMatch() {
+  if (MATCH_TRACK.result || !MATCH_TRACK.active || G_STATE.cfg.autopilot) return MATCH_TRACK.result;
   const humans = rosterHumanTeams();
   if (!humans.length) return null;
-  const res = G_STATE.result || {}, sc = G_STATE.score, run = (G_STATE.info && G_STATE.info.run) || {}, key = G_STATE.mode.key;
+  const res = G_STATE.result || {}, sc = G_STATE.score, run = (G_STATE.info && G_STATE.info.run) || {};
   const waves = Number.isFinite(res.waves) ? res.waves : Number.isFinite(run.cleared) ? run.cleared : null;
-  const endless = waves != null, top = Math.max(...sc);
-  const winTeam = sc.filter(s => s === top).length === 1 ? sc.indexOf(top) : -1;
-  const won = typeof res.won === 'boolean' ? res.won : !endless && humans.includes(winTeam);
-  const reward = { coins: 0, lines: [], won };
-  const give = (n, why) => { n = Math.round(n); if (n > 0) { reward.coins += n; reward.lines.push([why, n]); } };
-  const vsCpu = rosterHasCpu(), diffs = Object.keys(AI_LEVELS), di = Math.max(0, diffs.indexOf(G_STATE.cfg.diff || 'normal'));
-  const diffMul = [.7, 1, 1.5, 2.2, 3][di] || 1;
+  const top = Math.max(...sc), winTeam = sc.filter(s => s === top).length === 1 ? sc.indexOf(top) : -1;
+  const won = typeof res.won === 'boolean' ? res.won : waves == null && humans.includes(winTeam);
   bumpStat('matches');
-  give(10, 'Played a match');
-  if (!endless) give(humans.reduce((s, t) => s + (sc[t] || 0), 0) * 4, 'Rounds won');
-  if (won) matchWon(reward, give, vsCpu, diffs[di] || 'normal', diffMul, humans);
+  if (won) matchWon(humans);
   else bumpStat('losses');
-  if (Number.isFinite(run.won) && /tourn/i.test(key)) give(run.won * 12 * diffMul, `${run.won} challenger${run.won === 1 ? '' : 's'} beaten`);
-  if (won && (res.tournament || /tourn/i.test(key))) { bumpStat('tourneys'); give(100, 'Tournament cleared'); }
-  if (endless) { maxStat('bestWave', waves); give(waves * 6 * diffMul, `Survived ${waves} wave${waves === 1 ? '' : 's'}`); }
-  // A match played at a slowed practice speed pays less (accessRewardMul, 92-access); the results card says so.
-  const pm = typeof accessRewardMul === 'function' ? accessRewardMul() : 1;
-  if (pm < 1) { reward.mul = pm; reward.coins = Math.round(reward.coins * pm); }
-  MATCH_TRACK.reward = reward;
-  addCoins(reward.coins);
+  if (won && (res.tournament || /tourn/i.test(G_STATE.mode.key))) bumpStat('tourneys');
+  if (waves != null) maxStat('bestWave', waves);
+  MATCH_TRACK.result = { won };
   checkAchievements();
   saveProfile();
-  return reward;
+  return MATCH_TRACK.result;
 }
 
-function matchWon(reward, give, vsCpu, diff, diffMul, humans) {
-  const sc = G_STATE.score;
+function matchWon(humans) {
+  const sc = G_STATE.score, diffs = Object.keys(AI_LEVELS), mode = G_STATE.mode;
   bumpStat('wins');
-  if (vsCpu) { bumpMap('cpuWins', diff); give(30 * diffMul, `Victory (${diff} CPU)`); }
-  else { bumpStat('pvpWins'); give(15, 'Victory'); }
+  if (!mode.hidden) bumpMap('modeWins', mode.key);           // the quest modes (campaign, challenges) are hidden
+  if (rosterHasCpu()) bumpMap('cpuWins', diffs[Math.max(0, diffs.indexOf(G_STATE.cfg.diff || 'normal'))] || 'normal');
+  else bumpStat('pvpWins');
   if (G_STATE.log.length >= 3 && sc.every((s, t) => humans.includes(t) || s === 0)) PROFILE.flags.shutout = 1;
   if (MATCH_TRACK.trailed) PROFILE.flags.comeback = 1;
 }

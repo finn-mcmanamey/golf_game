@@ -19,9 +19,10 @@
 <!-- The arena is one full-bleed canvas. Every menu, pause and results panel is built by 95-ui.js inside #ui. -->
 <canvas id="c" aria-label="Stick Clash arena"></canvas>
 <div id="ui"></div>
-<!-- Touch controls (90-input shows them in play on a coarse pointer; 91-touch: stick, swipes, button arc). The stick
-     sits directly in #touch (which fills the viewport) so 91-touch can place it at the finger's client coordinates. -->
+<!-- Touch controls (90-input shows them in play on a coarse pointer; 91-touch: stick, swipes, button arc). One .tset
+     per touch seat (table mode adds a copy); its stick is placed at the finger's coordinates in the set's box. -->
 <div id="touch" hidden>
+  <div class="tset">
   <div class="tzone tzone-l"></div>
   <div class="tzone tzone-r"></div>
   <div class="tstick"><i></i></div>
@@ -36,6 +37,7 @@
     <button data-act="throw" class="small" aria-label="Throwable">&#9679;</button>
     <button data-act="grab" class="small" aria-label="Grab or throw">&#9995;</button>
     <button data-act="taunt" class="small" aria-label="Taunt">&#9996;</button>
+  </div>
   </div>
   <button data-act="pause" class="tpause" aria-label="Pause">II</button>
 </div>

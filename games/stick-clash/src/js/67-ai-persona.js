@@ -27,7 +27,7 @@ function aiPersonaOf(f) {
 
 // ---------- the rivals ----------
 defPersona('torque', {
-  name: 'Torque', title: 'Rusher', color: '#ff8a2e', hat: 'horns', cls: 'trickster',   // v3 balance: brute + heavy ran 66-73%
+  name: 'Torque', title: 'Rusher', color: '#ff8a2e', hat: 'horns', cls: 'trickster', flourish: 'hop',   // v3 balance: brute + heavy ran 66-73%
   weapons: ['battle-axe', 'hammer', 'chainsaw'], cats: ['heavy'], skills: ['lunge', 'frenzy', 'uppercut'], throws: ['grenade', 'cluster'],
   mul: { attack: 1.1, idle: .2, walk: 1.4, spacing: .6, guard: .4, block: .6, react: 1.25 }, add: { brawl: .2 },   // balance: ~56% vs a plain Normal CPU
   act(f, L, c) {     // closes long gaps with a dash and swings on arrival
@@ -37,7 +37,7 @@ defPersona('torque', {
     low: ['Just a scratch!'], win: ['Too slow!', 'Faster next time.'] },
 });
 defPersona('mirage', {
-  name: 'Mirage', title: 'Trickster', color: '#b98cff', hat: 'tophat', cls: 'trickster',
+  name: 'Mirage', title: 'Trickster', color: '#b98cff', hat: 'tophat', cls: 'trickster', flourish: 'taunt',
   weapons: ['katana', 'kunai', 'war-fan'], cats: ['blade'], skills: ['blink', 'vanish', 'decoy'], throws: ['smoke', 'sticky'],
   mul: { throw: 2.5, dodge: 1.3 },
   act(f, L, c) {     // dashes through the foe and swings at its back
@@ -52,7 +52,7 @@ defPersona('mirage', {
 defPersona('vale', {
   name: 'Vale', title: 'Zoner', color: '#5ef2ff', hat: 'cap', cls: 'gunner',
   weapons: ['longbow', 'crossbow', 'sniper'], cats: ['ranged'], skills: ['snare', 'repulse', 'frost-nova'], throws: ['mine', 'ice'],
-  mul: { guard: 2, block: 1.6, attack: .9 },
+  mul: { guard: 2, block: 1.6, attack: .8, react: 1.25 },   // balance (v4): 64-69% vs a plain Normal CPU -> ~58%
   act(f, L, c) {     // keeps the foe at arm's length: backs off its reach (baiting a whiff) or dashes away from a rusher
     const foe = f.ai.foe;
     if (c.style === 'melee') {
@@ -63,7 +63,7 @@ defPersona('vale', {
     low: ['Too close!'], win: ['Stay back next time.'] },
 });
 defPersona('dazzle', {
-  name: 'Dazzle', title: 'Show-off', color: '#ff5ad1', hat: 'unicorn', cls: 'mage',
+  name: 'Dazzle', title: 'Show-off', color: '#ff5ad1', hat: 'unicorn', cls: 'mage', flourish: 'taunt',
   weapons: ['flame-sword', 'nunchaku', 'lollipop'], skills: ['meteor', 'lightning', 'rocket'], throws: ['cluster', 'grenade'],
   mul: { super: 1.8, jump: 2.5 },
   act(f, L, c) {     // poses when ahead and fires the ultimate the moment it's full, in range or not
@@ -75,7 +75,7 @@ defPersona('dazzle', {
     low: ['Part of the show!'], win: ['Encore! Encore!'], taunt: ['Is that all?', '😎', 'Try to keep up!'] },
 });
 defPersona('tamsin', {
-  name: 'Tamsin', title: 'Parry Master', color: '#7dffcf', hat: 'kabuto', cls: 'tank',
+  name: 'Tamsin', title: 'Parry Master', color: '#7dffcf', hat: 'kabuto', cls: 'tank', flourish: 'bow',
   weapons: ['katana', 'saber', 'bo-staff'], cats: ['blade'], skills: ['parry', 'chrono', 'mend'], throws: ['ice', 'smoke'],
   mul: { parry: 2.2, block: 1.4, guard: 1.6, attack: .85 }, add: { punish: .2 },
   act(f, L, c) {     // waits at the edge of the foe's reach for it to commit
@@ -113,7 +113,7 @@ defPersona('magpie', {
     low: ['Need a power-up!'], win: ['Finders keepers!'] },
 });
 defPersona('fenn', {
-  name: 'Fenn', title: 'Berserker', color: '#ff4a6a', hat: 'mohawk', cls: 'none',   // no class: brute + heavy ran ~70%
+  name: 'Fenn', title: 'Berserker', color: '#ff4a6a', hat: 'mohawk', cls: 'none', flourish: 'hop',   // no class: brute + heavy ran ~70%
   weapons: ['double-axe', 'battle-axe', 'scythe'], cats: ['heavy'], skills: ['frenzy', 'slam', 'tremor'], throws: ['grenade', 'cluster'],
   // balance (v3 integration): 70% vs a plain Normal CPU -> ~60%: slower reads, and the ultimate goes off the moment it's full
   mul: { guard: 0, block: .3, parry: .3, idle: 0, dodge: .6, attack: 1.15, super: 2, react: 1.25 }, add: { brawl: .25 },
@@ -170,6 +170,20 @@ function aiTuned(f) {
 }
 // A persona-scaled knob kept in range (only chances; px and seconds knobs just scale).
 const aiChance = (k, v) => AI_CHANCE_KEYS.includes(k) ? clamp(v, 0, k === 'walk' ? 1 : AI_CHANCE_MAX) : v;
+
+// Flourishes: right after scoring a K.O. a rival shows off for a moment unless another foe is close: the show-offs
+// taunt, the brawlers hop about, the duellist stands still a moment. Called from think (65); true while it acts.
+on('ko', (V, K) => { const p = aiPersonaOf(K); if (p && p.flourish && K && K.alive && aiBrain(K) && K !== V) K.ai.flourish = { kind: p.flourish, t: G_STATE.t + 1 }; });
+function aiFlourish(f) {
+  const fl = f.ai.flourish, foe = nearestEnemy(f);
+  if (!fl) return false;
+  if (G_STATE.t > fl.t || (foe && dist(foe.P[2], f.P[2]) < 260)) { f.ai.flourish = null; return false; }
+  f.inp.mx = 0; f.inp.attackHeld = false; f.inp.blockHeld = false;
+  if (fl.kind === 'taunt') f.inp.taunt = !fl.done;
+  else if (fl.kind === 'hop' && f.grounded) f.inp.jump = true;
+  if (!fl.done) { fl.done = true; aiTalk(f, 'taunt', true); }
+  return true;
+}
 
 // The persona's signature move, once per decision (not in objective modes, where the mode steers the CPU).
 function aiPersonaAct(f, L, c) {

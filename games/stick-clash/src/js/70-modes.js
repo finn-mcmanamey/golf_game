@@ -71,8 +71,9 @@ function modePanel(ctx, x, y, w, h, edge) {
 }
 function modeText(ctx, text, x, y, size, color, align = 'center', font = FONT_DISPLAY) {
   ctx.font = `${size}px ${font}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
-  ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(3, size / 5); ctx.strokeStyle = 'rgba(7,8,15,.9)';
-  ctx.strokeText(text, x, y); ctx.fillStyle = color; ctx.fillText(text, x, y);
+  const raw = artRaw(ctx);   // the outline skips the art style: chalk would turn it to light grain
+  raw.lineJoin = 'round'; raw.lineWidth = Math.max(3, size / 5); raw.strokeStyle = 'rgba(7,8,15,.9)';
+  raw.strokeText(text, x, y); ctx.fillStyle = color; ctx.fillText(text, x, y);
 }
 // A big horizontal health bar (bosses, survival waves).
 function modeBigBar(ctx, x, y, w, frac, color, label) {
@@ -99,17 +100,18 @@ defMode('versus', {
   },
 });
 
+const roundsText = n => n + (n === 1 ? ' round' : ' rounds');   // "after 1 round"
 // Results for a 1P-vs-CPU duel (versus, one-hit KO, roulette, king of the hill).
 function duelResults() {
   const won = G_STATE.score[0] > G_STATE.score[1], draw = G_STATE.score[0] === G_STATE.score[1];
   return { title: draw ? 'Draw!' : won ? 'You win!' : 'CPU wins', color: won || draw ? G_STATE.roster[0].color : G_STATE.roster[1].color,
-    lines: [`Final score ${G_STATE.score[0]} – ${G_STATE.score[1]} after ${G_STATE.round} rounds (${levelName(modeDiff())}).`] };
+    lines: [`Final score ${G_STATE.score[0]} – ${G_STATE.score[1]} after ${roundsText(G_STATE.round)} (${levelName(modeDiff())}).`] };
 }
 
 defMode('pvp', {
   name: '2 Players', desc: 'Two players, one keyboard (or gamepads). First to 5.', order: 20,
-  players: [2, 2], cpu: false, pickers: 2, labels: ['Player 1', 'Player 2'],
-  setup(cfg) { return { roster: [humanEntry(cfg, 0, 0, 0, 'P1'), humanEntry(cfg, 1, 1, 1, 'P2')] }; },
+  players: [2, 2], cpu: false, pickers: 2, labels: ['Player 1', 'Player 2'], duo: 'versus',   // 73
+  setup(cfg) { const n = duoNames(cfg); return { roster: [humanEntry(cfg, 0, 0, 0, n[0]), humanEntry(cfg, 1, 1, 1, n[1])] }; },
 });
 
 defMode('watch', {
@@ -232,16 +234,16 @@ function tourneyDrawStrip(ctx, run) {
 const SURV_HEAL = 50;     // health back after each wave (a boss wave refills you completely)
 
 // Wave n: grunts get one skill level tougher every 5 waves (starting a level below your difficulty), come in
-// pairs and trios as waves go on (each weaker alone), and every 5th wave is a giant boss.
-function survivalWave(n, diff, playerColor) {
-  const boss = n % 5 === 0, count = boss ? 1 : [1, 1, 2, 1, 0, 2, 2, 3, 2][n - 1] || 3;
+// pairs and trios as waves go on (each weaker alone), and every 5th wave is a giant boss. duo: Co-op Waves.
+function survivalWave(n, diff, playerColor, duo) {
+  const boss = n % 5 === 0, count = boss ? 1 : ([1, 1, 2, 1, 0, 2, 2, 3, 2][n - 1] || 3) + !!duo;
   const lv = clamp(Math.floor((n - 1) / 5) + (DIFF_SHIFT[diff] || 0) - 1 + (boss ? 1 : 0), 0, AI_ORDER.length - 1);
   const grow = 1 + Math.max(0, n - 10) * .05, hpMul = (count === 1 ? .7 : count === 2 ? .5 : .4) * grow;
   return Array.from({ length: count }, (_, i) => {
     const theme = pick(MODE_THEMES);
     return modeEntry({ team: 1, ...themeLoadout(theme), color: boss ? '#ff4a6a' : modeColor(playerColor), hat: modeHat(),
       name: boss ? 'WARDEN' : MODE_NAMES[(n * 3 + i) % MODE_NAMES.length].toUpperCase(), aiLevel: AI_ORDER[lv],
-      scale: boss ? 1.4 : 1, hpMul: boss ? .9 * grow : hpMul, spawn: i + 1 });
+      scale: boss ? 1.4 : 1, hpMul: boss ? .9 * grow * (duo ? 1.5 : 1) : hpMul, spawn: i < 3 ? i + 1 : 5 });   // 4: P2's spot
   });
 }
 
@@ -254,16 +256,19 @@ defMode('survival', {
   },
   roundLabel() { return 'WAVE ' + modeRun().wave; },
   onRoundStart() {
-    const run = modeRun(), p = modePlayer(), foes = F.filter(f => f.team === 1);
+    const run = modeRun(), foes = F.filter(f => f.team === 1);
     G_STATE.winScore = 0;                                           // no round pips: the wave counter is the score
-    if (p && run.hp != null) p.hp = p.hpShow = (run.wave - 1) % 5 === 0 ? p.maxHp : Math.min(p.maxHp, run.hp + SURV_HEAL);
+    for (const p of F) if (run.hp && p.id in run.hp) {             // per hero; 0 = K.O.'d
+      p.hp = p.hpShow = (run.wave - 1) % 5 === 0 ? p.maxHp : Math.min(p.maxHp, run.hp[p.id] + SURV_HEAL);
+      if (!run.hp[p.id]) float(p.P[0].x, p.P[0].y - 50, 'BACK UP!', p.color, 20);
+    }
     banner('WAVE ' + run.wave, run.wave % 5 === 0 ? 'BOSS WAVE!' : foes.length > 1 ? foes.length + ' ENEMIES' : 'FIGHT!', 1.8, run.wave % 5 === 0 ? '#ff4a6a' : null);
   },
-  roundOver(winner, reason) {
-    const run = modeRun(), p = modePlayer();
-    if (!p || winner !== 0) return 'match';         // the round's winner decides (a time-out counts for the health leader)
-    run.cleared++; run.wave++; run.hp = Math.max(1, p.hp);
-    G_STATE.roster = [G_STATE.roster[0], ...survivalWave(run.wave, G_STATE.cfg.diff, G_STATE.roster[0].color)];
+  roundOver(winner) {
+    const run = modeRun(), heroes = F.filter(f => f.team === 0 && !f.summon);
+    if (!heroes.length || winner !== 0) return 'match';   // the round's winner decides (a time-out counts for the health leader)
+    run.cleared++; run.wave++; run.hp = Object.fromEntries(heroes.map(f => [f.id, f.alive ? Math.max(1, f.hp) : 0]));
+    G_STATE.roster = [...G_STATE.roster.slice(0, heroes.length), ...survivalWave(run.wave, G_STATE.cfg.diff, G_STATE.roster[0].color, heroes.length > 1)];
     return 'next';
   },
   hud(ctx) {
@@ -277,6 +282,29 @@ defMode('survival', {
       lines: [`You fell on wave ${run.wave} (${levelName(modeDiff())}).`, run.cleared >= best && run.cleared ? 'New personal best!' : `Personal best: ${best} waves.`] };
   },
 });
+
+// ---------- Co-op Waves (v4): Survival for two; best run per pair of names (73) ----------
+const coopwPair = () => [0, 1].map(s => G_STATE.roster.find(r => r.ctrl === 'human' && r.slot === s).name);
+defMode('coopwaves', Object.assign({}, MODES.survival, {
+  name: 'Co-op Waves', icon: '🛡', order: 52, duo: 'coop', players: [2, 2], pickers: 2, labels: ['Player 1', 'Player 2'], winScore: 1,
+  noScore: true,   // the waves cleared are the result
+  desc: 'Two players against ever bigger, tougher waves; a boss every 5th. A fallen partner is back next wave.',
+  setup(cfg) {
+    const n = duoNames(cfg), heroes = [humanEntry(cfg, 0, 0, 0, n[0]), Object.assign(humanEntry(cfg, 1, 1, 0, n[1]), { spawn: 4 })];
+    return { roster: [...heroes, ...survivalWave(1, cfg.diff, heroes[0].color, true)], run: { wave: 1, cleared: 0, hp: null } };
+  },
+  hud(ctx) {
+    const run = modeRun(), rec = duoRec(...coopwPair());
+    modeText(ctx, `Cleared ${run.cleared}  ·  Best together ${Math.max(rec ? rec.wave : 0, run.cleared)}`, W / 2, H - 22, 14, '#c9cdee', 'center', '600 ' + FONT_BODY);
+  },
+  results() {
+    const run = modeRun(), p = coopwPair(), rec = !G_STATE.cfg.autopilot && duoRec(...p, true), best = Math.max(rec ? rec.wave : 0, run.cleared);
+    if (rec) { rec.wave = best; duoSave(); }
+    const top = run.cleared && run.cleared >= best;
+    return { title: `${run.cleared} wave${run.cleared === 1 ? '' : 's'} cleared`, color: top ? '#ffd84a' : '#ff8a2e', waves: run.cleared,
+      lines: [`${p[0]} & ${p[1]} fell on wave ${run.wave} (${levelName(modeDiff())}).`, top ? 'New best together!' : `Best together: ${best} waves.`] };
+  },
+}));
 
 // ---------- Boss Rush: five giant bosses in a row, each with its own trick ----------
 // special: quake (ground shockwave), blink (teleports behind you), chill (frost pulse), twins (two at once,
@@ -431,15 +459,15 @@ defMode('team', {
 function teamResults(winText, loseText) {
   const won = G_STATE.score[0] > G_STATE.score[1];
   return { title: won ? winText : loseText, color: won ? G_STATE.roster[0].color : G_STATE.roster[2].color,
-    lines: [`Final score ${G_STATE.score[0]} – ${G_STATE.score[1]} after ${G_STATE.round} rounds (${levelName(modeDiff())}).`] };
+    lines: [`Final score ${G_STATE.score[0]} – ${G_STATE.score[1]} after ${roundsText(G_STATE.round)} (${levelName(modeDiff())}).`] };
 }
 
 defMode('coop', {
   name: 'Co-op 2v2', desc: 'Player 1 and Player 2 team up against two CPUs. First team to 3 rounds.',
-  order: 62, players: [2, 2], cpu: true, pickers: 2, labels: ['Player 1', 'Player 2'], winScore: 3,
+  order: 62, players: [2, 2], cpu: true, pickers: 2, labels: ['Player 1', 'Player 2'], winScore: 3, duo: 'coop',
   setup(cfg) {
-    const rivals = rivalEntries(2, 1, null).map((r, i) => Object.assign(r, { color: ['#ff8a2e', '#ff5ad1'][i], name: 'RIVAL ' + (i + 1) }));
-    return { roster: [humanEntry(cfg, 0, 0, 0, 'P1'), Object.assign(humanEntry(cfg, 1, 1, 0, 'P2'), { color: '#9dff5a' }), ...rivals], winScore: 3 };
+    const rivals = rivalEntries(2, 1, null).map((r, i) => Object.assign(r, { color: ['#ff8a2e', '#ff5ad1'][i], name: 'RIVAL ' + (i + 1) })), n = duoNames(cfg);
+    return { roster: [humanEntry(cfg, 0, 0, 0, n[0]), Object.assign(humanEntry(cfg, 1, 1, 0, n[1]), { color: '#9dff5a' }), ...rivals], winScore: 3 };
   },
   results() { return teamResults('Players win!', 'The CPUs win'); },
 });
@@ -516,7 +544,8 @@ function trainDrawMeter(ctx) {
     modeText(ctx, String(v), x + w - 16, y + 22 + i * 22, 15, '#ffffff', 'right');
   });
   modeText(ctx, `Dummy: ${TRAIN_BEHAVE_NAMES[run.behave]}`, x + 16, y + 140, 12, '#ffd84a', 'left', '600 ' + FONT_BODY);
-  modeText(ctx, '1 weapon · 2/3 skills · 4 dummy · 5 dummy weapon · 0 reset', x + 16, y + 176, 12, 'rgba(201,205,238,.75)', 'left', '600 ' + FONT_BODY);   // under the meter, clear of the mute tag
+  const skills = simpleOn(0) ? '2 skill' : '2/3 skills';   // Simple carries one skill: 3 (skill 2) does nothing
+  modeText(ctx, `1 weapon · ${skills} · 4 dummy · 5 dummy weapon · 0 reset`, x + 16, y + 176, 12, 'rgba(201,205,238,.75)', 'left', '600 ' + FONT_BODY);   // under the meter, clear of the mute tag
 }
 
 // Cycles to the next visible key in a registry (null/none included for skills).
@@ -557,7 +586,7 @@ on('damage', (B, amt, o) => {
 if (typeof addEventListener === 'function') {
   addEventListener('keydown', e => {
     if (e.repeat || !G_STATE.mode || G_STATE.mode.key !== 'training' || G_STATE.state !== 'play') return;
-    if (BINDS.some(b => Object.values(b).includes(e.code))) return;     // the player rebound this key to a control
+    if (keySets().some(b => Object.values(b).includes(e.code))) return;     // the player rebound this key to a control
     if (trainKey(e.code)) e.preventDefault();
   });
 }
@@ -680,7 +709,7 @@ function kothRespawn(old) {
   const f = makeFighter(Object.assign({}, r, { id: old.id, x: sp[0], y: sp[1], face: sp[0] < W / 2 ? 1 : -1, weapon: old.wkey,
     skills: old.skills, autopilot: old.autopilot }));
   f.inv = 1.2;                                        // brief spawn protection
-  applyMatchHp(f);                                    // the Settings health multiplier (75)
+  partyEnterRules(f);                                 // health, round length, mutators (71)
   F = F.map(o => o === old ? f : o);
   const c = chest(f);
   ring(c.x, c.y, 80, f.color, .4, 5); burst(c.x, c.y, f.color, 20, 300);

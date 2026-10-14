@@ -6,7 +6,7 @@
 //   screen's "World map" / "Next challenge" buttons. CSS: styles/98-campaign.css.
 
 const CAMP_UI = { at: null, path: [], seg: 0, sel: null, auto: null, canvas: null, info: null, raf: 0, last: 0, tall: false,
-  prevMode: null, selBefore: null, dlg: null,
+  prevMode: null, selBefore: null, dlg: null, coop: false, coopPick: false,
   dirty: true, drawn: 0, draws: 0, cw: 0, ch: 0 };   // redraw bookkeeping: dirty flag, last draw time, draw count (tests), last size
 const CAMP_BG = { ember: ['#2b0d07', '#521a0a'], frost: ['#0d2036', '#2a537a'], sky: ['#25204f', '#5a6cb5'], shadow: ['#07050d', '#1c1233'] };
 
@@ -16,12 +16,24 @@ function questCfg(extra) {
     orbs: SETTINGS.items !== 'off', orbRate: ITEM_RATES[SETTINGS.items] || 1, killcam: !!SETTINGS.killcam }, extra);
 }
 function questLaunch(extra) { initAudio(); uiSfx('fight'); startMatch(questCfg(extra)); }
-const campFight = id => questLaunch({ mode: 'campaign', node: id });
+function campFight(id) {   // CAMP_UI.coop: Player 2 joins as a second hero (76)
+  const coop = CAMP_UI.coop;
+  CAMP_UI.coop = false;
+  questLaunch(Object.assign({ mode: 'campaign', node: id }, coop ? { coop, loadouts: campCoopLoadouts() } : null));
+}
+// Picker 1 read as Player 2's own loadout (MENU.loadouts is shared by index), never as the Versus CPU's.
+function campCoopLoadouts() {
+  const keep = MENU.mode;
+  MENU.mode = 'campaign';
+  try { return [loadoutForMatch(0), loadoutForMatch(1)]; } finally { MENU.mode = keep; }
+}
+// "Play this node with 2 players": Player 2 picks a loadout first; its Fight ▸ starts the node (loadoutNext).
+function campCoopLoadout() { CAMP_UI.coopPick = true; questLoadout('campaign', 'campaign', 1); }
 const chalStart = id => questLaunch({ mode: 'challenge', challenge: id });
 // Opens the loadout screen for a quest mode; its last button comes back here (mode.loadoutNext, 96-ui-loadout).
-function questLoadout(modeKey, back) {
+function questLoadout(modeKey, back, picker = 0) {
   if (MENU.mode !== 'campaign' && MENU.mode !== 'challenge') CAMP_UI.prevMode = MENU.mode;
-  MENU.mode = modeKey; LO.picker = 0;
+  MENU.mode = modeKey; LO.picker = picker;
   openScreen('loadout', back);
 }
 // Leaving the loadout puts the menu's own mode back (so Quick Fight is unchanged).
@@ -29,8 +41,17 @@ function questRestoreMode() {
   if (MENU.mode !== 'campaign' && MENU.mode !== 'challenge') return;
   MENU.mode = CAMP_UI.prevMode && MODES[CAMP_UI.prevMode] ? CAMP_UI.prevMode : 'versus'; saveMenu();
 }
-MODES.campaign.loadoutLabel = 'World map ▸';
-MODES.campaign.loadoutNext = () => openScreen('campaign');
+// Picking for co-op: Player 2's picker too, and the last button starts the fight.
+Object.defineProperties(MODES.campaign, {
+  pickers: { get: () => CAMP_UI.coopPick ? 2 : 1 },
+  labels: { get: () => CAMP_UI.coopPick ? ['Player 1', 'Player 2'] : ['You'] },
+  loadoutLabel: { get: () => CAMP_UI.coopPick ? 'Fight ▸' : 'World map ▸' },
+});
+MODES.campaign.loadoutNext = () => {
+  const coop = CAMP_UI.coopPick;
+  openScreen('campaign');
+  if (coop) { CAMP_UI.coop = true; campEnter(CAMP_UI.sel); }
+};
 MODES.challenge.loadoutLabel = 'Challenges ▸';
 MODES.challenge.loadoutNext = () => openScreen('challenges');
 
@@ -83,6 +104,7 @@ function campWalkerPos() {
 // ---------- the world map screen ----------
 SCREENS.campaign = () => {
   questRestoreMode();
+  CAMP_UI.coopPick = false;
   const s = campSave(), u = CAMP_UI;
   u.tall = innerWidth < innerHeight * .95;
   if (!CAMP_BY_ID[u.at] || !campUnlocked(u.at, s)) { u.at = s.at; u.path = []; u.seg = 0; }
@@ -102,7 +124,7 @@ SCREENS.campaign = () => {
   return sheet('Mythic Quest', box, [uiButton('◂ Back', goBack, 'foot-back'), u.info,
     uiButton(`Skill tree${pts ? ` (${pts})` : ''}`, () => openScreen('skilltree', 'campaign'), 'camp-tree' + (pts ? ' has-pts' : '')),
     uiButton('Loadout', () => questLoadout('campaign', 'campaign')),
-    el('button', { class: 'go', onclick: () => { uiSfx('click'); campEnter(u.sel); } }, 'Fight ▸')],
+    el('button', { class: 'go', onclick: () => { uiSfx('click'); CAMP_UI.coop = false; campEnter(u.sel); } }, 'Fight ▸')],
   { cls: 'sheet-camp', headExtra: el('span', { class: 'quest-chip' }, `★ ${campStarTotal(s)}/${CAMP_NODES.length * 3}`) });
 };
 
@@ -122,7 +144,7 @@ function campNodeButton(n, s) {
 
 function campSelect(id) {
   if (CAMP_UI.sel === id) return;
-  CAMP_UI.sel = id; CAMP_UI.auto = null;
+  CAMP_UI.sel = id; CAMP_UI.auto = null; CAMP_UI.coop = false;
   campInvalidate();
   for (const b of document.querySelectorAll('.camp-node')) b.classList.toggle('sel', b.dataset.key === 'node-' + id);
   campRoute(id);
@@ -141,7 +163,8 @@ function campFillInfo() {
     el('b', { class: 'ci-name', style: { color: CAMP_REALMS[n.r].color } }, `${CAMP_KINDS[n.kind].icon} ${n.name}`),
     el('small', { text: where.filter(Boolean).join(' · ') }),
     el('span', { class: 'ci-foes', text: 'vs ' + Object.entries(foes).map(([k, c]) => c > 1 ? `${k} ×${c}` : k).join(', ') }),
-    el('span', { class: 'ci-stars' }, el('b', { text: questStarStr(s.stars[n.id] || 0) }), ' ', questStarRules(campSpec(n).st).map(questStarText).join(' · ')));
+    el('span', { class: 'ci-stars' }, el('b', { text: questStarStr(s.stars[n.id] || 0) }), ' ', questStarRules(campSpec(n).st).map(questStarText).join(' · ')),
+    el('button', { class: 'ci-coop', 'data-key': 'camp-coop', onclick: () => { uiSfx('click'); campCoopLoadout(); } }, '👥 Play this node with 2 players'));
 }
 
 function campEnter(id) {

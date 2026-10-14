@@ -1,14 +1,18 @@
 // Checks for the v3.1 world and content work: the HUD in the letterbox band and the camera rising under it on 4:3
-// iPads, the sky fill above the arena, the Codex's secret-code entry, practice-speed rewards, the hand-written
+// iPads, the sky fill above the arena, the Codex's secret-code entry, practice-speed results, the hand-written
 // codex lore, the asteroid's curved ground, CPU vines on the Jungle Temple and the "TOO BIG" grab label.
 // v3.2 (the iPad Safari audit): saves flushed when the tab is hidden, a Ranked match abandoned by pagehide and then
 // restored from the back/forward cache, GLOW_SCALE, the campaign map's canvas cap and dirty-flag redraws, the loadout
 // tile cache, the Codex arrows leaving the keyboard closed, the HUD's safe-area inset and touch wording.
+// v4: the camera keeps the lowest feet on screen with 8 fighters under the two-row HUD (zooming out a little when that
+// fits a high fighter too); banners fit the screen (long names, two-line mini-game rules) and skip the pop-in zoom
+// under reduced motion.
 // Called by tools/smoke.cjs; also runs alone (`node tools/smoke-world.cjs`, after `node build.mjs`).
 const path = require('path');
 const fs = require('fs');
 const ROOT = path.join(__dirname, '..');
 const URL = 'file://' + path.join(ROOT, 'dist', 'stick-clash.html');
+const W_ARENA = 1280;   // the arena's width (W in the game)
 
 async function open(browser, opts = {}) {
   const ctx = await browser.newContext(Object.assign({ viewport: { width: 1280, height: 720 } }, opts));
@@ -138,28 +142,27 @@ async function run(browser, { check, rows, SHOTS }) {
     return { ok: typed === 'SHINYX' && r.found && r.card && r.shown && r.lore, note: `typed ${typed} ` + JSON.stringify(r) };
   });
 
-  // (13) Practice speed pays less: coins and XP x .4 at 25 % speed, and both boxes say so.
-  await step('practice-speed reward', async () => {
-    const skip = await page.evaluate(() => typeof accessRewardMul !== 'function');
-    if (skip) return { ok: true, note: 'skipped: accessRewardMul not defined yet (92-access)' };
+  // (13) Practice speed: a slowed solo match still counts toward stats and trophies, and its results card shows no
+  // reward box (v4 has no coins or XP to scale).
+  await step('practice-speed results', async () => {
     // The last blow lands through the real stepper (advance, not SC.sim: the match counts), driven synchronously so a
-    // starved frame loop can't stall the K.O. delay at quarter speed; the results screen then settles coins and XP.
+    // starved frame loop can't stall the K.O. delay at quarter speed.
     const r = await page.evaluate(() => {
-      const keep = { speed: SETTINGS.practiceSpeed, prog: JSON.stringify(PROG), profile: JSON.stringify(PROFILE) };
+      const keep = { speed: SETTINGS.practiceSpeed, profile: JSON.stringify(PROFILE) }, m0 = PROFILE.stats.matches;
       SETTINGS.practiceSpeed = .25;
       SC.start({ mode: 'versus', weapons: ['blade', 'blade'], killcam: false }); SC.G.lock = 0;
       advance(1 / 60);                                        // a real-time step records the slowed speed for this match
-      SC.G.score[0] = SC.G.winScore - 1; damage(SC.F[1], 999, { src: SC.F[0], kind: 'melee' });
+      SC.G.score[0] = SC.G.winScore - 1; damage(SC.F[1], 999, { src: SC.F[0], kind: 'melee', unblockable: true });
       for (let i = 0; i < 6000 && SC.G.state !== 'over'; i++) advance(.05);
-      const rw = MATCH_TRACK.reward || {}, sum = (rw.lines || []).reduce((s, [, n]) => s + n, 0);
-      const out = { state: SC.G.state, mul: rw.mul, coins: rw.coins, want: Math.round(sum * .4), pm: PROG_MATCH.mul, xp: PROG_MATCH.xp,
-        boxes: !!document.querySelector('#over .reward .reward-mul') && !!document.querySelector('#over .xp-box .reward-mul') };
+      const card = document.querySelector('#over .results-card');
+      const out = { state: SC.G.state, slowed: ACCESS_MATCH.minSpeed, counted: PROFILE.stats.matches === m0 + 1,
+        clean: !!card && !card.querySelector('.reward-mul, .xp-box, .reward-total') && !/coin|\bXP\b|practice speed/i.test(card.textContent) };
       SETTINGS.practiceSpeed = keep.speed;
-      Object.assign(PROG, JSON.parse(keep.prog)); progSave(); Object.assign(PROFILE, JSON.parse(keep.profile)); saveProfile();
+      Object.assign(PROFILE, JSON.parse(keep.profile)); saveProfile();
       startMatch(demoConfig());
       return out;
     });
-    return { ok: r.state === 'over' && r.mul === .4 && r.coins === r.want && r.pm === .4 && r.boxes, note: JSON.stringify(r) };
+    return { ok: r.state === 'over' && r.slowed === .25 && r.counted && r.clean, note: JSON.stringify(r) };
   });
 
   // (14) Lore: every registry key has a hand-written entry, all unique, no template holes.
@@ -231,20 +234,20 @@ async function run(browser, { check, rows, SHOTS }) {
     return { ok: r.label && !r.held && r.cd && r.scale === 1.7, note: JSON.stringify(r) };
   });
 
-  // (19) iOS kills a backgrounded tab without a pagehide: hiding the tab must write every dirty store (profile coins,
+  // (19) iOS kills a backgrounded tab without a pagehide: hiding the tab must write every dirty store (profile stats,
   // codex counters bumped mid-round) through flushSaves, and a second flush saves nothing.
   await step('hidden tab flushes saves', async () => {
     const r = await page.evaluate(() => {
       const keep = { profile: JSON.stringify(PROFILE), codex: JSON.stringify(PROG.codex) };
-      const stored0 = store.get('profile', {}).coins, ko0 = ((store.get('prog', {}).codex || {}).w || {}).katana;
-      PROFILE.coins = (PROFILE.coins || 0) + 7; markProfile();
+      const stored0 = (store.get('profile', {}).stats || {}).kos, ko0 = ((store.get('prog', {}).codex || {}).w || {}).katana;
+      PROFILE.stats.kos = (PROFILE.stats.kos || 0) + 7; markProfile();
       codexBump('w', 'katana', 2);                                   // a K.O. counter: saved at the round's end, or now
       const dirtyBefore = profileDirty && progDirty;
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
       Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
       document.dispatchEvent(new Event('visibilitychange'));
       delete document.hidden; delete document.visibilityState;
-      const stored1 = store.get('profile', {}).coins, ko1 = store.get('prog', {}).codex.w.katana, want = PROFILE.coins, wantKo = PROG.codex.w.katana;
+      const stored1 = store.get('profile', {}).stats.kos, ko1 = store.get('prog', {}).codex.w.katana, want = PROFILE.stats.kos, wantKo = PROG.codex.w.katana;
       const dirtyAfter = profileDirty || progDirty;
       flushSaves();                                                  // clean: nothing to write
       Object.assign(PROFILE, JSON.parse(keep.profile)); saveProfile(); PROG.codex = JSON.parse(keep.codex); progSave();
@@ -346,6 +349,52 @@ async function run(browser, { check, rows, SHOTS }) {
       return { on, off, onUI, offUI };
     });
     return { ok: r.on === 'Tap to skip' && r.off === 'Press any key to skip' && r.onUI && !r.offUI, note: JSON.stringify(r) };
+  });
+
+  // (26) 8 fighters on Moon Base under the two-row HUD, one of them high: the camera never drops the floor fighters'
+  // feet off the bottom; a little lower, it zooms out (to at most CAM_OUT) and fits that fighter under the HUD too.
+  // A duel with both on the floor keeps its usual zoom.
+  await step('camera keeps feet on screen', async () => {
+    const r = await page.evaluate(() => {
+      const scene = (map, n, high) => {
+        SC.start({ mode: n > 2 ? 'watch' : 'versus', map, fighters: n, weather: 'clear' }); __W.quiet(); BANNER = null;
+        if (high != null) __W.put(SC.F[0], 640, high);
+        for (let k = 0; k < 150; k++) SC.render(1 / 60);
+        const { VIEW, CAM } = SC.view, s = VIEW.s * CAM.z, sy = y => VIEW.cy + (y - CAM.y) * s;
+        const feet = Math.max(...SC.F.filter(f => f.alive).map(f => Math.max(f.P[8].y, f.P[10].y)));
+        return { feetGap: Math.round(VIEW.vy + VIEW.vh - sy(feet)), chestGap: Math.round(sy(SC.F[0].P[1].y) - VIEW.hudY - VIEW.hudH), z: +CAM.z.toFixed(3),
+          sides: [Math.round(CAM.x - W / (2 * CAM.z)), Math.round(CAM.x + W / (2 * CAM.z))] };
+      };
+      return { high: scene('moon', 8, 110), mid: scene('moon', 8, 185), duel: scene('dojo', 2, null) };
+    });
+    const ok = r.high.feetGap >= 0 && r.mid.feetGap >= 0 && r.mid.chestGap > 0 && r.mid.z < 1 && [r.high, r.mid].every(x => x.z >= .94 - 1e-3 && x.sides[0] >= -41 && x.sides[1] <= W_ARENA + 41)
+      && r.duel.feetGap >= 0 && r.duel.z >= 1;
+    return { ok, note: JSON.stringify(r) };
+  });
+
+  // (27) Banners: every line fits the screen less 40 px a side (give or take hinting), long subtitles split into two
+  // readable lines, a long name never leaves the screen even mid pop-in, and reduced motion skips the pop-in zoom.
+  await step('banners fit and calm', async () => {
+    const r = await page.evaluate(() => {
+      SC.start({ mode: 'versus', map: 'neon' }); __W.quiet(); BANNER = null;
+      const texts = Object.values(MINIS).map(m => ['MINI-GAME · ' + m.how, true]).concat(CHALLENGES.map(c => [c.desc.toUpperCase(), true]),
+        [['Christopher wins Sumo Shove!', false], ['ALEXANDRINA STEPS IN', true]]);
+      const fits = texts.map(([t, wrap]) => { const f = bannerFit(t, wrap); ctx.font = `${f.px}px ${FONT_DISPLAY}`;
+        return { t: t.slice(0, 24), lines: f.lines.length, px: f.px, w: Math.round(Math.max(...f.lines.map(l => ctx.measureText(l).width))) }; });
+      // The banner's drawn width (pixels changed against a frame without it), early in its pop-in and at rest.
+      const band = () => CTX_MAIN.getImageData(0, Math.round(VIEW.cy - 160 * VIEW.s), cv.width, Math.round(200 * VIEW.s));
+      const span = (a, b) => { let x0 = 1e9, x1 = -1; for (let i = 0; i < a.data.length; i += 4) if (Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) > 80) { const x = (i / 4) % a.width; x0 = Math.min(x0, x); x1 = Math.max(x1, x); } return [x0, x1]; };
+      const drawn = (text, t) => { BANNER = null; SC.render(0); const base = band(); banner(text, '', 1.6, '#ffd84a'); BANNER.t = t; SC.render(0); const x = span(band(), base); BANNER = null; return x.map(v => Math.round((v - VIEW.vx) / VIEW.s)); };
+      const keep = [SETTINGS.reduceFlash, GLOW_SCALE], out = { fits }, wide = x => x[1] - x[0];
+      GLOW_SCALE = 0;   // glow() checks it: the drawn extent is then the text and its outline only
+      SETTINGS.reduceFlash = false; out.pop = [wide(drawn('FIGHT!', .05)), wide(drawn('FIGHT!', .8))]; out.longPop = drawn('Christopher wins Sumo Shove!', .02);
+      SETTINGS.reduceFlash = true; out.calm = [wide(drawn('FIGHT!', .05)), wide(drawn('FIGHT!', .8))];
+      [SETTINGS.reduceFlash, GLOW_SCALE] = keep;
+      return out;
+    });
+    const fitsOk = r.fits.every(f => f.w <= 1200 + 6 && (f.lines === 1 ? f.px >= 40 : f.px >= 56) && f.lines <= 2) && r.fits.some(f => f.lines === 2);
+    const ok = fitsOk && r.pop[0] > r.pop[1] * 1.25 && Math.abs(r.calm[0] - r.calm[1]) <= 4 && r.longPop[0] >= 6 && r.longPop[1] <= W_ARENA - 6;
+    return { ok, note: JSON.stringify({ pop: r.pop, calm: r.calm, longPop: r.longPop, worst: r.fits.sort((a, b) => a.px - b.px).slice(0, 3) }) };
   });
 
   await step('no console errors', async () => ({ ok: !errors.length && !(await page.evaluate(() => SC.errors.length)), note: errors.join(' | ').slice(0, 300) }));
