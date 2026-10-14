@@ -193,8 +193,8 @@ async function testTouch(browser, SHOTS, w, h) {
   await touch('touchStart', [{ x: sx + dir * 20, y: sy - 50, id: 1 }, { x: w * .62, y: h * .3, id: 2 }]);
   await page.waitForTimeout(40);
   await touch('touchEnd', []);
-  await page.waitForTimeout(60);
-  const attacked = await page.evaluate(() => __atk > 0 || SC.F[0].stats.shots > 0);
+  // The game attacks 1–2 ms after the finger lifts, but CDP's emulated touches arrive 100+ ms late, so wait for it.
+  const attacked = await page.waitForFunction(() => __atk > 0 || SC.F[0].stats.shots > 0, null, { timeout: 1500 }).then(() => true, () => false);
   const taunt = await page.evaluate(() => { const b = document.querySelector('#touch [data-act="taunt"]'); return !!b && b.offsetParent !== null; });
   const inView = await page.evaluate(() => [...document.querySelectorAll('#touch .tarc button')].every(b => {
     const r = b.getBoundingClientRect(); return r.left >= 0 && r.top >= 0 && r.right <= innerWidth + 1 && r.bottom <= innerHeight + 1; }));
