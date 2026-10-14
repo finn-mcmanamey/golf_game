@@ -4,7 +4,7 @@
 /* ---------- photo mode ---------- */
 .photo-bar { position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 40; width: min(980px, calc(100vw - 24px));
   display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: center; padding: 10px 14px;
-  background: rgba(10, 12, 26, .88); border: 1px solid var(--line2); border-radius: 14px; backdrop-filter: blur(6px);
+  background: rgba(10, 12, 26, .88); border: 1px solid var(--line2); border-radius: 14px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
   box-shadow: 0 12px 40px rgba(0, 0, 0, .5); animation: pop-in .2s ease-out; }
 .pb-seg { display: flex; gap: 4px; align-items: center; }
 .pb-seg > span { font: 600 12px var(--body); color: var(--dim); margin-right: 4px; text-transform: uppercase; letter-spacing: .06em; }
@@ -12,9 +12,11 @@
 .photo-bar button.sel { border-color: var(--p1); color: var(--p1); box-shadow: 0 0 12px -2px var(--p1); }
 .photo-bar button.go { background: var(--gold); color: #1a1400; border-color: var(--gold); }
 .photo-bar .hint { width: 100%; text-align: center; font-size: 11px; color: var(--faint); }
-.photo-bar.min { width: auto; padding: 6px 14px; cursor: pointer; opacity: .75; }
+.photo-bar.min { width: auto; padding: 4px; cursor: pointer; opacity: .75; }
 .photo-bar.min > * { display: none; }
-.photo-bar.min::after { content: '📷 Tab · show tools'; font: 600 12px var(--body); color: var(--dim); }
+/* The collapsed bar is one chip: the "Tools" button (86-photo photoBar), hidden while the full bar shows. */
+.photo-bar .pb-show { display: none; }
+.photo-bar.min > .pb-show { display: inline-block; border: 0; font: 600 12px var(--body); color: var(--dim); padding: 6px 12px; }
 
 @media (max-height: 520px) {   /* phones in landscape: a slimmer toolbar */
   .photo-bar { bottom: 6px; padding: 6px 10px; gap: 6px; }
@@ -28,7 +30,7 @@
 .fx-modal .card { width: min(720px, 100%); }
 .fx-modal h2 { font-size: 28px; }
 .fx-preview { width: 100%; max-height: 52vh; object-fit: contain; border-radius: 10px; border: 1px solid var(--line); background: #000;
-  user-select: auto; -webkit-touch-callout: default; }
+  -webkit-user-select: auto; user-select: auto; -webkit-touch-callout: default; -webkit-user-drag: auto; }   /* long-press or drag to save it */
 
 /* The delivery dialog's buttons (Share… / Download / Done), 86-photo fxModalActions. */
 .fx-modal .fx-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }

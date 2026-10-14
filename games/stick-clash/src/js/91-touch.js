@@ -14,7 +14,10 @@ for (const k in TOUCH_DEFAULTS) {
 }
 
 // ---------- the floating stick ----------
-const STICK = { id: null, x0: 0, y0: 0, up: false, down: null, R: 56 };
+// zone: the left zone's rect from the last touchLayout (the zones are inset from the screen edges, 92-access.css).
+// The stick element lives directly in #touch, which fills the viewport, so client coordinates place it exactly
+// under the finger wherever the zone starts.
+const STICK = { id: null, x0: 0, y0: 0, up: false, down: null, R: 56, zone: null };
 const STICK_DEAD = .16, STICK_UP = -.55, STICK_DOWN = .6, STICK_GAIN = 1.35;   // gain: 75% of the way = full speed
 const STICK_EL = TOUCH_EL && TOUCH_EL.querySelector('.tstick');
 
@@ -57,7 +60,16 @@ function stickUp(e) {
   Object.assign(STICK, { id: null, up: false, down: null });
   TOUCH_AXIS.mx = 0;
   STICK_EL.classList.remove('live');
-  STICK_EL.style.transform = ''; STICK_EL.firstChild.style.transform = '';
+  stickRest();
+}
+
+// Parks the idle ring in the left zone's bottom corner (inside the edge inset) so a thumb landing on it is in the zone.
+function stickRest() {
+  if (!STICK_EL || STICK.id !== null) return;
+  const z = STICK.zone, R = STICK.R;
+  const x = z && z.width ? z.left + 4 : 28, y = z && z.width ? z.bottom - 16 - 2 * R : innerHeight - 40 - 2 * R;
+  STICK_EL.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+  STICK_EL.firstChild.style.transform = '';
 }
 
 // ---------- right-side gestures ----------
@@ -123,6 +135,9 @@ function touchLayout() {
   TOUCH_EL.style.setProperty('--to', clamp(+SETTINGS.touchAlpha || .8, .2, 1));
   STICK.R = big * .72;
   if (STICK_EL) STICK_EL.style.setProperty('--sr', STICK.R + 'px');
+  const leftZone = TOUCH_EL.querySelector('.tzone-l');
+  STICK.zone = leftZone && !one ? leftZone.getBoundingClientRect() : null;
+  stickRest();
   touchPlace('attack', one ? big * 1.6 : big, one ? pad * 2 : cx, one ? pad * 2 : cx);
   for (const [act, ring, deg] of TOUCH_ARC) {
     const s = act === 'jump' ? size.big : ring === 1 || act === 'block' ? size.mid : size.small, a = deg * Math.PI / 180;

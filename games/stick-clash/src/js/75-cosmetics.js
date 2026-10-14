@@ -503,7 +503,7 @@ function loadProfile() {
 }
 function saveProfile() { profileDirty = false; store.set('profile', PROFILE); }
 function markProfile() { profileDirty = true; }
-addEventListener('pagehide', () => { if (profileDirty) saveProfile(); });
+onFlush(() => { if (profileDirty) saveProfile(); });   // written on pagehide and on visibilitychange -> hidden (flushSaves, 99-main)
 
 const ownsHat = key => !HATS[key] || !(HATS[key].price > 0) || PROFILE.hats.includes(key);
 const ownsPack = key => { const p = COLOR_PACKS.find(c => c.key === key); return !p || !(p.price > 0) || PROFILE.packs.includes(key); };

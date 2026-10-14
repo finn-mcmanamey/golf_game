@@ -6,7 +6,8 @@
 //   screen's "World map" / "Next challenge" buttons. CSS: styles/98-campaign.css.
 
 const CAMP_UI = { at: null, path: [], seg: 0, sel: null, auto: null, canvas: null, info: null, raf: 0, last: 0, tall: false,
-  prevMode: null, selBefore: null, dlg: null };
+  prevMode: null, selBefore: null, dlg: null,
+  dirty: true, drawn: 0, draws: 0, cw: 0, ch: 0 };   // redraw bookkeeping: dirty flag, last draw time, draw count (tests), last size
 const CAMP_BG = { ember: ['#2b0d07', '#521a0a'], frost: ['#0d2036', '#2a537a'], sky: ['#25204f', '#5a6cb5'], shadow: ['#07050d', '#1c1233'] };
 
 // ---------- starting fights ----------
@@ -65,6 +66,7 @@ function campRoute(to) {
 function campWalk(dt) {
   const u = CAMP_UI;
   if (!u.path.length) return;
+  campInvalidate();                                     // the walker moved (or just arrived): the map must redraw
   u.seg += dt * 34 / campLen(CAMP_BY_ID[u.at], CAMP_BY_ID[u.path[0]]);
   if (u.seg < 1) return;
   u.at = u.path.shift(); u.seg = 0;
@@ -121,6 +123,7 @@ function campNodeButton(n, s) {
 function campSelect(id) {
   if (CAMP_UI.sel === id) return;
   CAMP_UI.sel = id; CAMP_UI.auto = null;
+  campInvalidate();
   for (const b of document.querySelectorAll('.camp-node')) b.classList.toggle('sel', b.dataset.key === 'node-' + id);
   campRoute(id);
   campFillInfo();
@@ -179,6 +182,7 @@ function campDialogue(lines, done) {
   panel.append(box);
   show();
   next.focus({ preventScroll: true });
+  campInvalidate();
 }
 function campDialogueClose() {
   const d = CAMP_UI.dlg;
@@ -186,6 +190,7 @@ function campDialogueClose() {
   const sh = d.parentNode && d.parentNode.querySelector('.sheet');
   if (sh) sh.inert = false;
   d.remove(); CAMP_UI.dlg = null;
+  campInvalidate();
 }
 function campSpeakerColor(name) {
   if (name === LUMEN) return '#ffd84a';
@@ -202,8 +207,14 @@ addEventListener('keydown', e => {
 }, true);
 
 // ---------- drawing the map ----------
+// The map redraws only when something on it changed (the walker moving, the selection, a dialogue, the box's size),
+// at most CAMP_FPS times a second: an idle map costs nothing, which matters on an iPad where its canvas is big.
+const CAMP_FPS = 30;
+const CAMP_MAX_PIXELS = 2.3e6;   // backing-store cap, like the arena canvas (85-render): CSS scales it up
+function campInvalidate() { CAMP_UI.dirty = true; }
 function campLoopStart() {
-  if (!CAMP_UI.raf) CAMP_UI.raf = requestAnimationFrame(t => { CAMP_UI.last = t; campLoop(t); });
+  campInvalidate();
+  if (!CAMP_UI.raf) CAMP_UI.raf = requestAnimationFrame(t => { CAMP_UI.last = t; CAMP_UI.drawn = 0; campLoop(t); });
 }
 function campLoop(now) {
   const u = CAMP_UI;
@@ -212,7 +223,10 @@ function campLoop(now) {
   const dt = Math.min(.05, Math.max(0, (now - u.last) / 1000));
   u.last = now;
   campWalk(dt);
-  try { campDraw(now / 1000); } catch (e) { report(e, 'campaign map'); cancelAnimationFrame(u.raf); u.raf = 0; }
+  if (u.canvas.clientWidth !== u.cw || u.canvas.clientHeight !== u.ch) u.dirty = true;   // the box was resized
+  if (!u.dirty || now - u.drawn < 1000 / CAMP_FPS - 1) return;
+  try { if (campDraw(now / 1000)) { u.dirty = false; u.drawn = now; } }
+  catch (e) { report(e, 'campaign map'); cancelAnimationFrame(u.raf); u.raf = 0; }
 }
 on('state', () => { if (G_STATE.state !== 'menu') campDialogueClose(); });
 addEventListener('resize', () => {
@@ -230,11 +244,18 @@ const CAMP_DECOR = CAMP_REALMS.map((r, i) => {
   return out;
 });
 
+// Draws the whole map once; false when it couldn't (not laid out yet, or no context), so it stays due.
 function campDraw(t) {
-  const c = CAMP_UI.canvas, dpr = Math.min(2, devicePixelRatio || 1), w = c.clientWidth, h = c.clientHeight;
-  if (!w || !h) return;
-  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
-  const g = c.getContext('2d'), s = campSave(), realmAt = campRealmAt(s), k = Math.min(w, h) / 520;
+  const c = CAMP_UI.canvas, w = c.clientWidth, h = c.clientHeight;
+  if (!w || !h) return false;
+  const dpr = Math.max(.5, Math.min(2, devicePixelRatio || 1, Math.sqrt(CAMP_MAX_PIXELS / (w * h))));
+  // floor, not round: rounding both sides up can land a few pixels over the CAMP_MAX_PIXELS cap.
+  const bw = Math.floor(w * dpr), bh = Math.floor(h * dpr);
+  if (c.width !== bw || c.height !== bh) { c.width = bw; c.height = bh; }
+  const g = c.getContext('2d');
+  if (!g) return false;                                 // WebKit hands back null when canvas memory runs out
+  CAMP_UI.cw = w; CAMP_UI.ch = h; CAMP_UI.draws++;
+  const s = campSave(), realmAt = campRealmAt(s), k = Math.min(w, h) / 520;
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   const P = uv => ({ x: uv.x / 100 * w, y: uv.y / 100 * h });          // UV to canvas pixels
   CAMP_REALMS.forEach((r, i) => campDrawRealm(g, r, i, P, w, h, k, t));
@@ -243,6 +264,7 @@ function campDraw(t) {
   campDrawShade(g, P, w, h, me, k);
   CAMP_REALMS.forEach((r, i) => { if (i > realmAt) campFillBand(g, i, w, h, 'rgba(4,5,12,.55)'); });
   campDrawWalker(g, me, k, t);
+  return true;
 }
 // The band of realm i (landscape: a column; portrait: a row).
 function campBand(i, w, h) { return CAMP_UI.tall ? [0, i * h / 4, w, h / 4] : [i * w / 4, 0, w / 4, h]; }

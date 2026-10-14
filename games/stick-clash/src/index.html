@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
 <title>Stick Clash</title>
 <meta name="description" content="Wobbly physics stickman duels with floppy weapons, skills and power-ups.">
 <!-- Home-screen app on iOS/Android: full screen, dark status bar, our name; the icons are inlined by build.mjs. -->
@@ -18,10 +19,12 @@
 <!-- The arena is one full-bleed canvas. Every menu, pause and results panel is built by 95-ui.js inside #ui. -->
 <canvas id="c" aria-label="Stick Clash arena"></canvas>
 <div id="ui"></div>
-<!-- Touch controls (90-input shows them in play on a coarse pointer; 91-touch: stick, swipes, button arc). -->
+<!-- Touch controls (90-input shows them in play on a coarse pointer; 91-touch: stick, swipes, button arc). The stick
+     sits directly in #touch (which fills the viewport) so 91-touch can place it at the finger's client coordinates. -->
 <div id="touch" hidden>
-  <div class="tzone tzone-l"><div class="tstick"><i></i></div></div>
+  <div class="tzone tzone-l"></div>
   <div class="tzone tzone-r"></div>
+  <div class="tstick"><i></i></div>
   <div class="tarc">
     <button data-act="attack" class="big" aria-label="Attack">&#9876;</button>
     <button data-act="jump" class="big" aria-label="Jump">&#9650;</button>

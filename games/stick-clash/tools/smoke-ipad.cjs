@@ -3,11 +3,16 @@
 // (`node tools/smoke-ipad.cjs`, after `node build.mjs`). Chromium only, with iPad-shaped contexts (Safari UA, touch,
 // 2x) driven through CDP touch events:
 // - touch controls follow the latest input (touch / key / pad) and SETTINGS.touchMode; typing never hides them;
-// - a trackpad iPad still counts as a touch device; audio unlocks on a touch or a click; the announcer warms up once;
+// - a trackpad iPad still counts as a touch device; audio unlocks on a touch or a click; the announcer warms up on the
+//   next real key or tap after a pad start (an iOS-like speech engine that only starts inside a gesture);
 // - fullscreen refusal toasts (and no button where fullscreen is unavailable); the rotate card pauses in portrait but
 //   never in Split View; the "turn sound on" strip for pad-only starts; the lobby's touch seat;
 // - MP4-first export naming, the GIF export without MediaRecorder, the GIF encoder and the filter bake;
 // - the benchmark picks and stores a tier (and leaves Custom alone); one-button mode on seat P3 only.
+// - the iPad/WebKit audit fixes: the benchmark waits for a real gesture and judges a capped (30 fps) clock by render
+//   time; 'gesture' only from pointerup/touchend/click/keydown and the announcer's warm-up retries; no page zoom
+//   (gesture events, pinch resizes); the stick ring under the thumb and the edge insets; Apple Pencil as touch; save
+//   codes without DecompressionStream (inflater vectors + fuzz); captureStream failing -> GIF; wake-lock toggle.
 // Screenshots: tmp/smoke/ipad-*.png.
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -22,7 +27,30 @@ const DEVICES = {
   splitView: ipad(507, 834, { screen: { width: 1194, height: 834 } }),
   trackpad: ipad(1194, 834, { isMobile: false }),
   ipadFast: ipad(1194, 834, { deviceScaleFactor: 1 }),   // 1x: real-time steps (kill-cam frames, benchmark) run at a usable rate headless
+  phone: ipad(844, 390),                                   // a landscape phone: the short screen where the stick offset showed most
 };
+// A 30 fps display clock (Safari in a cross-origin iframe before the first tap): every requestAnimationFrame batch
+// fires 1/30 s apart with timestamps exactly 1/30 s apart, however long the frames take on this machine.
+const RAF_30 = () => {
+  const P = 1000 / 30, queue = [], cancelled = new Set();
+  let ts = 0, timer = 0, id = 0;
+  const tick = () => {
+    timer = 0; ts = ts ? ts + P : performance.now();
+    for (const [n, cb] of queue.splice(0)) {
+      if (cancelled.delete(n)) continue;
+      try { cb(ts); } catch (e) { setTimeout(() => { throw e; }); }
+    }
+  };
+  window.requestAnimationFrame = cb => { queue.push([++id, cb]); if (!timer) timer = setTimeout(tick, P); return id; };
+  window.cancelAnimationFrame = n => { cancelled.add(n); };
+};
+// zlib streams made by node's zlib, one per deflate block type (stored, fixed Huffman, dynamic Huffman).
+const INFLATE_VECTORS = [
+  { name: 'stored', b64: 'eAEBMgDN/1N0aWNrIENsYXNoIHNhdmUgY29kZSB2ZWN0b3IgMTIzNDU2Nzg5MCAxMjM0NTY3ODkwpPwOoQ==', text: 'Stick Clash save code vector 1234567890 1234567890' },
+  { name: 'fixed', b64: 'eNoLLslMzlZwzkkszlAoTixLVUjOT0lVKEtNLskvUjA0MjYxNTO3sDRAYgIApPwOoQ==', text: 'Stick Clash save code vector 1234567890 1234567890' },
+  { name: 'dynamic', b64: 'eNpljUFqwzAQRe/y1yLETiBUd+gNZqPKcqxa0qQeyaUY3z1IppS2s5p5w/9vwwrdKWTo7nb+GYUZeoNkb2cbjEyntT89Fh59cNDYCJZ9EoK+XvpOEZxZkhsI+qWmCZJNru+NMHNdul4RPo/MTRECi7h6XPYd6o9JXM4+3eVQvQXmSNCEyd8ngiJ8FBN8/mrQlMwNZi52euXB/cYmJS7JuqXhlb11hP/O6FI5fPG7YnWLFGkl0TwaGvj9aB38ODaSeIkm1MZ9fwKFkWvg',
+    text: '{"v":1,"t":1700000000000,"k":{"stickclash.v2.profile":"{\\"coins\\":4321,\\"earned\\":9000,\\"stats\\":{\\"kos\\":12,\\"wins\\":7,\\"losses\\":3}}","stickclash.v2.settings":"{\\"bloom\\":\\"high\\",\\"quality\\":\\"auto\\",\\"touchMode\\":\\"auto\\",\\"announcer\\":\\"voice\\"}","stickclash.v2.menu":"{\\"mode\\":\\"versus\\",\\"map\\":\\"dojo\\",\\"diff\\":\\"normal\\"}"}}' },
+];
 const CALM = () => { for (const f of SC.F) if (f.ctrl === 'cpu') { f.ai.behave = 'idle'; f.ai.t = 1e9; f.inp.mx = 0; f.inp.attackHeld = false; } };
 
 async function open(browser, device, init) {
@@ -39,13 +67,43 @@ async function open(browser, device, init) {
   const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts });
   const tap = async (x, y) => { await touch('touchStart', [{ x, y, id: 1 }]); await touch('touchEnd', []); };
   const pageErrors = () => page.evaluate(() => SC.errors.map(e => e.msg));
-  return { ctx, page, errors, touch, tap, pageErrors };
+  // An element's client rect with its centre.
+  const box = sel => page.evaluate(q => { const r = document.querySelector(q).getBoundingClientRect();
+    return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height, cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2 }; }, sel);
+  // A point on the title screen with nothing tappable under it (the demo side), for taps that must not open a menu.
+  const emptySpot = () => page.evaluate(() => {
+    for (const [fx, fy] of [[.86, .5], [.78, .3], [.9, .78], [.66, .62]]) {
+      const x = Math.round(innerWidth * fx), y = Math.round(innerHeight * fy), t = document.elementFromPoint(x, y);
+      if (t && !t.closest('button, a, input, select, textarea, [tabindex], .toast')) return { x, y };
+    }
+    return { x: Math.round(innerWidth * .86), y: Math.round(innerHeight * .5) };
+  });
+  return { ctx, page, errors, touch, tap, pageErrors, box, emptySpot };
 }
 const shot = (SHOTS, name) => path.join(SHOTS, `ipad-${name}.png`);
 
+// After the GIF export of (10): MediaRecorder is back but captureStream throws, so the video route must fall back.
+async function captureFallback(page) {
+  const r = await page.evaluate(() => {
+    window.MediaRecorder = window.__MR;
+    for (const m of document.querySelectorAll('.fx-modal')) if (m.fxClose) m.fxClose();
+    const H = SC.highlights.HL, before = SC.export.how();
+    H.lastExport = null;
+    HTMLCanvasElement.prototype.captureStream = function () { throw new DOMException('capture blocked here', 'NotSupportedError'); };
+    const started = SC.highlights.export(H.clips[0]);
+    return { before, started, noCapture: !!H.noCapture, after: SC.export.how(), gifRec: !!(H.rec && H.rec.gif) };
+  });
+  await page.waitForFunction(() => SC.highlights.HL.lastExport, null, { timeout: 40000 }).catch(() => {});
+  Object.assign(r, await page.evaluate(() => ({ exp: SC.highlights.HL.lastExport, hint: (document.querySelector('.fx-modal .hint') || {}).textContent || '' })));
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => document.querySelector('#highlights [data-key^="hl-export"]'), null, { timeout: 5000 }).catch(() => {});
+  r.label = await page.evaluate(() => (document.querySelector('#highlights [data-key^="hl-export"]') || {}).textContent || '');
+  return r;
+}
+
 async function run(browser, { check, rows, SHOTS }) {
   const allErrors = [];
-  let stepKey = '';
+  let stepKey = '', exportFallback = null;
   const step = async (key, fn) => {
     stepKey = key;
     let ok = false, note = '';
@@ -116,7 +174,8 @@ async function run(browser, { check, rows, SHOTS }) {
     return { ok: dev.touch && vis, note: JSON.stringify(dev) + ` visible ${vis}` };
   }));
 
-  // (4) Audio unlocks on a touch (touchend / pointer) and on a click; the announcer warms speech up once.
+  // (4) Audio unlocks on a touch (touchend / pointer) and on a click; the click warms speech up once (one try for its
+  // pointerup + click) and the warm-up settles: speech started, or (headless Chromium has no voices) the synth fallback.
   await step('audio unlocks on touch and click', async () => {
     const t = await withDevice('ipadPro11', async ({ page, tap }) => {
       const before = await page.evaluate(() => AC === null);
@@ -126,9 +185,11 @@ async function run(browser, { check, rows, SHOTS }) {
     });
     const c = await withDevice('ipadPro11', async ({ page }) => {
       await page.mouse.click(700, 700);
-      return page.evaluate(() => ({ ac: AC !== null, warmed: ANN.warmed, mode: SETTINGS.announcer }));
+      await page.waitForFunction(() => ANN.warmed || ANN.fallback, null, { timeout: 3000 }).catch(() => {});
+      return page.evaluate(() => ({ ac: AC !== null, tries: ANN.warmTries, warmed: ANN.warmed, fallback: ANN.fallback, mode: SC.announcer.mode() }));
     });
-    return { ok: t.before && t.after && c.ac && c.warmed, note: JSON.stringify({ touch: t, click: c }) };
+    const ok = t.before && t.after && c.ac && c.tries === 1 && (c.warmed || (c.fallback && c.mode === 'synth'));
+    return { ok, note: JSON.stringify({ touch: t, click: c }) };
   });
 
   // (5) Fullscreen refused (as inside an embedded viewer): a toast, no error; no button where it is unavailable.
@@ -167,11 +228,34 @@ async function run(browser, { check, rows, SHOTS }) {
     await page.waitForTimeout(150);
     const shown = await page.evaluate(() => ({ bar: !!document.getElementById('soundbar'), last: DEVICE.lastInput, acState: AC && AC.state, touch: touchVisible() }));
     await page.screenshot({ path: shot(SHOTS, 'soundbar-1194x834') });
+    // A pad's (untrusted) presses are no gesture: "Round one" went to the voice, which ignored it like iOS does.
+    const pad = await page.evaluate(() => ({ tries: ANN.warmTries, warmed: ANN.warmed, fallback: ANN.fallback, round: (ANN.log.find(l => /^Round/.test(l.text)) || {}).how }));
     await page.keyboard.press('KeyD');
-    await page.waitForTimeout(60);
+    await page.waitForTimeout(80);
     const gone = await page.evaluate(() => !document.getElementById('soundbar'));
-    return { ok: shown.bar && shown.last === 'pad' && !shown.touch && gone, note: JSON.stringify(shown) + ` gone ${gone}` };
-  }, () => { const Base = window.AudioContext; window.AudioContext = class extends Base { get state() { return 'suspended'; } }; }));
+    // The next real key or tap warms the voice up: it starts, and the announcer keeps the voice.
+    const key = await page.evaluate(() => ({ tries: ANN.warmTries, warmed: ANN.warmed, fallback: ANN.fallback, mode: SC.announcer.mode(), ignored: __speech.ignored, spoke: __speech.spoke }));
+    const ok = shown.bar && shown.last === 'pad' && !shown.touch && gone && pad.tries === 0 && !pad.warmed && !pad.fallback && pad.round === 'voice'
+      && key.tries === 1 && key.warmed && !key.fallback && key.mode === 'voice' && key.ignored >= 1 && key.spoke >= 1;
+    return { ok, note: JSON.stringify({ shown, gone, pad, key }) };
+  }, () => {
+    const Base = window.AudioContext; window.AudioContext = class extends Base { get state() { return 'suspended'; } };
+    // iOS-like speech (WebKit): speak() is silently ignored until one call is made while a real tap or key is being
+    // dispatched; that lifts the restriction for the page. (Playwright's evaluate counts as user activation, so the
+    // page's own activation flag can't tell a pad start from a tap: the stub watches trusted events itself.)
+    window.__speech = { ignored: 0, spoke: 0, gesture: false, unlocked: false };
+    for (const type of ['pointerup', 'touchend', 'click', 'keydown']) addEventListener(type, e => {
+      if (!e.isTrusted || (type === 'keydown' && e.code === 'Escape')) return;
+      __speech.gesture = true; setTimeout(() => { __speech.gesture = false; });
+    }, true);
+    const engine = { speaking: false, pending: false, cancel() {}, getVoices: () => [],
+      speak(u) {
+        if (__speech.gesture) __speech.unlocked = true;
+        if (!__speech.unlocked) { __speech.ignored++; return; }
+        __speech.spoke++; setTimeout(() => { if (u.onstart) u.onstart({}); if (u.onend) u.onend({}); }, 10);
+      } };
+    Object.defineProperty(window, 'speechSynthesis', { value: engine, configurable: true, writable: true });
+  }));
 
   // (8) The lobby's touch seat: joins once, shows as "Touch screen", and drives TOUCH_SLOT in the match.
   await step('lobby touch seat', () => withDevice('ipadPro11', async ({ page }) => {
@@ -238,18 +322,27 @@ async function run(browser, { check, rows, SHOTS }) {
     await page.waitForFunction(() => SC.highlights.HL.clips.length > 0, null, { timeout: 20000 }).catch(() => {});
     await page.waitForFunction(() => SC.G.state === 'over', null, { timeout: 30000 }).catch(() => {});
     const clips = await page.evaluate(() => SC.highlights.HL.clips.length);
-    const started = await page.evaluate(() => { toMenu(); window.MediaRecorder = undefined; return { how: SC.export.how(), ok: SC.highlights.export(SC.highlights.HL.clips[0]) }; });
+    const started = await page.evaluate(() => { toMenu(); window.__MR = window.MediaRecorder; window.MediaRecorder = undefined; return { how: SC.export.how(), ok: SC.highlights.export(SC.highlights.HL.clips[0]) }; });
     await page.waitForFunction(() => SC.highlights.HL.lastExport, null, { timeout: 40000 }).catch(() => {});
     const exp = await page.evaluate(() => SC.highlights.HL.lastExport);
     const modal = await page.evaluate(() => ({ img: !!document.querySelector('.fx-modal img.fx-preview'), download: !!document.querySelector('.fx-modal [data-key="fx-download"]'),
       share: !!document.querySelector('.fx-modal [data-key="fx-share"]'), hint: (document.querySelector('.fx-modal .hint') || {}).textContent }));
     await page.screenshot({ path: shot(SHOTS, 'export-1194x834') });
     await page.keyboard.press('Escape');
+    exportFallback = await captureFallback(page);
     const ok = units.mime === 'video/mp4' && /\.mp4$/.test(units.name) && units.how === 'video' && units.gifHead === 'GIF89a' && units.gifFrames === 2
       && units.bake[0] === units.bake[1] && units.bake[1] === units.bake[2] && clips >= 1 && started.how === 'gif' && started.ok
       && exp && exp.type === 'image/gif' && exp.size > 1000 && modal.img && modal.download && /GIF/.test(modal.hint);
     return { ok, note: JSON.stringify({ units, clips, started, exp, modal: { img: modal.img, download: modal.download, share: modal.share } }) };
   }));
+
+  // (10b) A browser whose canvas capture or recorder throws (MediaRecorder present): the clip is made as a GIF.
+  await step('export: captureStream throwing -> GIF', async () => {
+    const f = exportFallback || {};
+    const ok = f.before === 'video' && f.started && f.noCapture && f.after === 'gif' && f.gifRec && f.exp && f.exp.type === 'image/gif'
+      && f.exp.size > 1000 && f.exp.fallback === 'gif' && /Video capture is not available/.test(f.hint || '') && f.label === '⬇ Export GIF';
+    return { ok, note: JSON.stringify(f) };
+  });
 
   // (11) The benchmark: a tier, stored, applied under Auto; a Custom mix is left alone.
   await step('benchmark picks and stores a tier', () => withDevice('ipadFast', async ({ page }) => {
@@ -289,7 +382,307 @@ async function run(browser, { check, rows, SHOTS }) {
     return { ok, note: JSON.stringify(r) };
   }));
 
-  // (18) Nothing above logged an error in any context.
+  // (13) Audit 1: no benchmark before a real gesture. A stored Low measured under a 30 fps cap is measured once more on
+  // a later launch, a second after the next real tap (automation is what blocks it everywhere else: switched off here).
+  await step('benchmark waits for a real gesture', () => withDevice('ipadFast', async ({ page, touch, emptySpot }) => {
+    await page.waitForTimeout(3000);
+    const idle = await page.evaluate(() => ({ block: SC.perf.autoBlock(), can: SC.perf.canAutoRun(), stored: localStorage.getItem('stickclash.v2.bench'), job: !!SC.perf.PERF.job }));
+    await page.evaluate(() => localStorage.setItem('stickclash.v2.bench', JSON.stringify({ tier: 'low', fps: 30, ms: 4, fpsLow: 30, msLow: 3,
+      capped: true, capFps: 30, when: Date.now(), ua: navigator.userAgent, ver: VERSION })));
+    await page.reload();
+    await page.waitForFunction(() => window.SC && SC.G.state === 'menu');
+    await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false, configurable: true }));
+    const launch = await page.evaluate(() => ({ stale: SC.perf.stale(), block: SC.perf.autoBlock() }));
+    const spot = await emptySpot();
+    await touch('touchStart', [{ x: spot.x, y: spot.y, id: 1 }]);
+    await touch('touchEnd', []);
+    await page.waitForTimeout(250);
+    const soon = await page.evaluate(() => ({ block: SC.perf.autoBlock(), job: !!SC.perf.PERF.job }));
+    await page.waitForFunction(() => SC.perf.PERF.autoDone, null, { timeout: 4000 }).catch(() => {});
+    const started = await page.evaluate(() => ({ job: !!SC.perf.PERF.job, done: SC.perf.PERF.autoDone }));
+    await page.waitForFunction(() => !SC.perf.PERF.job, null, { timeout: 30000 }).catch(() => {});
+    const after = await page.evaluate(() => { const b = store.get('bench') || {}; return { tier: b.tier, again: b.again, stale: SC.perf.stale(), block: SC.perf.autoBlock(), state: SC.G.state, demo: SC.G.demo }; });
+    const ok = idle.block === 'no gesture yet' && !idle.can && idle.stored === null && !idle.job && launch.stale === 'capped' && launch.block === 'no gesture yet'
+      && soon.block === 'too soon after the gesture' && !soon.job && started.done && ['high', 'medium', 'low'].includes(after.tier) && after.again === true
+      && after.stale === '' && after.block === 'done this session' && after.state === 'menu' && after.demo;
+    return { ok, note: JSON.stringify({ idle, launch, soon, started, after }) };
+  }));
+
+  // (14) Audit 1: a 30 fps clock (stubbed requestAnimationFrame) is detected; the tier then comes from render time only.
+  await step('capped clock judged by render time', () => withDevice('ipadFast', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      SETTINGS.quality = 'auto';
+      const res = await SC.perf.run(.6), s = res && res.stats, b = store.get('bench') || {};
+      const byMs = s ? (s.high.ms <= 9 ? 'high' : s.low.ms <= 11 ? 'medium' : 'low') : null;
+      return { tier: res && res.tier, byMs, capped: res && res.capped, capFps: res && res.capFps, stored: [b.tier, b.capped, b.capFps].join(),
+        ms: s && ['off', 'low', 'high'].map(k => s[k].ms).join('/'), caps: s && ['off', 'low', 'high'].map(k => s[k].cap).join('/') };
+    });
+    await page.evaluate(() => openScreen('settings', 'menu'));
+    const last = await page.evaluate(() => (document.querySelector('[data-key="perf-last"]') || {}).textContent || '');
+    const u = await page.evaluate(() => {
+      const C = SC.perf.cap, T = SC.perf.tier, P = 1000 / 30, rep = (v, n) => new Array(n).fill(v);
+      const light = { off: { fps: 30, ms: 2 }, low: { fps: 30, ms: 4 }, high: { fps: 30, ms: 6 } };
+      return { all30: C(rep(P, 60), 5), jitter30: C(rep(P, 60).map((g, i) => g + (i % 3) - 1), 5), mixed: C(rep(P, 30).concat(rep(P / 2, 30)), 5),
+        busy30: C(rep(P, 60), 25), tiny60: C(rep(P / 2, 60), 2), busy60: C(rep(P / 2, 60), 10), fast: C(rep(8.3, 60), 3), few: C(rep(P, 5), 5),
+        capped: T(light, true), uncapped: T(light, false), mid: T({ low: { fps: 30, ms: 10 }, high: { fps: 30, ms: 12 } }, true) };
+    });
+    const ok = r.capped === true && r.capFps === 30 && r.tier === r.byMs && r.stored === `${r.tier},true,30` && /measured while the display was limited to 30 fps/.test(last)
+      && u.all30 === 30 && u.jitter30 === 30 && u.mixed === 0 && u.busy30 === 0 && u.tiny60 === 60 && u.busy60 === 0 && u.fast === 0 && u.few === 0
+      && u.capped === 'high' && u.uncapped === 'low' && u.mid === 'medium';
+    return { ok, note: JSON.stringify({ r, last: last.slice(0, 140), u }) };
+  }, RAF_30));
+
+  // (15) Audit 4: 'gesture' comes from pointerup / touchend / click / keydown only (trusted, not Esc); audio is still
+  // created on pointerdown.
+  await step('gesture only from pointerup, touchend, click, keydown', () => withDevice('ipadPro11', async ({ page, touch, emptySpot }) => {
+    await page.evaluate(() => { window.__g = []; on('gesture', e => __g.push(e.type)); });
+    const spot = await emptySpot();
+    await touch('touchStart', [{ x: spot.x, y: spot.y, id: 1 }]);
+    await page.waitForTimeout(40);
+    const down = await page.evaluate(() => ({ g: __g.join(), ac: AC !== null }));
+    await touch('touchEnd', []);
+    await page.waitForTimeout(80);
+    const up = await page.evaluate(() => __g.slice());
+    const fake = await page.evaluate(() => {
+      const n = __g.length;
+      for (const ev of [new PointerEvent('pointerup', { bubbles: true }), new MouseEvent('click', { bubbles: true }), new KeyboardEvent('keydown', { code: 'KeyX', bubbles: true })]) document.body.dispatchEvent(ev);
+      return __g.length - n;
+    });
+    const n0 = await page.evaluate(() => __g.length);
+    await page.keyboard.press('Escape');
+    const esc = (await page.evaluate(() => __g.length)) - n0;
+    await page.keyboard.press('KeyX');
+    const key = await page.evaluate(() => __g[__g.length - 1]);
+    const ok = down.g === '' && down.ac && up.includes('pointerup') && up.every(t => ['pointerup', 'touchend', 'click'].includes(t)) && fake === 0 && esc === 0 && key === 'keydown';
+    return { ok, note: JSON.stringify({ down, up, fake, esc, key }) };
+  }));
+
+  // (16) Audit 4: the speech warm-up retries after 'not-allowed' until the utterance starts; a cancelled warm-up is no
+  // failure; an engine that stays silent after a sure gesture hands the announcer to the synth voice.
+  await step('announcer warm-up retries, then falls back', () => withDevice('ipadPro11', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const A = SC.announcer.ANN, wait = ms => new Promise(res => setTimeout(res, ms));
+      let calls = 0, answer = 'deny';
+      const engine = { speaking: false, pending: false, cancel() {}, getVoices: () => [],
+        speak(u) { calls++; const a = answer; setTimeout(() => { if (a === 'deny') u.onerror({ error: 'not-allowed' }); else if (a === 'ok') u.onstart({}); }, 20); } };
+      Object.defineProperty(window, 'speechSynthesis', { value: engine, configurable: true, writable: true });
+      const reset = () => { clearTimeout(A.warmTimer); Object.assign(A, { warmed: false, fallback: false, warmTries: 0, warmAt: -1e9, warmTimer: 0 }); };
+      reset(); SETTINGS.announcer = 'voice';
+      SC.announcer.warm();
+      await wait(100);
+      const denied = { warmed: A.warmed, fallback: A.fallback, timer: !!A.warmTimer, mode: SC.announcer.mode() };
+      answer = 'ok';
+      await wait(450);                                          // the next tap: a new try
+      SC.announcer.warm();
+      await wait(100);
+      const started = { warmed: A.warmed, fallback: A.fallback, calls, tries: A.warmTries, mode: SC.announcer.mode() };
+      reset(); answer = 'silent';
+      SC.announcer.warm();
+      annWarmError({ error: 'canceled' });                      // a newer line cut the warm-up off: not a failure
+      const cancelled = A.fallback;
+      await wait(2300);
+      const silent = { fallback: A.fallback, warmed: A.warmed, mode: SC.announcer.mode() };
+      const broken = [annSpeechBroken({ error: 'synthesis-failed' }), annSpeechBroken({ error: 'canceled' }), annSpeechBroken({ error: 'not-allowed' })].join();
+      return { denied, started, cancelled, silent, broken };
+    });
+    const ok = !r.denied.warmed && !r.denied.fallback && !r.denied.timer && r.denied.mode === 'voice' && r.started.warmed && !r.started.fallback
+      && r.started.calls === 2 && r.started.tries === 2 && r.started.mode === 'voice' && r.cancelled === false && r.silent.fallback && !r.silent.warmed
+      && r.silent.mode !== 'voice' && r.broken === 'true,false,false';
+    return { ok, note: JSON.stringify(r) };
+  }));
+
+  // (17) Audit 3: no page zoom. Safari's gesture events are cancelled except in a text field; a pinch step's
+  // visual-viewport resize (scale 2) lays nothing out; the menus' touch-action stops pinch and double-tap zoom.
+  await step('no page zoom: gesture events and pinch resizes', () => withDevice('ipadPro11', async ({ page }) => {
+    const r = await page.evaluate(async () => {
+      const wait = ms => new Promise(res => setTimeout(res, ms)), D = SC.device;
+      const fire = (type = 'gesturestart') => { const e = new Event(type, { bubbles: true, cancelable: true }); document.body.dispatchEvent(e); return e.defaultPrevented; };
+      const add = (tag, props) => document.body.appendChild(Object.assign(document.createElement(tag), props));
+      const out = { events: D.pinchEvents.join(), menu: fire(), change: fire('gesturechange'), end: fire('gestureend') };
+      const text = add('input', { type: 'text' }), area = add('textarea', {}), range = add('input', { type: 'range' });
+      text.focus(); out.text = fire(); area.focus(); out.area = fire(); range.focus(); out.slider = fire();
+      out.touch = { menu: getComputedStyle(document.getElementById('menu')).touchAction, range: getComputedStyle(range).touchAction };
+      const camp = el('div', { class: 'camp-map' }, el('canvas', { class: 'camp-canvas' }));
+      UI_ROOT.append(camp); out.touch.camp = getComputedStyle(camp.firstChild).touchAction; camp.remove();
+      text.remove(); area.remove(); range.remove();
+      const n0 = D.relayouts, s0 = D.pinchSkips;
+      Object.defineProperty(visualViewport, 'scale', { get: () => 2, configurable: true });
+      visualViewport.dispatchEvent(new Event('resize'));
+      await wait(450);
+      out.pinched = { skips: D.pinchSkips - s0, relayouts: D.relayouts - n0 };
+      delete visualViewport.scale;
+      visualViewport.dispatchEvent(new Event('resize'));
+      await wait(450);
+      out.unpinched = { relayouts: D.relayouts - n0, scale: visualViewport.scale };
+      return out;
+    });
+    const ok = r.events === 'gesturestart,gesturechange,gestureend' && r.menu && r.change && r.end && !r.text && !r.area && r.slider
+      && r.touch.menu === 'pan-x pan-y' && r.touch.range === 'manipulation' && r.touch.camp === 'manipulation'
+      && r.pinched.skips === 1 && r.pinched.relayouts === 0 && r.unpinched.relayouts >= 1 && r.unpinched.scale === 1;
+    return { ok, note: JSON.stringify(r) };
+  }));
+
+  // (18, 19) Audit 2 + 5: the stick ring is drawn under the thumb (not 14% lower), the knob follows it, and the idle ring
+  // rests on screen inside the zone, which keeps 24 px clear of the left edge and the bottom (swipe-back, Dock).
+  for (const [device, size] of [['phone', '844x390'], ['ipadPro11', '1194x834']]) {
+    await step(`stick under the thumb ${size}`, () => withDevice(device, async ({ page, touch, box }) => {
+      await page.evaluate(() => { ROTATE_SKIPPED = true; MENU.map = 'dojo'; MENU.mode = 'versus'; });
+      await page.tap('#menu .go');
+      await page.evaluate(CALM);
+      await page.waitForTimeout(300);
+      const view = await page.evaluate(() => ({ w: innerWidth, h: innerHeight, vis: touchVisible() }));
+      const zone = await box('#touch .tzone-l'), right = await box('#touch .tzone-r'), idle = await box('#touch .tstick');
+      const x = Math.round(zone.l + zone.w * .5), y = Math.round(zone.t + zone.h * .55);
+      await touch('touchStart', [{ x, y, id: 1 }]);
+      await page.waitForTimeout(40);
+      const live = await box('#touch .tstick');
+      await touch('touchMove', [{ x: x + 15, y, id: 1 }]);
+      await page.waitForTimeout(40);
+      const held = await box('#touch .tstick'), knob = await box('#touch .tstick i');
+      await page.screenshot({ path: shot(SHOTS, `stick-${size}`) });
+      await touch('touchEnd', []);
+      await page.waitForTimeout(60);
+      const rest = await box('#touch .tstick');
+      const near = (a, b) => Math.abs(a - b) <= 4;
+      const checks = {
+        visible: view.vis, ring: near(live.cx, x) && near(live.cy, y), stays: near(held.cx, x) && near(held.cy, y), knob: near(knob.cx, x + 15) && near(knob.cy, y),
+        insets: zone.l >= 24 && view.h - zone.b >= 24 && view.h - right.b >= 24,
+        idleOnScreen: idle.l >= 0 && idle.t >= 0 && idle.r <= view.w && idle.b <= view.h,
+        idleInZone: idle.l >= zone.l && idle.t >= zone.t && idle.b <= zone.b && idle.r <= zone.r,
+        backToRest: Math.abs(rest.l - idle.l) <= 1 && Math.abs(rest.t - idle.t) <= 1,
+      };
+      const failed = Object.keys(checks).filter(k => !checks[k]);
+      return { ok: !failed.length, note: `failed [${failed}] touch ${x},${y} ring ${live.cx.toFixed(1)},${live.cy.toFixed(1)} zone ${JSON.stringify(zone)} idle ${JSON.stringify(idle)}` };
+    }));
+  }
+
+  // (20) Audit 6 + 9: an Apple Pencil is the touch screen (device input, photo-mode pinch with a finger); the photo bar
+  // talks touch and collapses to a tappable "Tools" chip.
+  await step('pen counts as touch; photo Tools chip', () => withDevice('ipadPro11', async ({ page }) => {
+    await page.evaluate(() => { ROTATE_SKIPPED = true; SC.start({ mode: 'versus', map: 'dojo' }); });
+    await page.waitForTimeout(100);
+    await page.keyboard.press('KeyD');
+    const r = await page.evaluate(() => {
+      const fire = (type, init) => cv.dispatchEvent(new PointerEvent(type, Object.assign({ bubbles: true, cancelable: true }, init)));
+      const out = { key: DEVICE.lastInput };
+      fire('pointerdown', { pointerType: 'mouse', pointerId: 1, clientX: 600, clientY: 400 }); fire('pointerup', { pointerType: 'mouse', pointerId: 1 });
+      out.mouse = DEVICE.lastInput;
+      fire('pointerdown', { pointerType: 'pen', pointerId: 7, clientX: 600, clientY: 400 }); fire('pointerup', { pointerType: 'pen', pointerId: 7 });
+      out.pen = DEVICE.lastInput;
+      setState('paused'); photoEnter();
+      const z0 = PHOTO.z;
+      fire('pointerdown', { pointerType: 'touch', pointerId: 11, clientX: 500, clientY: 400 });
+      fire('pointerdown', { pointerType: 'pen', pointerId: 12, clientX: 700, clientY: 400 });
+      fire('pointermove', { pointerType: 'pen', pointerId: 12, clientX: 800, clientY: 400 });   // fingers 200 -> 300 px apart
+      out.zoom = +(PHOTO.z / z0).toFixed(2);
+      fire('pointerup', { pointerType: 'pen', pointerId: 12 }); fire('pointerup', { pointerType: 'touch', pointerId: 11 });
+      out.hint = document.querySelector('.photo-bar .hint').textContent;
+      return out;
+    });
+    await page.click('[data-photo="tools"]');
+    const chip = await page.evaluate(() => { const b = document.querySelector('.photo-bar [data-photo="show"]'), rc = b.getBoundingClientRect();
+      return { min: PHOTO.bar.classList.contains('min'), text: b.textContent, shown: rc.width > 20 && getComputedStyle(b).display !== 'none' }; });
+    await page.screenshot({ path: shot(SHOTS, 'photo-tools-chip') });
+    await page.tap('.photo-bar [data-photo="show"]');
+    const reopened = await page.evaluate(() => { const open = !PHOTO.bar.classList.contains('min'), hidden = getComputedStyle(document.querySelector('.photo-bar [data-photo="show"]')).display === 'none'; photoExit(); return open && hidden; });
+    const ok = r.key === 'key' && r.mouse === 'key' && r.pen === 'touch' && r.zoom >= 1.4 && /pinch/.test(r.hint) && !/Tab/.test(r.hint)
+      && chip.min && chip.shown && /Tools/.test(chip.text) && !/Tab/.test(chip.text) && reopened;
+    return { ok, note: JSON.stringify({ r, chip, reopened }) };
+  }));
+
+  // (21) Audit 7: save codes on a browser without DecompressionStream. The inflater against node zlib vectors (stored,
+  // fixed, dynamic blocks), a real save and a 200-code fuzz compressed by CompressionStream('deflate') (repeats for
+  // long back-references, one over 64 KB for many blocks), hand-made stored blocks over 64 KB, damaged input; then a
+  // 'z' code imported through readSaveCode and the Transfer screen with DecompressionStream deleted.
+  await step('save codes without DecompressionStream', () => withDevice('ipadFast', async ({ page }) => {
+    const r = await page.evaluate(async vectors => {
+      const enc = new TextEncoder(), dec = new TextDecoder(), inflate = SC.savecode.inflate;
+      const zip = async bytes => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer());
+      const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+      const out = { vectors: vectors.map(v => dec.decode(inflate(Uint8Array.from(atob(v.b64), c => c.charCodeAt(0)))) === v.text).join() };
+      const real = enc.encode(JSON.stringify({ v: 1, t: Date.now(), k: saveKeysNow() }));
+      out.real = real.length > 50 && same(inflate(await zip(real)), real);
+      let seed = 20261014;
+      const rand = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296, pick = a => a[Math.floor(rand() * a.length)];
+      const words = Array.from({ length: 48 }, (_, i) => 'k' + i.toString(36).repeat(1 + i % 6));
+      const value = () => {
+        const k = rand();
+        if (k < .3) return pick(words);
+        if (k < .45) return Math.round(rand() * 1e6) / 100;
+        if (k < .6) return { [pick(words)]: rand() < .5, n: Math.floor(rand() * 999), tag: pick(words) };
+        if (k < .72) return Array.from({ length: Math.floor(rand() * 8) }, () => Math.floor(rand() * 300));
+        if (k < .8) return pick(words).repeat(2 + Math.floor(rand() * 400));
+        return String.fromCharCode(...Array.from({ length: 1 + Math.floor(rand() * 40) }, () => 32 + Math.floor(rand() * 2000)));
+      };
+      const save = size => { const list = []; let n = 0; while (n < size) { const v = value(); list.push(v); n += JSON.stringify(v).length; }
+        return enc.encode(JSON.stringify({ v: 1, t: Math.floor(rand() * 1e12), k: { 'stickclash.v2.fuzz': JSON.stringify(list), 'stickclash.v2.misc': JSON.stringify(pick(words)) } })); };
+      let pass = 0, maxLen = 0;
+      const bad = [];
+      for (let i = 0; i < 200; i++) {
+        const bytes = save(i === 199 ? 90000 : Math.floor(rand() * rand() * 24000));
+        maxLen = Math.max(maxLen, bytes.length);
+        let back = null;
+        try { back = inflate(await zip(bytes)); } catch (e) { bad.push(i + ': ' + e.message); continue; }
+        if (same(back, bytes)) pass++; else bad.push(i + ': differs');
+      }
+      out.fuzz = { pass, maxLen, bad: bad.slice(0, 3) };
+      // Stored blocks by hand: zlib header, blocks of at most 65535 raw bytes, Adler-32 (not checked by the inflater).
+      const raw = new Uint8Array(150000).map((_, i) => (Math.imul(i, 2654435761) >>> 24) & 255), parts = [Uint8Array.of(0x78, 0x01)];
+      for (let o = 0; o < raw.length; o += 65535) {
+        const n = Math.min(65535, raw.length - o), last = o + n >= raw.length ? 1 : 0;
+        parts.push(Uint8Array.of(last, n & 255, n >> 8, ~n & 255, (~n >> 8) & 255), raw.subarray(o, o + n));
+      }
+      parts.push(new Uint8Array(4));
+      const stored = new Uint8Array(parts.reduce((a, p) => a + p.length, 0));
+      parts.reduce((o, p) => { stored.set(p, o); return o + p.length; }, 0);
+      out.storedBlocks = same(inflate(stored), raw);
+      const cut = (await zip(real)).subarray(0, 12);   // damaged inputs must throw, never hang or return junk silently
+      let threw = 0;
+      for (const b of [cut, Uint8Array.of(0x78, 0x9c, 0xff, 0xff, 0, 0, 0, 0), Uint8Array.of(1, 2, 3)]) { try { inflate(b); } catch (e) { threw++; } }
+      out.damagedThrows = threw;
+      const code = await makeSaveCode(), keep = window.DecompressionStream;
+      delete window.DecompressionStream;
+      out.ds = typeof DecompressionStream;
+      try { const data = await readSaveCode(code); out.imported = code.startsWith('SC1z.') && JSON.stringify(data.k) === JSON.stringify(saveKeysNow()); }
+      catch (e) { out.imported = 'error: ' + e.message; }
+      window.__DS = keep;
+      return out;
+    }, INFLATE_VECTORS);
+    await page.evaluate(() => { XFER.code = ''; XFER.input = ''; XFER.preview = null; openScreen('transfer', 'settings'); });
+    await page.waitForFunction(() => /^SC1z\./.test((document.querySelector('[data-key="xfer-out"]') || {}).value || ''), null, { timeout: 5000 }).catch(() => {});
+    const code = await page.evaluate(() => document.querySelector('[data-key="xfer-out"]').value);
+    await page.fill('[data-key="xfer-in"]', code);
+    await page.click('[data-key="xfer-check"]');
+    await page.waitForSelector('.xfer-preview', { timeout: 5000 }).catch(() => {});
+    const ui = await page.evaluate(() => ({ preview: !!document.querySelector('.xfer-preview'), msg: document.querySelector('#transfer .xfer-msg').textContent, ds: typeof DecompressionStream }));
+    await page.evaluate(() => { window.DecompressionStream = window.__DS; XFER.preview = null; XFER.msg = ''; });
+    const ok = r.vectors === 'true,true,true' && r.real && r.fuzz.pass === 200 && r.fuzz.maxLen > 65536 && r.storedBlocks && r.damagedThrows === 3
+      && r.ds === 'undefined' && r.imported === true && ui.preview && ui.ds === 'undefined' && !ui.msg;
+    return { ok, note: JSON.stringify({ r, ui }) };
+  }));
+
+  // (22) Audit 9: no "Keep screen awake" toggle where the browser has no wake lock (iPad Safari before 16.4).
+  await step('wake-lock toggle only with the API', async () => {
+    const r = await withDevice('ipadPro11', async ({ page }) => page.evaluate(() => {
+      openScreen('settings', 'menu');
+      return { api: !!navigator.wakeLock, toggle: !!document.querySelector('[data-key="Keep screen awake"]'), touchMode: !!document.querySelector('[data-key="Touch controls-auto"]') };
+    }), () => { delete Navigator.prototype.wakeLock; });
+    return { ok: !r.api && !r.toggle && r.touchMode, note: JSON.stringify(r) };
+  });
+
+  // (23) Audit 10: WebKit details in the page: no phone-number links, prefixed CSS next to the standard properties.
+  await step('WebKit meta and CSS details', () => withDevice('phone', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const css = [...document.querySelectorAll('style')].map(s => s.textContent).join('\n'), col = document.querySelector('.title-col');
+      return { meta: (document.querySelector('meta[name="format-detection"]') || {}).content, sizeAdjust: /html \{ -webkit-text-size-adjust: 100%; \}/.test(css),
+        drag: /img \{ -webkit-user-drag: none; \}/.test(css), backdrop: /-webkit-backdrop-filter: blur\(6px\); backdrop-filter: blur\(6px\)/.test(css),
+        select: /-webkit-user-select: auto; user-select: auto/.test(css), colTop: col ? Math.round(col.getBoundingClientRect().top) : null };
+    });
+    const ok = r.meta === 'telephone=no' && r.sizeAdjust && r.drag && r.backdrop && r.select && r.colTop >= 0;
+    return { ok, note: JSON.stringify(r) };
+  }));
+
+  // (24) Nothing above logged an error in any context.
   await step('no console or page errors', async () => ({ ok: !allErrors.length, note: allErrors.join(' | ') }));
 }
 module.exports = { run };

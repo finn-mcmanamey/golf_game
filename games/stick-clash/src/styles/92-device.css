@@ -5,3 +5,8 @@
   font: 600 15px var(--body); text-align: center; cursor: pointer; animation: fade-in .2s ease-out; }
 #soundbar::before { content: '🔇 '; }
 .title-foot .fs-btn { margin-left: auto; padding: 6px 10px; font-size: 13px; white-space: nowrap; }
+
+/* iOS ignores user-scalable=no: these stop a two-finger pinch (or a double tap) over a menu from zooming the page,
+   while scrolling in every direction still works. Sliders and the campaign map answer taps at once (no double-tap wait). */
+.overlay, .card, .sheet, .sheet-body, .fx-modal, #rotate { touch-action: pan-x pan-y; }
+input[type=range], #ui .camp-map canvas.camp-canvas { touch-action: manipulation; }   /* #ui: outranks 95-ui's `#ui canvas` */

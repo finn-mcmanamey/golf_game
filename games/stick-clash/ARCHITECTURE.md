@@ -99,11 +99,19 @@ vx(p), vy(p)                       // verlet point velocity (px/s)
 kick(p, vx, vy)                    // add velocity;  setVel(p, vx, vy) sets it
 rgba('#rrggbb', a)                 // cached colour string
 store.get(key, fallback), store.set(key, value)   // localStorage under 'stickclash.v2.', never throws
+onFlush(fn), flushSaves()          // slices with unsaved changes register a flusher (it checks its own dirty flag);
+                                   // 99-main flushes on pagehide AND visibilitychange -> hidden, because iOS Safari
+                                   // suspends or kills a backgrounded tab without a pagehide (profile, codex counters)
+touchUI()                          // true while the on-screen controls are in use: hints say "Tap", not "Press"
 report(err, where)                 // log an error (console + SC.errors); tests fail on any
 hook(def, 'method', ...args)       // call an optional content method with errors contained (this = def)
 on(event, fn) -> unsubscribe, off(event, fn), emit(event, ...args)
 line(ctx,a,b,color,w)  lineXY(ctx,x1,y1,x2,y2,color,w)  circle(ctx,x,y,r,fill,stroke,lw)  poly(ctx,pts,fill,stroke,lw)
-glow(ctx, color, blur, () => { ...draw... })    // neon glow (shadowBlur) around what fn draws
+glow(ctx, color, blur, () => { ...draw... })    // neon glow (shadowBlur) around what fn draws, scaled by GLOW_SCALE
+GLOW_SCALE                         // 1 | .5 | 0: Safari draws canvas shadows slowly, so the quality tier (High / Medium /
+                                   // Low, via SETTINGS.quality or the SETTINGS.particles level 84-quality applies)
+                                   // scales every glow; at 0 no shadow is set at all. 85-render's glowApply sets it
+                                   // (wrapped into applySettings). Direct shadowBlur uses should multiply by it too.
 ```
 
 **Events** (`on(name, fn)`): `boot`, `state(now, before)`, `matchStart(cfg)`, `roundStart(round)`,
@@ -259,7 +267,11 @@ HUD block (`VIEW.hudH = hudBlockPx()`, the same row maths as `drawHUD`) and puts
 max(0, vy − hudH)`); whatever doesn't fit still overlaps the top of the viewport by `VIEW.hudOver` px (0 on a 12.9"
 iPad, ~45 on an 11", the whole block on 16:9). The `MUTED (M)` note sits at the viewport's bottom corner.
 `ctx` is the 2D context; its backing store is capped at ~2.3 megapixels (`MAX_CANVAS_PIXELS`) and CSS scales it up,
-because the frame cost grows with pixels while the arena is a fixed 1280x720 drawing. The camera (`CAM`) follows living fighters with a gentle zoom (≤1.24) and never shows outside
+because the frame cost grows with pixels while the arena is a fixed 1280x720 drawing. `VIEW.inset` (v3.2) is the top
+safe-area inset in canvas px, measured by a hidden probe (`#safe-probe`, `padding-top: env(safe-area-inset-top)`): a
+home-screen (standalone) app has the status bar over the page, so `hudLayout` keeps `VIEW.hudY` below it in both
+orientations (`hudOver` grows by whatever that pushes into the viewport). Every `getContext('2d')` in the UI and
+render code checks for `null` (WebKit returns it when canvas memory is exhausted) and skips the drawing. The camera (`CAM`) follows living fighters with a gentle zoom (≤1.24) and never shows outside
 the arena; it is drawing-only. One exception (v3.1): the strip of the viewport under the HUD (`VIEW.hudOver`, `topPad`
 in arena units) is not usable height, so `updateCamera` zooms as if the viewport were that much shorter and, when
 fighters are near the arena's top, lets the view rise above y = 0 by at most `topPad` so they sit under the HUD instead
@@ -386,7 +398,10 @@ API: `BINDS[slot][action]`, `setBind(slot, action, code)`, `resetBinds()`, `keyL
 ### Menus, settings and progression (`75-cosmetics.js`, `95`–`97-ui`)
 
 - Menu screens are built by `SCREENS[name]()` into `#<name>` panels; `openScreen(name, backTo)`, `goBack()`,
-  `refreshScreen()`. Arrow keys/WASD and the gamepad d-pad move focus spatially, Enter/A presses, Esc/B goes back.
+  `refreshScreen()`. Drawn tiles (weapon icons, hat heads, the Codex's weapon icons) come from `uiTile(id, w, h, cls,
+  draw)` (96-ui-loadout, v3.2): a cache keyed by id, size and pixel ratio that hands back the same canvas element on
+  every rebuild, so a tap on the loadout no longer redraws ~55 icons; it empties itself past `UI_TILE_MAX` entries.
+  Wording follows the controls: `touchUI()` picks "Tap…" over "Press…" / "Hover…" (kill-cam skip hint, skill info). Arrow keys/WASD and the gamepad d-pad move focus spatially, Enter/A presses, Esc/B goes back.
   `toast(title, sub, icon, color)` shows a notification (hidden while a kill-cam replay plays). Test hooks the smoke test relies on: `#menu .go` (Quick Fight),
   `#menu button` "Controls", `#controls .binds`/`.go`, `#pause .go` (Resume), `#over h2`, first `#over button:not(.go)` = Menu.
 - The results screen only takes a fresh confirm: pad A / Enter / Space must be seen released for 300 ms after a 1.2 s
@@ -592,7 +607,28 @@ sets `crowd: [min, max, default]` to get a "Fighters" stepper on the arena scree
   ('Gold II'), color, icon, into, floor, gm }`; 100 points per division, 3 divisions per tier, Grandmaster from
   `RANK_GM` (1800). Win +25 (+5 per streak step, max +15), loss −18 (never below the tier floor). `rankOpponent(pts)`
   scales the CPU's level (`RANK_TIERS[t].levels[div]`), health and class. Autopilot matches don't save.
-  `results()` adds `rankUp: true`, which makes the results card glow and toasts.
+  `results()` adds `rankUp: true`, which makes the results card glow and toasts. A match is settled once per run
+  (`rankSettleRun(run, won)` keeps the result on `run.rankResult`): `abandon` (quit, restart, pagehide) records a loss,
+  and a later `results()` or second abandon reuses it.
+- **Leaving the page** (99-main, v3.2): `pagehide` abandons a live match (Ranked: a loss) and `flushSaves()`. iOS may
+  park the page in the back/forward cache instead of unloading it, so `pageshow` with `event.persisted` after such an
+  abandon sends the game back to the title menu (`startMatch(demoConfig())`, with a toast) instead of letting the
+  dropped match play on and settle again. `visibilitychange` → hidden also calls `flushSaves()` (the tab may never
+  get a pagehide), while 90-input pauses the fight.
+- **iPad Safari details** (v3.2): the `gesture` event (80-audio) fires only for trusted `pointerup`, `touchend`,
+  `click` and non-Esc `keydown`: iOS doesn't count `pointerdown` as a user activation for speech, and both the
+  announcer's warm-up (82: `annWarm` retries each tap until an utterance starts, then falls back to the synth voice
+  via `ANN.fallback`) and the automatic benchmark (84-quality: `perfAutoBlock()` explains why it may not run yet)
+  wait for one. The benchmark treats frame gaps pinned at 33.3 ms as a capped clock (`perfCapFps`; Safari caps an
+  untapped cross-origin iframe and Low Power Mode at 30 fps) and then judges the tier by render time only. `.tstick`
+  is a direct child of `#touch`, so 91-touch places it in viewport coordinates under the finger; the touch zones keep
+  24 px (or the safe area) clear of the left and bottom edges for Safari's swipe-back and the Dock. 92-device cancels
+  Safari's `gesture*` events outside text fields (iOS ignores `user-scalable=no`) and skips visual-viewport resizes
+  while the page is pinched (`DEVICE.pinchSkips`). Save codes made with `CompressionStream('deflate')` are zlib
+  streams; without `DecompressionStream` (iPadOS 16.0–16.3) 94-savecode unpacks them with its own inflater
+  (`SC.savecode.inflate`). A video export whose `captureStream`/recorder throws becomes a GIF (`HL.noCapture`).
+  `tools/webkit-check.py` runs the built game in a real WebKit engine (WebKitGTK's MiniBrowser via WebKitWebDriver
+  on Xvfb; `apt-get install webkit2gtk-driver`).
 - **`bossPhases(bosses, phases)`** (74): `bosses` is a fighter or an array (their combined health counts). `phases` =
   `[{ at: .5, name, sub, color, fx: [[kind, opts], ...], enter(ctl), step(ctl, dt) }, ...]`. When the health fraction
   falls to `at`, it shows a banner (name/sub), shakes, shoves nearby foes, gives the boss 1 s of `inv`, then runs the
@@ -627,6 +663,9 @@ sets `crowd: [min, max, default]` to get a "Fighters" stepper on the arena scree
   points in all, applied by `campApplyTree` at round start, campaign fights only). Autopilot matches never save.
 - **Challenges** (77): 31 specs in `CHALLENGES`, saved as `store 'challenges'` = `{ id: stars }`.
 - **UI** (98-campaign-ui): the world map (`SCREENS.campaign`), dialogue (`campDialogue`), `skilltree`, `challenges`.
+  The map canvas (v3.2) is capped at `CAMP_MAX_PIXELS` (2.3 MP, like the arena) and redraws only when
+  `campInvalidate()` marked it dirty (the walker moving, `campSelect`, a dialogue opening or closing, a resize), at
+  most `CAMP_FPS` (30) times a second; an idle map draws nothing (`CAMP_UI.draws` counts draws for the tests).
   Test hook `SC.quest = { nodes(), challenges(), start(kind, id, extra), win(), run(), dialogue() }`;
   `tools/smoke-quest.cjs` runs every node and challenge. Win rates of the late nodes for an autopilot (Normal) hero with
   no / mid / full skill tree are in `tmp/balance.md` (bench: `tmp/lead2/camp.cjs`).
@@ -974,4 +1013,8 @@ Tip: to stop the real-time loop interfering while you script a test, set `SC.G.s
   the viewport with both fighters on the Asteroid's top planet), the Codex's code box, practice-speed rewards (× .4 at
   25 %), the lore table (every key, all lines unique), the asteroid's `groundBelow` + Phase Step, CPU vines and the
   "TOO BIG" label. `tools/smoke-ipad.cjs` (touch mode, fullscreen, performance) runs when present.
+- v3.2 (`tools/smoke-world.cjs` too): a hidden tab flushes dirty saves, a Ranked match abandoned by pagehide and then
+  restored from the bfcache ends at the menu with the rank moved once, `GLOW_SCALE` through `glow()` and the settings,
+  the campaign map's canvas cap and no idle redraws (`tmp/smoke/ipad-campaign-*.png`), the loadout tile cache, the
+  Codex arrows not focusing the input, the HUD's stubbed safe-area inset, and "Tap to skip" on touch.
 It prints a table and exits non-zero on any failure. Screenshots: `tmp/smoke/`.

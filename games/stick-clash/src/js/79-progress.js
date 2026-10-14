@@ -17,7 +17,9 @@ const PROG = (() => {
   const p = store.getObj('prog'), obj = v => v && typeof v === 'object' && !Array.isArray(v) ? v : {};
   return { xp: numOr(p.xp), own: obj(p.own), title: typeof p.title === 'string' ? p.title : 'rookie', secrets: obj(p.secrets), codex: obj(p.codex), seen: numOr(p.seen, 1) || 1 };
 })();
-function progSave() { store.set('prog', PROG); }
+let progDirty = false;   // codex K.O. counters are bumped mid-round and saved at the round's end (or by flushSaves)
+function progSave() { progDirty = false; store.set('prog', PROG); }
+onFlush(() => { if (progDirty) progSave(); });
 const lookOwned = (kind, key) => (LOOK_FREE[kind] || []).includes(key) || ((PROG.own[kind] || []).includes(key));
 function lookGrant(kind, key) {
   if (kind === 'hat') { if (ownsHat(key)) return false; PROFILE.hats.push(key); saveProfile(); return true; }
@@ -109,6 +111,7 @@ function codexBump(kind, key, slot, n = 1) {
   if (!key) return;
   const t = PROG.codex[kind] = PROG.codex[kind] || {}, row = t[key] = t[key] || [0, 0, 0];
   row[slot] += n;
+  progDirty = true;
 }
 const codexKeys = f => [['w', f.wkey], ['c', f.clsKey], ['m', MAP && MAP.key], ['p', lookOf(f).pet], ...f.skills.filter(Boolean).map(k => ['s', k])];
 function codexRound(f, won) { for (const [k, key] of codexKeys(f)) { codexBump(k, key, 0); if (won) codexBump(k, key, 1); } progSave(); }

@@ -184,8 +184,14 @@ function codexCodeEntry() {
     uiSfx('deny');
     status.textContent = k ? `Already found: ${SECRETS[k].name}.` : text ? 'Nothing happened. The hints below may help.' : 'Type a code first.';
   }
-  const arrow = ch => uiButton(ch, () => { input.value = CODEX_ENTRY.text = (input.value + ch).slice(0, 16); input.focus(); }, 'cx-arrow',
-    { 'aria-label': 'Arrow ' + ch, 'data-key': 'cx-arrow-' + { '↑': 'up', '↓': 'down', '←': 'left', '→': 'right' }[ch] });
+  // The arrow buttons add their character without opening the on-screen keyboard: they never take the focus (the
+  // mousedown is cancelled), and they only move the caret when the box is already being typed in.
+  const arrow = ch => uiButton(ch, () => {
+    const typing = document.activeElement === input, len = input.value.length;
+    const at = typing && input.selectionStart != null ? input.selectionStart : len, to = typing && input.selectionEnd != null ? input.selectionEnd : len;
+    input.value = CODEX_ENTRY.text = (input.value.slice(0, at) + ch + input.value.slice(to)).slice(0, 16);
+    if (typing) { const pos = Math.min(at + 1, input.value.length); input.setSelectionRange(pos, pos); }
+  }, 'cx-arrow', { 'aria-label': 'Arrow ' + ch, 'data-key': 'cx-arrow-' + { '↑': 'up', '↓': 'down', '←': 'left', '→': 'right' }[ch], onmousedown: e => e.preventDefault() });
   return el('section', { class: 'set-group cx-entry' }, el('h3', { text: 'Enter a code' }),
     el('div', { class: 'cx-row' }, input, el('div', { class: 'cx-arrows' }, ['↑', '↓', '←', '→'].map(arrow)), uiButton('Try code', tryCode, 'go', { 'data-key': 'cx-try' })),
     status);
@@ -215,10 +221,9 @@ function codexEntries(tab) {
 }
 // A weapon shows its own drawing (the loadout's icon), an arena a swatch of its own sky; everything else keeps its emoji.
 function codexIcon(e) {
-  if (e.weapon && WEAPONS[e.weapon]) {
-    const c = uiCanvas(64, 34, 'cx-weapon');
-    try { drawWeaponIcon(c, e.weapon, '#9fb4ff'); } catch (err) { return el('span', { class: 'tr-icon', text: e.icon }); }
-    return c;
+  if (e.weapon && WEAPONS[e.weapon]) {   // the drawn tiles are cached and reused across rebuilds (uiTile, 96-ui-loadout)
+    try { return uiTile(`cx|${e.weapon}`, 64, 34, 'cx-weapon', c => drawWeaponIcon(c, e.weapon, '#9fb4ff')); }
+    catch (err) { return el('span', { class: 'tr-icon', text: e.icon }); }
   }
   if (e.palette && e.palette.sky1) return el('span', { class: 'tr-icon cx-swatch', style: { background: `linear-gradient(${e.palette.sky1}, ${e.palette.sky2 || e.palette.sky1} 70%, ${e.palette.ground || e.palette.sky2})`, borderColor: e.palette.line || '' } });
   return el('span', { class: 'tr-icon', text: e.icon });

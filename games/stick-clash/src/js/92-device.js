@@ -9,6 +9,8 @@
 //   embedded viewer refuses; a screen wake lock while a fight plays (SETTINGS.wakeLock).
 // - #soundbar: a gamepad can start a match without the tap or key browsers need before sound may play; a tappable
 //   strip says so until the first real gesture.
+// - No page zoom: iOS ignores user-scalable=no, so Safari's gesture events are cancelled (outside text fields) and a
+//   pinch step's visualViewport resize is ignored (the arena canvas is not reallocated per step).
 
 const DEVICE_DEFAULTS = { touchMode: 'auto', wakeLock: true };
 for (const k in DEVICE_DEFAULTS) {
@@ -25,6 +27,8 @@ const DEVICE = {
   wake: null,        // the screen wake lock sentinel ('pending' while requested)
   fsFailAt: 0,       // when fullscreen was last refused (the promise and the error event both report it)
   lw: 0, lh: 0,      // window size at the last layout
+  relayouts: 0,      // layouts run (tests watch it)
+  pinchSkips: 0,     // visual-viewport resizes ignored because the page was pinched (scale ≠ 1)
 };
 
 // ---------- touch mode ----------
@@ -43,8 +47,10 @@ function inputSeen(kind) {
 }
 const deviceTyping = t => !!t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '') || t.isContentEditable === true);
 const DEVICE_MODIFIERS = new Set(['ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight', 'CapsLock']);
+// An Apple Pencil taps like a finger: both are the touch screen.
+const devicePointerIsTouch = e => e.pointerType === 'touch' || e.pointerType === 'pen';
 // Capture phase, so a touch on the hidden controls' canvas and a key inside a menu both count.
-addEventListener('pointerdown', e => { if (e.pointerType === 'touch') inputSeen('touch'); }, { capture: true, passive: true });
+addEventListener('pointerdown', e => { if (devicePointerIsTouch(e)) inputSeen('touch'); }, { capture: true, passive: true });
 addEventListener('keydown', e => {
   // Typing a name or pasting a save code is not "playing on a keyboard": the controls stay for the touch player.
   if (e.code === 'Escape' || DEVICE_MODIFIERS.has(e.code) || deviceTyping(e.target)) return;
@@ -56,6 +62,7 @@ on('pad', () => inputSeen('pad'));
 // Split View / Stage Manager: a narrow window on a wide screen is not a turned phone, so no rotate card (and no pause).
 const deviceFullWidth = () => !screen.width || innerWidth >= screen.width - 40;
 function deviceRelayout() {
+  DEVICE.relayouts++;
   if (innerWidth !== DEVICE.lw || innerHeight !== DEVICE.lh) { DEVICE.lw = innerWidth; DEVICE.lh = innerHeight; resize(); }
   updateRotatePrompt();
   touchLayout();
@@ -66,7 +73,27 @@ function deviceRelayoutSoon() {
   setTimeout(() => { try { deviceRelayout(); } catch (e) { report(e, 'relayout'); } }, 350);
 }
 if (screen.orientation && typeof screen.orientation.addEventListener === 'function') screen.orientation.addEventListener('change', deviceRelayoutSoon);
-if (window.visualViewport) visualViewport.addEventListener('resize', deviceRelayoutSoon);
+// Every step of a pinch also fires a visual-viewport resize: with the page zoomed (scale ≠ 1) nothing is laid out again.
+function deviceViewportResized() {
+  const vv = window.visualViewport;
+  if (vv && typeof vv.scale === 'number' && Math.abs(vv.scale - 1) > .01) { DEVICE.pinchSkips++; return; }
+  deviceRelayoutSoon();
+}
+if (window.visualViewport) visualViewport.addEventListener('resize', deviceViewportResized);
+
+// ---------- no page zoom ----------
+// iOS ignores user-scalable=no: a two-finger pinch over a menu zooms the whole page. Safari's gesture events can still
+// be cancelled (92-device.css adds touch-action for the rest); a focused text field keeps its zoom for accessibility.
+const DEVICE_PINCH_EVENTS = ['gesturestart', 'gesturechange', 'gestureend'];
+const DEVICE_TEXT_INPUTS = /^(text|search|email|url|tel|password|number)$/;
+// A field the player types in (not a slider, switch or select): zooming in to read it is fine.
+function deviceTextField(t) {
+  if (!t) return false;
+  if (t.tagName === 'TEXTAREA' || t.isContentEditable === true) return true;
+  return t.tagName === 'INPUT' && DEVICE_TEXT_INPUTS.test((t.getAttribute('type') || 'text').toLowerCase());
+}
+function devicePinchGuard(e) { if (!deviceTextField(document.activeElement)) e.preventDefault(); }
+for (const ev of DEVICE_PINCH_EVENTS) document.addEventListener(ev, devicePinchGuard, { passive: false });
 
 // ---------- fullscreen ----------
 const fullscreenAvailable = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
@@ -110,6 +137,7 @@ for (const ev of ['fullscreenerror', 'webkitfullscreenerror']) document.addEvent
 
 // ---------- wake lock ----------
 // Keeps the screen on while a fight plays (a pad or a slow one-button match may go seconds without a touch).
+const wakeLockAvailable = () => !!(navigator.wakeLock && typeof navigator.wakeLock.request === 'function');
 function wakeLockUpdate() {
   const want = G_STATE.state === 'play' && SETTINGS.wakeLock !== false && !document.hidden && !G_STATE.sim;
   const api = navigator.wakeLock;
@@ -159,8 +187,10 @@ function deviceSettingsExtras(node) {
     const h = touch.querySelector('h3');
     const mode = segField('Touch controls', [['auto', 'Auto'], ['on', 'Always'], ['off', 'Off']], S.touchMode, v => { setSetting('touchMode', v); updateTouchUI(); });
     const hint = el('small', { class: 'hint', text: 'Auto shows the stick and buttons on a touch screen and hides them while you use a keyboard or gamepad.' });
-    const wake = toggleField('Keep screen awake', S.wakeLock !== false, v => { setSetting('wakeLock', v); wakeLockUpdate(); }, 'Stops the screen dimming during a fight.');
-    if (h) h.after(mode, hint, wake); else touch.prepend(mode, hint, wake);
+    const extras = [mode, hint];
+    // No toggle for a lock this browser cannot take (iPad Safari before 16.4, some embedded viewers).
+    if (wakeLockAvailable()) extras.push(toggleField('Keep screen awake', S.wakeLock !== false, v => { setSetting('wakeLock', v); wakeLockUpdate(); }, 'Stops the screen dimming during a fight.'));
+    if (h) h.after(...extras); else touch.prepend(...extras);
     if (fullscreenAvailable()) { const links = touch.querySelector('.access-links'); if (links) links.prepend(fullscreenButton()); }
   }
   for (const g of groups) {
@@ -193,5 +223,5 @@ on('boot', () => {
       return node;
     };
   }
-  if (window.SC) { DEVICE.touchWanted = touchWanted; window.SC.device = DEVICE; }
+  if (window.SC) { DEVICE.touchWanted = touchWanted; DEVICE.pinchEvents = DEVICE_PINCH_EVENTS; DEVICE.wakeLockAvailable = wakeLockAvailable; window.SC.device = DEVICE; }
 });

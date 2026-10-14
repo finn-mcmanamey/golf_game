@@ -13,6 +13,11 @@
 @media (orientation: portrait) {
   #touch .tpause { bottom: auto; top: max(12px, env(safe-area-inset-top)); }
 }
+/* Portrait iPads: iPadOS's multitasking "..." handle hangs at the top centre, so the button moves down and left of it
+   (the HUD's cards start lower on a tablet, so there is room; phones keep the spot above their cards). */
+@media (orientation: portrait) and (min-width: 700px) {
+  #touch .tpause { top: calc(env(safe-area-inset-top) + 34px); left: 38%; }
+}
 
 /* "Turn your device" card (90-input.js shows it on portrait touch screens during a fight). */
 #rotate { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: #05060d; }

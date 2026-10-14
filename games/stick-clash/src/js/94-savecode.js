@@ -2,6 +2,7 @@
 // copyable code: JSON { v, t, k: { key: raw } } → deflate (CompressionStream, when the browser has it) → base64url,
 // written as SC<version><z|p>.<data>.<fnv-1a checksum of the JSON>. Importing checks the code, previews what will
 // change and asks for a confirm (no window.confirm: embedded viewers block it), then replaces the saves and reloads.
+// A browser without DecompressionStream (iPadOS 16.0–16.3) unpacks 'z' codes with the small inflater at the end.
 
 const SAVE_CODE_V = 1, SAVE_KEY_PREFIX = 'stickclash';
 const SAVE_NAMES = { settings: 'Settings', profile: 'Coins, unlocks & stats', prog: 'Progress track', tasks: 'Quests', presets: 'Fighter presets',
@@ -43,9 +44,8 @@ async function readSaveCode(text) {
   const m = String(text).replace(/\s+/g, '').match(/^SC(\d+)([zp])\.([A-Za-z0-9_-]+)\.([0-9a-f]{8})$/);
   if (!m) throw new Error('That isn’t a Stick Clash code. Copy the whole code, from SC to the end.');
   if (+m[1] > SAVE_CODE_V) throw new Error('This code comes from a newer version of the game.');
-  if (m[2] === 'z' && typeof DecompressionStream !== 'function') throw new Error('This browser can’t unpack compressed codes. Try another browser.');
   let json;
-  try { const bytes = fromB64u(m[3]); json = new TextDecoder().decode(m[2] === 'z' ? await codecPipe(bytes, DecompressionStream) : bytes); }
+  try { const bytes = fromB64u(m[3]); json = new TextDecoder().decode(m[2] === 'z' ? await saveUnzip(bytes) : bytes); }
   catch (e) { throw new Error('The code is damaged or cut short.'); }
   if (fnv1a(json) !== m[4]) throw new Error('The code is damaged or cut short (checksum mismatch).');
   const data = JSON.parse(json), keys = data && data.k;
@@ -123,3 +123,126 @@ function transferScreen() {   // registered at boot by 93-pads
   return sheet('Transfer progress', el('div', {}, el('p', { class: 'xfer-msg', role: 'status', text: XFER.msg }), body),
     [el('button', { class: 'go', onclick: () => { XFER.preview = null; XFER.msg = ''; XFER.code = ''; XFER.input = ''; uiSfx('click'); goBack(); } }, 'Done')]);
 }
+
+// ---------- unpacking without DecompressionStream ----------
+// CompressionStream('deflate') writes a zlib stream (RFC 1950: a 2-byte header, raw deflate, an Adler-32 trailer).
+async function saveUnzip(bytes) {
+  if (typeof DecompressionStream === 'function') return codecPipe(bytes, DecompressionStream);
+  return inflateZlib(bytes);
+}
+function inflateZlib(bytes) {
+  if (bytes.length < 6 || (bytes[0] & 15) !== 8 || (bytes[1] & 32) || ((bytes[0] << 8) | bytes[1]) % 31) throw new Error('not a zlib stream');
+  return inflateRaw(bytes.subarray(2, bytes.length - 4));   // the trailer's checksum is not needed: the code carries its own
+}
+
+// A small RFC 1951 inflater (after zlib's "puff"): stored, fixed-Huffman and dynamic-Huffman blocks. Bits are read
+// least-significant first; Huffman codes are decoded one bit at a time from canonical code-length counts.
+// Lengths (3..258) and distances (1..32768) are a base plus extra bits; each base follows from the extra-bit counts.
+const INF_LEN_EXTRA = Array.from({ length: 29 }, (_, i) => (i < 8 || i === 28 ? 0 : (i - 4) >> 2));
+const INF_DIST_EXTRA = Array.from({ length: 30 }, (_, i) => (i < 4 ? 0 : (i - 2) >> 1));
+const infBases = (extra, first) => extra.map((_, i) => extra.slice(0, i).reduce((b, e) => b + (1 << e), first));
+const INF_LEN_BASE = infBases(INF_LEN_EXTRA, 3).map((b, i) => (i === 28 ? 258 : b));
+const INF_DIST_BASE = infBases(INF_DIST_EXTRA, 1);
+const INF_CODE_ORDER = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
+const INF_MAX_OUT = 16 << 20;   // saves are a few KB: a pasted "code" that unpacks past this is refused, not obeyed
+let INF_FIXED = null;           // the fixed-Huffman tables, built on first use
+
+function infFail(why) { throw new Error('inflate: ' + why); }
+// The reader: input bytes, a bit buffer and the growing output.
+const infState = src => ({ src, pos: 0, buf: 0, cnt: 0, out: new Uint8Array(Math.max(1024, src.length * 4)), len: 0 });
+// The next n bits, least significant first.
+function infBits(s, n) {
+  while (s.cnt < n) {
+    if (s.pos >= s.src.length) infFail('unexpected end');
+    s.buf |= s.src[s.pos++] << s.cnt; s.cnt += 8;
+  }
+  const v = s.buf & ((1 << n) - 1);
+  s.buf >>>= n; s.cnt -= n;
+  return v;
+}
+function infPut(s, byte) {
+  if (s.len === s.out.length) {
+    if (s.len >= INF_MAX_OUT) infFail('too big');
+    const grown = new Uint8Array(s.out.length * 2); grown.set(s.out); s.out = grown;
+  }
+  s.out[s.len++] = byte;
+}
+
+// A canonical Huffman code from its code lengths: how many codes of each length, and the symbols in code order.
+function inflateTable(lengths) {
+  const count = new Uint16Array(16), offs = new Uint16Array(16), symbol = new Uint16Array(lengths.length);
+  for (const l of lengths) count[l]++;
+  count[0] = 0;
+  for (let i = 1; i < 16; i++) offs[i] = offs[i - 1] + count[i - 1];
+  lengths.forEach((l, sym) => { if (l) symbol[offs[l]++] = sym; });
+  return { count, symbol };
+}
+// One symbol: the codes of one length are consecutive numbers, so a bit at a time finds the length and the symbol.
+function infDecode(s, h) {
+  let code = 0, first = 0, index = 0;
+  for (let len = 1; len < 16; len++) {
+    code |= infBits(s, 1);
+    const n = h.count[len];
+    if (code - first < n) return h.symbol[index + code - first];
+    index += n; first = (first + n) << 1; code <<= 1;
+  }
+  return infFail('bad code');
+}
+
+// A stored block: skip to the byte boundary, then a length, its complement and that many raw bytes.
+function infStored(s) {
+  s.buf = 0; s.cnt = 0;   // only the current byte's leftover bits are ever buffered here
+  const src = s.src, p = s.pos;
+  if (p + 4 > src.length) infFail('unexpected end');
+  const len = src[p] | (src[p + 1] << 8), nlen = src[p + 2] | (src[p + 3] << 8);
+  if (len !== (~nlen & 0xffff) || p + 4 + len > src.length) infFail('bad stored block');
+  for (let i = 0; i < len; i++) infPut(s, src[p + 4 + i]);
+  s.pos = p + 4 + len;
+}
+function infFixedTables() {
+  if (!INF_FIXED) INF_FIXED = { lit: inflateTable(Array.from({ length: 288 }, (_, i) => (i < 144 ? 8 : i < 256 ? 9 : i < 280 ? 7 : 8))),
+    dist: inflateTable(new Array(30).fill(5)) };
+  return INF_FIXED;
+}
+// A dynamic block starts with its own codes: a code for the code lengths, then the run-length coded lengths.
+function infDynamicTables(s) {
+  const nlit = infBits(s, 5) + 257, ndist = infBits(s, 5) + 1, ncode = infBits(s, 4) + 4, order = new Array(19).fill(0);
+  for (let i = 0; i < ncode; i++) order[INF_CODE_ORDER[i]] = infBits(s, 3);
+  const lengthCode = inflateTable(order), lens = [];
+  while (lens.length < nlit + ndist) {
+    const sym = infDecode(s, lengthCode);
+    if (sym < 16) { lens.push(sym); continue; }
+    if (sym === 16 && !lens.length) infFail('repeat with no length');
+    const [value, times] = sym === 16 ? [lens[lens.length - 1], 3 + infBits(s, 2)] : sym === 17 ? [0, 3 + infBits(s, 3)] : [0, 11 + infBits(s, 7)];
+    for (let k = 0; k < times; k++) lens.push(value);
+  }
+  if (lens.length > nlit + ndist) infFail('too many lengths');
+  return { lit: inflateTable(lens.slice(0, nlit)), dist: inflateTable(lens.slice(nlit)) };
+}
+// Literal bytes and (length, distance) copies of earlier output, until the end-of-block symbol.
+function infCodes(s, { lit, dist }) {
+  for (let sym = infDecode(s, lit); sym !== 256; sym = infDecode(s, lit)) {
+    if (sym < 256) { infPut(s, sym); continue; }
+    const li = sym - 257;
+    if (li >= 29) infFail('bad length');
+    const len = INF_LEN_BASE[li] + infBits(s, INF_LEN_EXTRA[li]), di = infDecode(s, dist);
+    if (di >= 30) infFail('bad distance');
+    const back = INF_DIST_BASE[di] + infBits(s, INF_DIST_EXTRA[di]);
+    if (back > s.len) infFail('distance too far back');
+    for (let k = 0; k < len; k++) infPut(s, s.out[s.len - back]);
+  }
+}
+function inflateRaw(src) {
+  const s = infState(src);
+  let last = 0;
+  do {
+    last = infBits(s, 1);
+    const type = infBits(s, 2);
+    if (type === 0) infStored(s);
+    else if (type === 3) infFail('bad block type');
+    else infCodes(s, type === 1 ? infFixedTables() : infDynamicTables(s));
+  } while (!last);
+  return s.out.subarray(0, s.len);
+}
+
+on('boot', () => { if (window.SC) window.SC.savecode = { make: makeSaveCode, read: readSaveCode, unzip: saveUnzip, inflate: inflateZlib, inflateRaw }; });

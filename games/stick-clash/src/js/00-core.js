@@ -2,7 +2,7 @@
 // Everything here is plain data and functions; no DOM access at load time.
 
 const W = 1280, H = 720, DT = 1 / 120;      // logical arena size and fixed physics step
-const VERSION = '3.1.0';
+const VERSION = '3.2.0';
 const TAU = Math.PI * 2;
 // One neon colour per fighter slot (up to MAX_FIGHTERS); the first four are the classic player colours.
 const DEFAULT_COLORS = ['#2ee6ff', '#ff8a2e', '#9dff5a', '#ff5ad1', '#ffd84a', '#b98cff', '#7dffcf', '#ff4a6a'];
@@ -134,6 +134,20 @@ const store = {
 };
 // A finite number from anything (else the fallback).
 const numOr = (v, fallback = 0) => typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+
+// Unsaved changes (a dirty profile, codex counters) are written by flushSaves(). 99-main calls it on pagehide and on
+// visibilitychange -> hidden, because iOS Safari suspends or kills a backgrounded tab without ever firing pagehide.
+// Slices register what they hold with onFlush(fn); every fn checks its own dirty flag, so a second call saves nothing.
+const SAVE_FLUSHERS = [];
+function onFlush(fn) { SAVE_FLUSHERS.push(fn); }
+function flushSaves() { for (const fn of SAVE_FLUSHERS) { try { fn(); } catch (e) { report(e, 'flushSaves'); } } }
+
+// Player-facing hints say "Tap" instead of "Press" while the on-screen controls are in use (92-device decides from
+// the latest input; before it loads, 90-input's coarse-pointer check).
+function touchUI() {
+  if (typeof touchWanted === 'function') return !!touchWanted();
+  return typeof IS_TOUCH !== 'undefined' && !!IS_TOUCH;
+}
 
 // ---------- event bus ----------
 // Events: matchStart(cfg) roundStart(round) roundEnd(winnerTeam, reason) matchOver(result) state(now, before)
@@ -294,8 +308,12 @@ function poly(ctx, pts, fill, stroke, lw = 2) {
   if (fill) { ctx.fillStyle = fill; ctx.fill(); }
   if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); }
 }
-// Neon glow for whatever is drawn inside fn.
+// Neon glow for whatever is drawn inside fn. Canvas shadows are slow on Safari, so the quality tier scales every glow
+// through GLOW_SCALE (85-render sets it from the settings: High 1, Medium .5, Low 0 = no shadow drawn at all).
+let GLOW_SCALE = 1;
 function glow(ctx, color, blur, fn) {
-  ctx.save(); ctx.shadowColor = color; ctx.shadowBlur = blur;
+  const b = blur * GLOW_SCALE;
+  ctx.save();
+  if (b > 0) { ctx.shadowColor = color; ctx.shadowBlur = b; } else ctx.shadowBlur = 0;
   try { fn(); } finally { ctx.restore(); }
 }

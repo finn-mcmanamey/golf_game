@@ -4,8 +4,9 @@
 // The Highlights screen (title menu) replays a clip through the kill-cam player and can export it as a video: the
 // replay plays on screen while each finished frame (bloom included) is copied to a fixed 1280x720 canvas that
 // MediaRecorder records via captureStream (MP4 where the browser encodes it, else WebM), with the game's sound when
-// WebAudio is running. Without MediaRecorder (iOS Safari inside some viewers) the frames become a 640x360 15 fps
-// GIF (89-gif). hlDeliver hands the file over: Share…, Download and a preview to long-press.
+// WebAudio is running. Without MediaRecorder (iOS Safari inside some viewers), or when canvas capture or the recorder
+// throws (then for the rest of the session), the frames become a 640x360 15 fps GIF (89-gif). hlDeliver hands the
+// file over: Share…, Download and a preview to long-press.
 
 const HL_KEEP = 5;
 const HL = { clips: [], pending: [], lastAmt: new WeakMap(), best: store.getArr('highlights').filter(h => h && typeof h.title === 'string' && Number.isFinite(h.score) && Array.isArray(h.tags)), playing: null, rec: null,
@@ -101,10 +102,10 @@ function hlMime() {
 }
 const hlExt = mime => (/mp4/.test(mime || '') ? 'mp4' : 'webm');
 const hlExportName = mime => `stick-clash-highlight-${Date.now()}.${hlExt(mime)}`;
-// 'video': MediaRecorder on the canvas stream; 'gif': no recorder or no video format, frames are encoded in JS;
-// 'none': a recorder with nothing to feed it (no captureStream).
+// 'video': MediaRecorder on the canvas stream; 'gif': no recorder or no video format (or the video route already
+// failed this session: HL.noCapture), frames are encoded in JS; 'none': a recorder with nothing to feed it (no captureStream).
 function hlExportHow() {
-  if (typeof MediaRecorder === 'undefined' || !hlMime()) return 'gif';
+  if (HL.noCapture || typeof MediaRecorder === 'undefined' || !hlMime()) return 'gif';
   return HTMLCanvasElement.prototype.captureStream ? 'video' : 'none';
 }
 function hlExportSupport() { return hlExportHow() === 'none' ? 'This browser cannot capture the game canvas as video.' : ''; }
@@ -120,19 +121,42 @@ function hlExport(clip, how = hlExportHow()) {
   }
   const canvas = document.createElement('canvas');
   canvas.width = 1280; canvas.height = 720;
-  const stream = canvas.captureStream(30), mime = hlMime(), chunks = [];
-  const audio = hlAudioTrack();
-  if (audio) stream.addTrack(audio.track);
-  let rec;
-  try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4e6 }); }
-  catch (e) { HL.lastExport = { error: e.message }; fxModal('Video export failed', el('p', { text: e.message })); return false; }
-  rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
-  rec.onstop = () => hlExportDone(new Blob(chunks, { type: mime.split(';')[0] }), audio);
+  const mime = hlMime(), chunks = [];
+  let stream, rec, audio = null;
+  // captureStream, the recorder and start can all throw where the API exists but can't take this canvas (some WebKit
+  // builds, embedded viewers): the GIF route then makes the clip instead. The recorder starts before the replay so a
+  // failure here never leaves a replay running without one.
+  try {
+    stream = canvas.captureStream(30);
+    audio = hlAudioTrack();
+    if (audio) stream.addTrack(audio.track);
+    rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4e6 });
+    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = () => hlExportDone(new Blob(chunks, { type: mime.split(';')[0] }), audio);
+    rec.start(250);
+  } catch (e) {
+    hlAudioDrop(audio);
+    return hlExportFallback(clip, e);
+  }
   HL.rec = { canvas, g: canvas.getContext('2d'), rec, mime, frames: 0, lastAt: 0 };
-  if (!hlPlay(clip, () => { if (rec.state !== 'inactive') rec.stop(); HL.rec = null; })) { HL.rec = null; return false; }
-  rec.start(250);
+  if (!hlPlay(clip, () => { if (rec.state !== 'inactive') rec.stop(); HL.rec = null; })) {
+    HL.rec = null; rec.onstop = null;
+    try { rec.stop(); } catch (e) { /* already inactive */ }
+    hlAudioDrop(audio);
+    return false;
+  }
   return true;
 }
+// The video route broke in this browser: remember it for the session (the Highlights buttons then offer GIFs) and
+// make the GIF right away; the delivery dialog says why it is a GIF (hlDeliver reads HL.fallbackWhy).
+function hlExportFallback(clip, err) {
+  HL.noCapture = true;
+  HL.fallbackWhy = err && err.message ? err.message : 'video capture failed';
+  const started = hlExportGif(clip);
+  if (!started) HL.fallbackWhy = '';
+  return started;
+}
+function hlAudioDrop(audio) { if (audio) try { MASTER.disconnect(audio.node); } catch (e) { /* already gone */ } }
 
 // The GIF path: the replay plays on screen, 15 frames a second (at most 90, 6 s) are scaled to 640x360 and encoded as
 // they come (89-gif), so the file is ready the moment the replay ends.
@@ -184,9 +208,10 @@ function hlRecordFrame() {
 }
 
 function hlExportDone(blob, audio) {
-  if (audio) try { MASTER.disconnect(audio.node); } catch (e) { /* already gone */ }
+  hlAudioDrop(audio);
   HL.lastExport = { size: blob.size, type: blob.type };
-  if (!blob.size) return fxModal('Export failed', el('p', { text: 'The recording came out empty. Try again with the tab in front.' }));
+  if (HL.fallbackWhy) Object.assign(HL.lastExport, { fallback: 'gif', why: HL.fallbackWhy });
+  if (!blob.size) { HL.fallbackWhy = ''; return fxModal('Export failed', el('p', { text: 'The recording came out empty. Try again with the tab in front.' })); }
   const gif = blob.type === 'image/gif';
   hlDeliver(blob, gif ? `stick-clash-highlight-${Date.now()}.gif` : hlExportName(blob.type), gif ? 'gif' : 'video');
 }
@@ -202,7 +227,10 @@ function hlDeliver(blob, name, kind) {
   try { file = new File([blob], name, { type: blob.type }); } catch (e) { /* no File constructor */ }
   let canShare = false;
   try { canShare = !!(file && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) { canShare = false; }
-  const size = `${(blob.size / 1024).toFixed(0)} KB ${hlKindName(blob, kind)}. `;
+  // A GIF that stands in for a failed video export says why (once).
+  const why = kind === 'gif' && HL.fallbackWhy ? 'Video capture is not available in this browser, so this is a GIF. ' : '';
+  HL.fallbackWhy = '';
+  const size = `${why}${(blob.size / 1024).toFixed(0)} KB ${hlKindName(blob, kind)}. `;
   const hint = el('p', { class: 'hint', text: size + (canShare ? 'Share… sends it to Photos, Files, Messages or another app.'
     : 'If no download started (some embedded viewers block downloads), right-click or long-press the preview and save it.') });
   const preview = kind === 'video' ? el('video', { src: url, controls: true, loop: true, playsinline: true, class: 'fx-preview' })

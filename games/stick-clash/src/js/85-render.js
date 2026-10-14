@@ -8,9 +8,10 @@ const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 // least camera zoom that keeps the view inside the arena; hudK = extra HUD scale so its text stays readable; hudY = top
 // of the HUD (canvas px). On a landscape screen the viewport is the letterboxed 16:9 arena (hv = H, zMin = 1).
 // band = the letterbox strip above the viewport (canvas px, 0 in portrait); hudH = the HUD block's height; hudOver =
-// how much of it still overlaps the top of the viewport (0 when the band is tall enough, as on a 12.9" iPad).
+// how much of it still overlaps the top of the viewport (0 when the band is tall enough, as on a 12.9" iPad);
+// inset = the top safe-area inset (canvas px): the status bar of a home-screen app, which the HUD stays below.
 const VIEW = { s: 1, ox: 0, oy: 0, dpr: 1, vx: 0, vy: 0, vw: W, vh: H, cx: W / 2, cy: H / 2, hv: H, top: 0, zMin: 1, hudK: 1, hudW: W, hudY: 0,
-  band: 0, hudH: 0, hudOver: 0 };
+  band: 0, hudH: 0, hudOver: 0, inset: 0 };
 const VIEW_HUD_CSS = .72;      // smallest on-screen (CSS px) scale for HUD text: 15px HUD text stays ~11px
 const CAM = { x: W / 2, y: H / 2, z: 1, fx: 0, fy: 0, focusT: 0, follow: store.getBool('camera', true), maxZoom: 1.24,
   punch: 0 };   // punch: brief extra zoom on heavy hits (set by 87-juice, decays here)
@@ -19,12 +20,30 @@ let BANNER = null;
 // The frame cost grows with pixels (sky gradients, glows, vignettes), and the arena is a fixed 1280x720 drawing, so
 // the backing store is capped at about 2.3 megapixels and CSS scales it up on big or high-DPI screens.
 const MAX_CANVAS_PIXELS = 2.3e6;
+
+// A home-screen (standalone) app on iOS has the status bar laid over the page. A hidden probe measures
+// env(safe-area-inset-top) in CSS px (0 in a browser tab or an embedded viewer) so the HUD can start below the bar.
+// Tests stub it by setting #safe-probe's padding-top.
+let SAFE_PROBE = null;
+function safeInsetTop() {
+  if (typeof document === 'undefined' || !document.body) return 0;
+  if (!SAFE_PROBE) {
+    SAFE_PROBE = document.createElement('div');
+    SAFE_PROBE.id = 'safe-probe';
+    SAFE_PROBE.setAttribute('aria-hidden', 'true');
+    SAFE_PROBE.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top)';
+    document.body.append(SAFE_PROBE);
+  }
+  return Math.max(0, parseFloat(getComputedStyle(SAFE_PROBE).paddingTop) || 0);
+}
+
 function resize() {
   const css = Math.max(1, innerWidth * innerHeight);
   const dpr = Math.max(.5, Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(MAX_CANVAS_PIXELS / css)));
   cv.width = Math.round(innerWidth * dpr); cv.height = Math.round(innerHeight * dpr);
   cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
   VIEW.dpr = dpr;
+  VIEW.inset = Math.round(safeInsetTop() * dpr);
   // Portrait (after "Play in portrait anyway"): a 16:9 strip would leave fighters tiny, so the viewport fills the
   // width and is taller (up to ~square, between the HUD band and the thumb buttons); the camera zooms in to fill it.
   const portrait = cv.height > cv.width, s = portrait ? cv.width / W : Math.min(cv.width / W, cv.height / H);
@@ -48,14 +67,29 @@ function hudBlockPx() {
 // Where the HUD sits: in the letterbox band above the arena when there is one (4:3 iPads), else overlapping the top
 // of the viewport by hudOver px (16:9 screens), where the camera keeps fighters below it (updateCamera).
 function hudLayout() {
-  const portrait = cv.height > cv.width;
-  VIEW.band = portrait ? 0 : VIEW.vy;
+  const portrait = cv.height > cv.width, inset = VIEW.inset || 0;   // the status bar's strip (standalone mode) is off limits
+  VIEW.band = portrait ? 0 : Math.max(0, VIEW.vy - inset);
   VIEW.hudH = hudBlockPx();
-  VIEW.hudY = portrait ? Math.round(cv.height * .075) : Math.max(0, VIEW.vy - VIEW.hudH);
-  VIEW.hudOver = portrait ? 0 : Math.max(0, VIEW.hudH - VIEW.vy);
+  VIEW.hudY = portrait ? Math.round(cv.height * .075) + inset : Math.max(inset, VIEW.vy - VIEW.hudH);
+  VIEW.hudOver = portrait ? 0 : Math.max(0, VIEW.hudY + VIEW.hudH - VIEW.vy);
 }
 on('roundStart', hudLayout);   // the number of cards (and so the block height) can change between matches
 resize();
+
+// ---------- glow scale (Safari draws canvas shadows slowly) ----------
+// The quality tier sets GLOW_SCALE for every glow() in the game: High 1, Medium .5, Low 0 (no shadows at all).
+// 84-quality applies a tier through SETTINGS.particles, so Auto and Custom mixes follow that choice as well.
+const GLOW_BY_LEVEL = { high: 1, medium: .5, low: 0 };
+function glowApply() {
+  const S = typeof SETTINGS === 'object' && SETTINGS ? SETTINGS : {};
+  const level = GLOW_BY_LEVEL[S.quality] != null ? S.quality : S.particles;
+  GLOW_SCALE = GLOW_BY_LEVEL[level] ?? 1;
+}
+on('boot', () => {
+  const glowBaseApply = applySettings;   // 75's declaration is reassignable (84-postfx and 92-access wrap it the same way)
+  applySettings = function () { glowBaseApply(); glowApply(); };
+  glowApply();
+});
 
 // ---------- camera ----------
 function focusCamera(x, y, seconds = 1.1) { CAM.fx = x; CAM.fy = y; CAM.focusT = seconds; }
@@ -200,7 +234,7 @@ function drawHazard(c2, hz, m, t) {
 function drawOrbs() {
   for (const o of ORB_LIST) {
     const y = o.y + Math.sin(o.t * 3) * 6, fade = o.t > 11 ? (Math.sin(o.t * 20) > 0 ? 1 : .3) : 1, c = o.def.color;
-    ctx.save(); ctx.globalAlpha = fade; ctx.shadowColor = c; ctx.shadowBlur = 24;
+    ctx.save(); ctx.globalAlpha = fade; ctx.shadowColor = c; ctx.shadowBlur = 24 * GLOW_SCALE;
     circle(ctx, o.x, y, 18, 'rgba(10,10,25,.85)', c, 3);
     ctx.shadowBlur = 0; ctx.fillStyle = c; ctx.font = `20px ${FONT_DISPLAY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(o.def.icon, o.x, y + 1);
@@ -339,6 +373,7 @@ function hatReach(key) {
   try {
     const c = document.createElement('canvas'); c.width = c.height = 160;
     const g = c.getContext('2d'), r = HEAD_R;
+    if (!g) return HAT_REACH[key];                  // WebKit hands back null when canvas memory runs out
     g.translate(80, 120);
     HATS[key].draw(g, { id: 0, P: [{ x: 0, y: 0 }], face: 1 }, { r, face: 1, scale: 1, color: '#ffffff' });
     const d = g.getImageData(0, 0, 160, 160).data;
@@ -691,6 +726,7 @@ function drawScreenOverlays(dt) {
 }
 
 function render(dt) {
+  if (!ctx) return;                                // no 2D context (WebKit out of canvas memory): nothing to draw with
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = '#05060c'; ctx.fillRect(0, 0, cv.width, cv.height);
   if (!MAP) return;

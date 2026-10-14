@@ -213,6 +213,11 @@ function fxModal(title, ...body) { return fxModalActions(title, [{ text: 'OK', c
 function fxModalClose(wrap) { if (wrap && typeof wrap.fxClose === 'function') wrap.fxClose(); }
 
 // ---------- toolbar ----------
+// Touch screens get touch words and a tappable "Tools" chip (the collapsed bar); keyboards get the shortcuts.
+const photoTouch = () => (typeof DEVICE !== 'undefined' ? DEVICE.touch : IS_TOUCH);
+const photoHintText = () => (photoTouch()
+  ? 'Drag to pan · pinch to zoom · tap a filter or frame · Tools hides or shows this bar'
+  : 'Drag or WASD/arrows to pan · wheel or +/− to zoom · 1–5 filter · F frame · H HUD · Tab tools · Enter save · Esc back');
 function photoBar() {
   if (PHOTO.bar) return PHOTO.bar;
   const seg = (label, list, key, names) => el('div', { class: 'pb-seg' }, el('span', { text: label }), list.map(v => el('button', {
@@ -228,7 +233,9 @@ function photoBar() {
       el('button', { class: 'go', 'data-photo': 'save', onclick: photoSave }, '📷 Save PNG'),
       el('button', { 'data-photo': 'tools', onclick: photoToggleBar }, 'Hide tools'),
       el('button', { 'data-photo': 'exit', onclick: photoExit }, 'Done')),
-    el('p', { class: 'hint', text: 'Drag or WASD/arrows to pan · wheel or +/− to zoom · 1–5 filter · F frame · H HUD · Tab tools · Enter save · Esc back' }));
+    el('p', { class: 'hint', text: photoHintText() }),
+    // Only shown while the bar is collapsed (84-fx.css): a real button, so it is tappable and focusable.
+    el('button', { class: 'pb-show', 'data-photo': 'show', title: 'Tab', 'aria-label': 'Show tools', onclick: photoToggleBar }, photoTouch() ? '📷 Tools' : '📷 Tab · show tools'));
   PHOTO.bar.addEventListener('click', e => { if (PHOTO.bar.classList.contains('min') && e.target === PHOTO.bar) photoToggleBar(); });
   document.body.append(PHOTO.bar);
   photoSyncBar();
@@ -274,7 +281,8 @@ addEventListener('pointermove', e => {
   const prev = PHOTO_PTS.get(e.pointerId);
   if (!PHOTO.on || !prev) return;
   const k = VIEW.dpr / (VIEW.s * PHOTO.z), dx = e.clientX - prev.x, dy = e.clientY - prev.y;
-  const other = e.pointerType === 'touch' ? [...PHOTO_PTS].find(([id]) => id !== e.pointerId) : null;
+  const finger = e.pointerType === 'touch' || e.pointerType === 'pen';   // an Apple Pencil pinches with a finger too
+  const other = finger ? [...PHOTO_PTS].find(([id]) => id !== e.pointerId) : null;
   if (other) {   // pinch: the distance to the other finger sets the zoom, their midpoint drags the view
     const o = other[1], before = Math.hypot(prev.x - o.x, prev.y - o.y), after = Math.hypot(e.clientX - o.x, e.clientY - o.y);
     PHOTO.x -= dx / 2 * k; PHOTO.y -= dy / 2 * k;

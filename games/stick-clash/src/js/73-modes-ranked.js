@@ -57,15 +57,12 @@ defMode('ranked', {
   onStep() { if (G_STATE.lock <= 0) modeRun().live = true; },
   abandon() {
     const run = modeRun();
-    if (!run.live || run.settled || G_STATE.cfg.autopilot) return;
-    run.settled = true;
-    rankSettle(false, false);
+    if (run.live && !G_STATE.cfg.autopilot) rankSettleRun(run, false);
   },
   onRoundStart() { if (G_STATE.round === 1) banner(rankOf(modeRun().start).label.toUpperCase(), 'RANKED MATCH', 1.8, rankOf(modeRun().start).color); },
   hud(ctx) { rankDrawBar(ctx, rankOf(modeRun().start), W / 2, H - 26); },
   results() {
-    modeRun().settled = true;
-    const won = G_STATE.score[0] > G_STATE.score[1], r = rankSettle(won, !!G_STATE.cfg.autopilot);
+    const won = G_STATE.score[0] > G_STATE.score[1], r = rankSettleRun(modeRun(), won);
     const sign = r.delta >= 0 ? '+' : '';
     const title = r.up ? `RANK UP: ${r.after.label}!` : r.down ? `Down to ${r.after.label}` : won ? 'Ranked win!' : 'Ranked loss';
     return { title, color: r.up ? r.after.color : won ? '#9dff5a' : '#ff8a2e', won, rankUp: r.up,
@@ -74,6 +71,13 @@ defMode('ranked', {
         `Season: ${r.save.wins} W – ${r.save.losses} L · best ${rankOf(r.save.best).label}.`] };
   },
 });
+
+// Settles a match's run exactly once and keeps the result on it: an abandoned match (pagehide) whose page comes back
+// from the back/forward cache, or a results screen after an abandon, must never move the rank a second time.
+function rankSettleRun(run, won) {
+  if (!run.rankResult) run.rankResult = rankSettle(won, !!G_STATE.cfg.autopilot);
+  return run.rankResult;
+}
 
 // Applies a match result to the saved rank (unless it was an autopilot test) and reports what changed.
 function rankSettle(won, dryRun) {

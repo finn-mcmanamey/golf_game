@@ -39,9 +39,14 @@ function applyAudioMix() {
 
 function defSfx(name, fn) { SFX[name] = fn; }
 
+// The events browsers count as a user gesture (activation): the announcer's speech warm-up (82) and the benchmark
+// (84-quality) wait for one of these. pointerdown is not one on iOS, and Esc is excluded everywhere.
+const AUDIO_GESTURE_EVENTS = new Set(['pointerup', 'touchend', 'click', 'keydown']);
+const audioIsGesture = e => !!e && e.isTrusted && AUDIO_GESTURE_EVENTS.has(e.type) && !(e.type === 'keydown' && e.code === 'Escape');
+
 // Also the listener for every activation event, so resume() runs synchronously inside the gesture (iOS insists).
 function initAudio(e) {
-  if (e && e.isTrusted) emit('gesture', e);   // a real tap or key: the announcer (82) and the sound hint (92-device) listen
+  if (audioIsGesture(e)) emit('gesture', e);   // a real tap or key: the announcer (82), the benchmark (84) and 92-device listen
   if (AUDIO_FAILED) return;
   if (AC) { audioResume(); return; }
   try {

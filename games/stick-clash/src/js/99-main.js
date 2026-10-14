@@ -58,10 +58,29 @@ function startMatch(cfg) {
 }
 
 // Tells the running mode its match is being dropped before a result (modes may hook 'abandon').
+const matchLive = () => !!G_STATE.mode && !G_STATE.demo && G_STATE.state !== 'over';
 function abandonMatch() {
-  if (G_STATE.mode && !G_STATE.demo && G_STATE.state !== 'over') hook(G_STATE.mode, 'abandon');
+  if (matchLive()) hook(G_STATE.mode, 'abandon');
 }
-addEventListener('pagehide', abandonMatch);   // closing the tab mid-match too
+
+// Leaving the page mid-match (closing the tab, or iOS parking it in the back/forward cache) drops the match: Ranked
+// records a loss. A page restored from that cache must not play the dropped match on and settle it a second time, so
+// pageshow sends it back to the title menu instead. Unsaved progress is written on the way out, and also whenever the
+// tab is hidden: iOS Safari suspends or kills a backgrounded page without ever firing pagehide.
+let MATCH_ABANDONED = false;
+addEventListener('pagehide', () => {
+  if (matchLive()) MATCH_ABANDONED = true;
+  abandonMatch();
+  flushSaves();
+});
+addEventListener('pageshow', e => {
+  if (!e.persisted || !MATCH_ABANDONED) return;
+  MATCH_ABANDONED = false;
+  if (!matchLive()) return;                        // the results were already up, or the menu
+  if (typeof toast === 'function') toast('Match ended', 'The page was left in the middle of it.', '⏸', '#ff8a2e');
+  startMatch(demoConfig());                        // abandonMatch runs again inside; a settled Ranked run ignores it
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushSaves(); });
 
 // A 'random' weapon or skill is rolled once per match, so the player keeps what they just learned between rounds.
 // Modes with rerollRandom: true (Weapon Roulette) roll again every round.

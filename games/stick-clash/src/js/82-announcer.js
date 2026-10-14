@@ -10,7 +10,10 @@ for (const k in ANN_DEFAULTS) {
   if (!(k in SETTINGS)) SETTINGS[k] = ANN_DEFAULTS[k];
 }
 
-const ANN = { log: [], last: 0, lastPrio: 0, synthAt: 0, waitFight: false, voice: undefined, bus: null, warmed: false };
+// warmed: speech has started once; fallback: it never did (or failed), so the synth voice speaks for the session;
+// warmTries: taps that tried to warm it up; warmAt: when the last try spoke; warmTimer: the start deadline.
+const ANN = { log: [], last: 0, lastPrio: 0, synthAt: 0, waitFight: false, voice: undefined, bus: null, warmed: false,
+  warmTries: 0, warmAt: -1e9, warmTimer: 0, fallback: false };
 const ANN_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
 // How the synth voice pronounces a line (rough phonetics: one vowel group = one syllable).
 const ANN_SAY = { 'K.O.!': 'kay oh', 'Double K.O.!': 'dub bul kay oh', 'Fight!': 'faait', 'Perfect!': 'per fect',
@@ -38,11 +41,12 @@ function announce(text, prio = 1) {
 }
 
 // 'voice' when speech works and is wanted, else 'synth' (which needs WebAudio), else 'none'.
+// Speech that never started after a real gesture (ANN.fallback, see annWarm) counts as not working for the session.
 function annMode() {
-  const speech = typeof speechSynthesis !== 'undefined' && typeof SpeechSynthesisUtterance !== 'undefined';
-  if (SETTINGS.announcer === 'voice' && speech) return 'voice';
+  if (SETTINGS.announcer === 'voice' && annSpeechApi() && !ANN.fallback) return 'voice';
   return AC ? 'synth' : 'none';
 }
+const annSpeechApi = () => typeof speechSynthesis !== 'undefined' && typeof SpeechSynthesisUtterance !== 'undefined';
 
 // Picks a low English voice once (the list loads late in some browsers, so it is re-checked until found).
 function annPickVoice() {
@@ -59,6 +63,8 @@ function annSpeak(text, cut) {
   if (v) u.voice = v;
   u.rate = .92; u.pitch = .15;                       // slow and low: the arcade robot
   u.volume = clamp(SETTINGS.annVol * AUDIO_MIX.master, 0, 1);
+  u.onstart = annWarmDone;                           // a real line that plays proves speech works here too
+  u.onerror = e => { if (annSpeechBroken(e)) ANN.fallback = true; };   // the next lines use the synth voice
   if (cut) speechSynthesis.cancel();
   speechSynthesis.speak(u);
 }
@@ -125,13 +131,46 @@ function annClick(bus, t, hiss) {
   audioVoice(s);
 }
 
-// Safari only starts speech from inside a user gesture: the first real tap or key speaks a silent utterance once,
-// so "Round one" (called from a timer later) is allowed. 80-audio emits 'gesture' from its activation listeners.
-function annWarm() {
-  if (ANN.warmed || SETTINGS.announcer !== 'voice') return;
-  if (typeof speechSynthesis === 'undefined' || typeof SpeechSynthesisUtterance === 'undefined') return;
+// Safari only starts speech from inside a user gesture: a real tap or key (80-audio emits 'gesture' from pointerup,
+// touchend, click and keydown only; pointerdown is not a gesture for speech on iOS) speaks a silent utterance, so
+// "Round one" (called from a timer later) is allowed. It is tried again on every gesture until the utterance's start
+// (or end) event shows speech really runs. If nothing started within ANN_WARM_MS of a sure gesture (a click, a touchend
+// or a non-modifier key: every browser counts those), or the engine reports a failure, speech counts as broken here
+// and the synth voice takes over for the session (annMode).
+const ANN_WARM_MS = 2000, ANN_WARM_TRIES = 3, ANN_TAP_MS = 400;
+const annSureGesture = e => !e || e.type === 'click' || e.type === 'touchend' ||
+  (e.type === 'keydown' && !/^(Shift|Control|Alt|Meta|CapsLock|Fn)/.test(e.code || ''));
+// 'not-allowed': no gesture was seen; 'canceled' / 'interrupted': a newer line cut it off. Anything else is a failure.
+const annSpeechBroken = e => !!e && !['not-allowed', 'canceled', 'interrupted'].includes(e.error);
+function annWarm(e) {
+  if (ANN.warmed || ANN.fallback || SETTINGS.announcer !== 'voice' || !annSpeechApi()) return;
+  const now = annNow() * 1000;
+  if (now - ANN.warmAt > ANN_TAP_MS) ANN.warmTries++;   // pointerup, touchend and click of one tap are one try
+  ANN.warmAt = now;
+  try {
+    const u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0;
+    u.onstart = annWarmDone; u.onend = annWarmDone;
+    u.onerror = annWarmError;
+    speechSynthesis.speak(u);
+  } catch (err) { ANN.fallback = true; return; }
+  if (!ANN.warmTimer && annSureGesture(e)) ANN.warmTimer = setTimeout(annWarmDeadline, ANN_WARM_MS);
+}
+function annWarmDone() {
   ANN.warmed = true;
-  try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) { /* no speech */ }
+  clearTimeout(ANN.warmTimer); ANN.warmTimer = 0;
+}
+// No start within ANN_WARM_MS: an engine that is busy speaking works; one that stayed silent does not.
+function annWarmDeadline() {
+  ANN.warmTimer = 0;
+  if (ANN.warmed) return;
+  if (annSpeechApi() && speechSynthesis.speaking) annWarmDone(); else ANN.fallback = true;
+}
+function annWarmError(e) {
+  if (ANN.warmed || (e && (e.error === 'canceled' || e.error === 'interrupted'))) return;
+  clearTimeout(ANN.warmTimer); ANN.warmTimer = 0;
+  if (e && e.error === 'not-allowed' && ANN.warmTries < ANN_WARM_TRIES) return;   // the next tap tries again
+  ANN.fallback = true;
 }
 on('gesture', annWarm);
 
@@ -184,4 +223,4 @@ on('matchOver', () => {
   announce(humans.some(f => f.team === best) ? 'You win!' : 'You lose!', 3);
 });
 
-on('boot', () => { if (window.SC) window.SC.announcer = { log: ANN.log, say: announce, mode: annMode }; });
+on('boot', () => { if (window.SC) window.SC.announcer = { log: ANN.log, say: announce, mode: annMode, warm: annWarm, ANN }; });

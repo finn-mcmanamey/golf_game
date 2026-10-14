@@ -231,6 +231,7 @@ function kcScanlines(c2) {
   const p = document.createElement('canvas');
   p.width = 4; p.height = 4;
   const g = p.getContext('2d');
+  if (!g) return null;                             // WebKit hands back null when canvas memory runs out
   g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(0, 0, 4, 1);
   KC_SCANLINES = c2.createPattern(p, 'repeat');
   return KC_SCANLINES;
@@ -284,8 +285,10 @@ function kcDrawCaption(c2, y) {
     word(ko.ringout ? 'falls out of the arena' : 'is knocked out', '#ff4a6a', plain);
   }
   c2.textAlign = 'right'; c2.font = `600 14px ${FONT_BODY}`; c2.fillStyle = 'rgba(200,205,240,.6)';
-  if (KC.play.real > KC_SKIP_GRACE) c2.fillText('Press any key to skip', W - 36, y);
+  if (KC.play.real > KC_SKIP_GRACE) c2.fillText(kcSkipHint(), W - 36, y);
 }
+// The skip hint names the controls in use: a tap on a touch screen, a key elsewhere (pad buttons skip too).
+const kcSkipHint = () => (touchUI() ? 'Tap to skip' : 'Press any key to skip');
 
 // Test hooks: SC.killcam.state() and SC.killcam.skip().
 on('boot', () => {

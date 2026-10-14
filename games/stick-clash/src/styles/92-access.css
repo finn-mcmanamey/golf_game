@@ -1,21 +1,26 @@
 /* 92-access.css: touch stick + gesture zones + thumb arc (91-touch), join lobby and pad remap (93-pads), transfer
    screen (94-savecode) and the accessibility settings links. Button sizes and arc positions are set inline by
    touchLayout(); --to is the player's touch opacity and --sr the stick radius. */
-#touch .tzone { position: absolute; top: 14%; bottom: 0; pointer-events: auto; touch-action: none; }
-#touch .tzone-l { left: 0; width: 44%; }
+/* The zones keep 24 px (or the safe area, if wider) clear of the left edge and the bottom: a thumb starting there
+   would pull Safari's swipe-back or the Dock instead of moving the fighter. The stick's idle ring waits inside. */
+#touch { --tz-left: max(24px, env(safe-area-inset-left)); --tz-bottom: max(24px, env(safe-area-inset-bottom)); }
+#touch .tzone { position: absolute; top: 14%; bottom: var(--tz-bottom); pointer-events: auto; touch-action: none; }
+#touch .tzone-l { left: var(--tz-left); width: calc(44% - var(--tz-left)); }
 #touch .tzone-r { right: 0; width: 56%; }
-@media (orientation: portrait) { #touch .tzone-l { width: 40%; } #touch .tzone-r { width: 60%; } }
+@media (orientation: portrait) { #touch .tzone-l { width: calc(40% - var(--tz-left)); } #touch .tzone-r { width: 60%; } }
+/* Positioned by 91-touch in viewport coordinates (translate); the transform here only covers the moment before the
+   first layout. */
 #touch .tstick { position: absolute; left: 0; top: 0; width: calc(var(--sr, 56px) * 2); height: calc(var(--sr, 56px) * 2); border-radius: 50%;
   border: 2px solid rgba(170, 180, 255, .35); background: rgba(20, 22, 44, .22); pointer-events: none; opacity: calc(var(--to, .8) * .45);
-  transform: translate(max(28px, env(safe-area-inset-left)), calc(100vh - var(--sr, 56px) * 2 - 40px));
-  transform: translate(max(28px, env(safe-area-inset-left)), calc(100dvh - var(--sr, 56px) * 2 - 40px)); }   /* iOS: below the toolbar, not under it */
+  transform: translate(calc(var(--tz-left) + 4px), calc(100vh - var(--sr, 56px) * 2 - var(--tz-bottom) - 16px));
+  transform: translate(calc(var(--tz-left) + 4px), calc(100dvh - var(--sr, 56px) * 2 - var(--tz-bottom) - 16px)); }   /* iOS: below the toolbar, not under it */
 #touch .tstick.live { opacity: var(--to, .8); }
 #touch .tstick i { position: absolute; left: 50%; top: 50%; width: 46%; height: 46%; margin: -23% 0 0 -23%; border-radius: 50%;
   background: rgba(94, 242, 255, .5); border: 2px solid rgba(94, 242, 255, .85); box-shadow: 0 0 14px rgba(94, 242, 255, .5); }
 #touch .tarc { position: absolute; right: env(safe-area-inset-right); bottom: env(safe-area-inset-bottom); width: 0; height: 0; }
 #touch .tarc button { position: absolute; opacity: var(--to, .8); }
-#touch.one .tzone-l, #touch.one .tarc button:not([data-act="attack"]) { display: none; }
-#touch.one .tzone-r { left: 0; width: 100%; top: 0; }
+#touch.one .tzone-l, #touch.one .tstick, #touch.one .tarc button:not([data-act="attack"]) { display: none; }
+#touch.one .tzone-r { top: 0; left: var(--tz-left); right: 0; width: auto; }   /* one-button mode: the whole screen (inside the insets) is the button */
 #touch.one .tarc button[data-act="attack"] { pointer-events: none; }
 
 .join-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 12px; outline: none; }

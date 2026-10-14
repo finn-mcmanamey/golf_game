@@ -1,6 +1,9 @@
 // Checks for the v3.1 world and content work: the HUD in the letterbox band and the camera rising under it on 4:3
 // iPads, the sky fill above the arena, the Codex's secret-code entry, practice-speed rewards, the hand-written
 // codex lore, the asteroid's curved ground, CPU vines on the Jungle Temple and the "TOO BIG" grab label.
+// v3.2 (the iPad Safari audit): saves flushed when the tab is hidden, a Ranked match abandoned by pagehide and then
+// restored from the back/forward cache, GLOW_SCALE, the campaign map's canvas cap and dirty-flag redraws, the loadout
+// tile cache, the Codex arrows leaving the keyboard closed, the HUD's safe-area inset and touch wording.
 // Called by tools/smoke.cjs; also runs alone (`node tools/smoke-world.cjs`, after `node build.mjs`).
 const path = require('path');
 const fs = require('fs');
@@ -73,6 +76,26 @@ async function run(browser, { check, rows, SHOTS }) {
       });
       if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `ipad-void-${name}.png`) });
       return { ok: r.bad === 0 && r.n > 1000 && (r.over === 0 || r.camY < r.hh), note: JSON.stringify(r) };
+    });
+    // (18) The campaign map's canvas stays under 2.3 megapixels on a 2x iPad, and it only redraws when something on it
+    // changed: nothing over half a second of idling, then again once the walker sets off to a newly chosen node.
+    await step(`campaign canvas ${name}`, async () => {
+      await page.evaluate(() => {
+        window.__keepQuest = store.get('quest', null);
+        store.set('quest', { stars: { e1: 3 }, at: 'e1', seen: { e1: 1 }, tree: {} });   // e1 cleared: its next nodes are open
+        openScreen('campaign', 'menu');
+      });
+      await page.waitForTimeout(400);
+      const a = await page.evaluate(() => { const c = CAMP_UI.canvas; return { px: c.width * c.height, css: [c.clientWidth, c.clientHeight], draws: CAMP_UI.draws, walking: CAMP_UI.path.length, at: CAMP_UI.at }; });
+      await page.waitForTimeout(500);
+      const idle = await page.evaluate(() => CAMP_UI.draws);
+      await page.evaluate(() => campSelect(CAMP_BY_ID.e1.to[0]));   // the walker sets off: the map must redraw
+      await page.waitForTimeout(250);
+      const b = await page.evaluate(() => ({ draws: CAMP_UI.draws, moving: CAMP_UI.path.length > 0 || CAMP_UI.at !== 'e1' }));
+      if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `ipad-campaign-${name}.png`) });
+      await page.evaluate(() => { if (__keepQuest) store.set('quest', __keepQuest); else localStorage.removeItem(STORE_PREFIX + 'quest'); CAMP_UI.at = CAMP_UI.sel = null; CAMP_UI.path = []; openScreen('menu'); });
+      const r = Object.assign(a, { idle, after: b });
+      return { ok: a.px > 0 && a.px <= 2.3e6 && a.css[0] * a.css[1] * 4 > 2.3e6 && a.draws >= 1 && idle === a.draws && b.draws > idle && b.moving, note: JSON.stringify(r) };
     });
     await step(`no errors ${name}`, async () => ({ ok: !errors.length && !(await page.evaluate(() => SC.errors.length)), note: errors.join(' | ').slice(0, 300) }));
     await ctx.close();
@@ -206,6 +229,123 @@ async function run(browser, { check, rows, SHOTS }) {
       return out;
     });
     return { ok: r.label && !r.held && r.cd && r.scale === 1.7, note: JSON.stringify(r) };
+  });
+
+  // (19) iOS kills a backgrounded tab without a pagehide: hiding the tab must write every dirty store (profile coins,
+  // codex counters bumped mid-round) through flushSaves, and a second flush saves nothing.
+  await step('hidden tab flushes saves', async () => {
+    const r = await page.evaluate(() => {
+      const keep = { profile: JSON.stringify(PROFILE), codex: JSON.stringify(PROG.codex) };
+      const stored0 = store.get('profile', {}).coins, ko0 = ((store.get('prog', {}).codex || {}).w || {}).katana;
+      PROFILE.coins = (PROFILE.coins || 0) + 7; markProfile();
+      codexBump('w', 'katana', 2);                                   // a K.O. counter: saved at the round's end, or now
+      const dirtyBefore = profileDirty && progDirty;
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));
+      delete document.hidden; delete document.visibilityState;
+      const stored1 = store.get('profile', {}).coins, ko1 = store.get('prog', {}).codex.w.katana, want = PROFILE.coins, wantKo = PROG.codex.w.katana;
+      const dirtyAfter = profileDirty || progDirty;
+      flushSaves();                                                  // clean: nothing to write
+      Object.assign(PROFILE, JSON.parse(keep.profile)); saveProfile(); PROG.codex = JSON.parse(keep.codex); progSave();
+      return { stored0, stored1, want, ko0, ko1, wantKo, dirtyBefore, dirtyAfter, hiddenNow: document.hidden, state: SC.G.state };
+    });
+    return { ok: r.dirtyBefore && !r.dirtyAfter && r.stored1 === r.want && r.stored1 !== r.stored0 && JSON.stringify(r.ko1) === JSON.stringify(r.wantKo) && r.hiddenNow === false && r.state === 'menu', note: JSON.stringify(r) };
+  });
+
+  // (20) A Ranked match dropped by pagehide (a loss) whose page comes back from the back/forward cache: the match ends
+  // cleanly at the title menu and the rank moved exactly once.
+  await step('bfcache after a ranked abandon', async () => {
+    const r = await page.evaluate(() => {
+      const keep = store.get('ranked', null), before = rankLoad();
+      SC.start({ mode: 'ranked', map: 'dojo', weapons: ['blade', 'blade'], killcam: false });
+      SC.G.lock = 0; worldStep(DT);                                  // the first FIGHT! has begun: the match is on the record
+      const live = !!modeRun().live, autopilot = !!SC.G.cfg.autopilot, state0 = SC.G.state;
+      dispatchEvent(new Event('pagehide'));                          // iOS parks the page: the match counts as a loss
+      const hide = rankLoad(), state1 = SC.G.state;
+      abandonMatch();                                                // what startMatch does on the way back: no second settle
+      dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+      const show = rankLoad(), state2 = SC.G.state, demo = SC.G.demo, screen = UI.screen;
+      if (keep) store.set('ranked', keep); else localStorage.removeItem(STORE_PREFIX + 'ranked');
+      return { live, autopilot, state0, state1, state2, demo, screen, losses: [before.losses, hide.losses, show.losses], pts: [before.pts, hide.pts, show.pts] };
+    });
+    const once = r.losses[1] === r.losses[0] + 1 && r.losses[2] === r.losses[1] && r.pts[2] === r.pts[1];
+    return { ok: r.live && !r.autopilot && r.state0 === 'play' && r.state1 === 'play' && r.state2 === 'menu' && r.demo && r.screen === 'menu' && once, note: JSON.stringify(r) };
+  });
+
+  // (21) GLOW_SCALE: 0 leaves shadowBlur off inside glow(), .5 halves it, and the quality / particles settings set it.
+  await step('glow scale', async () => {
+    const r = await page.evaluate(() => {
+      const keep = { g: GLOW_SCALE, p: SETTINGS.particles, q: SETTINGS.quality };
+      let b0 = -1, bHalf = -1;
+      GLOW_SCALE = 0; glow(ctx, '#fff', 20, () => { b0 = ctx.shadowBlur; });
+      GLOW_SCALE = .5; glow(ctx, '#fff', 20, () => { bHalf = ctx.shadowBlur; });
+      const after = ctx.shadowBlur, levels = {};
+      SETTINGS.quality = 'custom';
+      for (const p of ['low', 'medium', 'high']) { SETTINGS.particles = p; applySettings(); levels[p] = GLOW_SCALE; }
+      SETTINGS.quality = 'low'; SETTINGS.particles = 'high'; applySettings();
+      const tierWins = GLOW_SCALE;
+      Object.assign(SETTINGS, { particles: keep.p, quality: keep.q }); applySettings();
+      return { b0, bHalf, after, levels, tierWins, restored: GLOW_SCALE === keep.g };
+    });
+    return { ok: r.b0 === 0 && r.bHalf === 10 && r.after === 0 && r.levels.low === 0 && r.levels.medium === .5 && r.levels.high === 1 && r.tierWins === 0 && r.restored, note: JSON.stringify(r) };
+  });
+
+  // (22) Loadout tiles come from a cache: rebuilding the screen hands back the very same canvas elements.
+  await step('loadout tile cache', async () => {
+    const r = await page.evaluate(() => {
+      MENU.mode = 'versus'; LO.tab = 'weapon'; LO.picker = 0; LO.cat = 'all'; openScreen('loadout', 'menu');
+      const wk = listOf(WEAPONS)[0].key, wSel = `[data-key="w-${wk}"] canvas`, a = document.querySelector(wSel), n0 = UI_TILES.size;
+      refreshScreen();
+      const b = document.querySelector(wSel), n1 = UI_TILES.size, bLive = !!b && b.isConnected;   // before the tab switch takes it out
+      LO.tab = 'style'; refreshScreen();
+      const hk = listOf(HATS)[1].key, hSel = `[data-key="hat-${hk}"] canvas`, h1 = document.querySelector(hSel);
+      refreshScreen();
+      const h2 = document.querySelector(hSel);
+      LO.tab = 'weapon'; openScreen('menu');
+      return { same: !!a && a === b, connected: bLive, n0, n1, weapons: listOf(WEAPONS).length, hats: !!h1 && h1 === h2 };
+    });
+    return { ok: r.same && r.connected && r.n1 === r.n0 && r.n0 >= r.weapons && r.hats, note: JSON.stringify(r) };
+  });
+
+  // (23) The Codex's arrow buttons add their character without focusing the input (no on-screen keyboard), and keep the
+  // caret when the box is already being typed in.
+  await step('codex arrows keep the keyboard closed', async () => {
+    await page.evaluate(() => { CODEX_TAB.tab = 'x'; CODEX_ENTRY.text = ''; openScreen('codex', 'menu'); });
+    await page.click('[data-key="cx-arrow-up"]');
+    const a = await page.evaluate(() => { const i = document.querySelector('[data-key="cx-code"]'); return { focused: document.activeElement === i, value: i.value, active: document.activeElement && document.activeElement.tagName }; });
+    await page.click('[data-key="cx-code"]');
+    await page.keyboard.type('AB');
+    await page.evaluate(() => document.querySelector('[data-key="cx-code"]').setSelectionRange(2, 2));   // caret between A and B
+    await page.click('[data-key="cx-arrow-left"]');
+    const b = await page.evaluate(() => { const i = document.querySelector('[data-key="cx-code"]'); return { focused: document.activeElement === i, value: i.value, caret: i.selectionStart, text: CODEX_ENTRY.text }; });
+    await page.evaluate(() => { CODEX_ENTRY.text = ''; openScreen('menu'); });
+    return { ok: !a.focused && a.value === '↑' && b.focused && b.value === '↑A←B' && b.caret === 3 && b.text === '↑A←B', note: JSON.stringify({ a, b }) };
+  });
+
+  // (24) The HUD starts below the top safe-area inset (the status bar of a home-screen app), read from the probe.
+  await step('HUD safe-area inset', async () => {
+    const r = await page.evaluate(() => {
+      const probe = document.getElementById('safe-probe'), before = { y: VIEW.hudY, inset: VIEW.inset, over: VIEW.hudOver };
+      probe.style.paddingTop = '30px'; resize();
+      const stub = { y: VIEW.hudY, inset: VIEW.inset, over: VIEW.hudOver, dpr: VIEW.dpr };
+      probe.style.paddingTop = 'env(safe-area-inset-top)'; resize();
+      return { probe: !!probe, before, stub, after: { y: VIEW.hudY, inset: VIEW.inset } };
+    });
+    const want = Math.round(30 * r.stub.dpr);
+    return { ok: r.probe && r.before.inset === 0 && r.stub.inset === want && r.stub.y - r.before.y === want && r.stub.over === r.before.over + want && r.after.y === r.before.y && r.after.inset === 0, note: JSON.stringify(r) };
+  });
+
+  // (25) Touch wording: the kill-cam's skip hint says "Tap" while the on-screen controls are in use.
+  await step('touch wording', async () => {
+    const r = await page.evaluate(() => {
+      const keep = SETTINGS.touchMode;
+      SETTINGS.touchMode = 'on'; const on = kcSkipHint(), onUI = touchUI();
+      SETTINGS.touchMode = 'off'; const off = kcSkipHint(), offUI = touchUI();
+      SETTINGS.touchMode = keep;
+      return { on, off, onUI, offUI };
+    });
+    return { ok: r.on === 'Tap to skip' && r.off === 'Press any key to skip' && r.onUI && !r.offUI, note: JSON.stringify(r) };
   });
 
   await step('no console errors', async () => ({ ok: !errors.length && !(await page.evaluate(() => SC.errors.length)), note: errors.join(' | ').slice(0, 300) }));

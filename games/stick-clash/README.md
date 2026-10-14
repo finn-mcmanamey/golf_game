@@ -401,6 +401,11 @@ preset for older devices. Highlights can be **shared** or exported as a **GIF** 
 typed into the **Codex's Secrets tab** (with arrow buttons), since a phone has no keyboard on the title screen. The
 `mobile/` folder holds an Expo app that wraps the game for iOS (see `mobile/README.md`).
 
+Your progress is saved whenever a round ends and whenever you switch away from the game, so swapping apps mid-fight
+loses nothing. One caveat when you play inside the claude.ai viewer on an iPhone or iPad: Safari keeps that page's
+saves in its own partitioned storage, which it may clear after 7 days without a visit. Open **Settings → Transfer
+progress** now and then and keep the code it gives you; pasting it back restores everything.
+
 ## Tips
 
 - Don't mash. Wind up, then swing *into* your foe while moving.

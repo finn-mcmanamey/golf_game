@@ -16,7 +16,9 @@ h4 { margin: 4px 0 0; font: 600 12px var(--body); letter-spacing: .1em; text-tra
 #menu.overlay { padding: 0; place-items: stretch;
   background: linear-gradient(90deg, rgba(4, 5, 12, .92) 0%, rgba(4, 5, 12, .7) 32%, rgba(4, 5, 12, .08) 62%, rgba(4, 5, 12, 0) 100%); }
 .title-wrap { height: 100%; overflow: auto; display: flex; align-items: safe center; padding: 24px clamp(16px, 6vw, 96px); }
-.title-col { width: min(430px, 100%); display: grid; gap: 16px; animation: pop-in .3s ease-out; }
+/* margin: auto centres the column where `safe center` is unknown (older WebKit) and still lets a short viewport start
+   at the top and scroll instead of clipping the logo. */
+.title-col { width: min(430px, 100%); display: grid; gap: 16px; animation: pop-in .3s ease-out; margin: auto 0; }
 .logo { font-size: clamp(56px, 8.5vw, 108px); line-height: .86; transform: skewX(-6deg); display: grid; }
 .logo .a { color: var(--p1); text-shadow: 0 0 22px rgba(46, 230, 255, .55), 4px 4px 0 rgba(46, 230, 255, .18); }
 .logo .b { color: var(--p2); text-shadow: 0 0 22px rgba(255, 138, 46, .55), 4px 4px 0 rgba(255, 138, 46, .18); margin-left: .5em; }

@@ -33,6 +33,7 @@ requestAnimationFrame(uiLiveLoop);
 // Clears and draws into a ui canvas with errors contained (a broken preview must never break the menu).
 function paintCanvas(c, fn, onError) {
   const g = c.getContext('2d'), { dpr } = c.ui;
+  if (!g) return;                                  // WebKit hands back null when canvas memory runs out: skip the drawing
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, c.ui.w, c.ui.h);
   g.save();
@@ -149,6 +150,7 @@ function iconMeasure(f, thick) {
   const n = ICON_SCRATCH.size, half = n / 2;
   const c = ICON_SCRATCH.c || (ICON_SCRATCH.c = Object.assign(document.createElement('canvas'), { width: n, height: n }));
   const g = c.getContext('2d', { willReadFrequently: true });
+  if (!g) return { x0: -40, y0: -20, x1: 40, y1: 20 };   // no context (WebKit out of canvas memory): a plain box
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, n, n);
   g.save(); g.translate(half, half);
   try { drawIconWeapons(g, f, thick); } catch (e) { report(e, 'weapon icon ' + f.wkey); }
@@ -161,6 +163,21 @@ function iconMeasure(f, thick) {
   }
   if (x1 < 0) return { x0: -40, y0: -20, x1: 40, y1: 20 };
   return { x0: x0 - half, y0: y0 - half, x1: x1 + 1 - half, y1: y1 + 1 - half };
+}
+// Drawn tiles (weapon icons, hat heads) are kept per key, colour, size and pixel ratio, and the same canvas element is
+// handed back on every rebuild: a tap on the loadout no longer redraws ~55 icons (and allocates their backing stores)
+// each time. The cache is emptied when it grows past UI_TILE_MAX entries (a few colour sets).
+const UI_TILES = new Map();
+const UI_TILE_MAX = 240;
+function uiTile(id, w, h, cls, draw) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1), key = `${id}|${w}x${h}|${dpr}`;
+  let c = UI_TILES.get(key);
+  if (c) return c;
+  if (UI_TILES.size >= UI_TILE_MAX) UI_TILES.clear();
+  c = uiCanvas(w, h, cls);
+  draw(c);
+  UI_TILES.set(key, c);
+  return c;
 }
 // A head wearing a hat, for hat tiles.
 function drawHatIcon(c, key, color) {
@@ -326,8 +343,7 @@ function weaponTab(i, lo) {
   const groups = (LO.cat === 'all' ? cats : [LO.cat]).map(c => el('section', { class: 'w-group' },
     el('h4', { text: `${CAT_ICONS[c] || ''} ${CAT_NAMES[c] || c}` }),
     el('div', { class: 'tile-grid' }, all.filter(w => w.cat === c).map(w => {
-      const c2 = uiCanvas(132, 54);
-      drawWeaponIcon(c2, w.key, lo.color);
+      const c2 = uiTile(`w|${w.key}|${lo.color}`, 132, 54, null, cnv => drawWeaponIcon(cnv, w.key, lo.color));
       return el('button', { class: 'tile w-tile' + (lo.weapon === w.key ? ' sel' : ''), 'data-key': 'w-' + w.key, title: w.desc, onclick: pick(w.key) },
         c2, el('span', { text: w.name }));
     }))));
@@ -359,8 +375,9 @@ function skillsTab(i, lo) {
   };
   // The tiles clamp descriptions to two lines; the info line shows the full text of the hovered or focused skill.
   const lastPick = SKILLS[sk[1]] || SKILLS[sk[0]];
-  const info = el('p', { class: 'sk-info', 'aria-live': 'polite' });
-  const showInfo = d => { info.replaceChildren(d ? el('b', { style: { color: d.color }, text: `${d.icon} ${d.name} · ${d.cd}s  ` }) : '', d ? d.desc : 'Hover or focus a skill to read all about it.'); };
+  const info = el('p', { class: 'sk-info', 'aria-live': 'polite' }), touch = touchUI();   // wording follows the controls in use
+  const idle = touch ? 'Tap a skill to read all about it.' : 'Hover or focus a skill to read all about it.';
+  const showInfo = d => { info.replaceChildren(d ? el('b', { style: { color: d.color }, text: `${d.icon} ${d.name} · ${d.cd}s  ` }) : '', d ? d.desc : idle); };
   showInfo(lastPick);
   const grid = el('div', { class: 'skill-grid' }, listOf(SKILLS).map(s => {
     const slot = sk.indexOf(s.key);
@@ -371,7 +388,7 @@ function skillsTab(i, lo) {
       el('span', { class: 'sk-cd', text: `${s.cd}s` }),
       slot >= 0 ? el('span', { class: 'sk-badge', text: String(slot + 1) }) : null);
   }));
-  return el('div', { class: 'tab-body' }, el('p', { class: 'hint', text: 'Choose two skills. Click a chosen skill again to drop it.' }), slots, info, grid);
+  return el('div', { class: 'tab-body' }, el('p', { class: 'hint', text: `Choose two skills. ${touch ? 'Tap' : 'Click'} a chosen skill again to drop it.` }), slots, info, grid);
 }
 
 // ---------- style tab (colour + hat) ----------
@@ -396,8 +413,8 @@ function styleTab(i, lo) {
 }
 
 function hatTile(h, lo) {
-  const owned = ownsHat(h.key), c = uiCanvas(84, 84), asking = LO.confirm === 'hat:' + h.key;
-  drawHatIcon(c, h.key, lo.color);
+  const owned = ownsHat(h.key), asking = LO.confirm === 'hat:' + h.key;
+  const c = uiTile(`hat|${h.key}|${lo.color}`, 84, 84, null, cnv => drawHatIcon(cnv, h.key, lo.color));
   const onclick = () => owned ? (lo.hat = h.key, saveMenu(), uiSfx('click'), refreshScreen())
     : tryBuy('hat', h.key, () => { lo.hat = h.key; saveMenu(); });
   return el('button', { class: 'tile hat-tile' + (lo.hat === h.key ? ' sel' : '') + (owned ? '' : ' locked') + (asking ? ' asking' : ''), 'data-key': 'hat-' + h.key, onclick },

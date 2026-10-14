@@ -10,6 +10,8 @@
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; overscroll-behavior: none; }   /* no rubber-band scroll or pull-to-refresh under the arena */
+html { -webkit-text-size-adjust: 100%; }                  /* iOS: no surprise text inflation after a rotation */
+img { -webkit-user-drag: none; }                          /* map thumbnails and icons are not things to drag off the page */
 [hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--body); overflow: hidden;
   -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
