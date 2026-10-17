@@ -135,7 +135,7 @@ async function testKillcamPhoto(browser, { check, rows, SHOTS }) {
   await page.evaluate(() => { startMatch({ mode: 'versus', map: 'spikepit' }); SC.G.lock = 0; for (const f of SC.F) if (f.ctrl === 'cpu') { f.ai.behave = 'idle'; f.ai.t = 1e9; } });
   await page.waitForTimeout(2200);
   await page.evaluate(() => { SC.G.score[0] = SC.G.winScore - 1; damage(SC.F[1], 999, { src: SC.F[0], kind: 'melee', nx: 1, ny: -.3 }); });
-  const played = await page.waitForFunction(() => KC.play && KC.play.clock > KC.play.ko.t + .15, null, { timeout: 9000 }).then(() => true).catch(() => false);
+  const played = await page.waitForFunction(() => KC.play && KC.play.clock > KC.play.ko.t + .15, null, { timeout: 15000 }).then(() => true).catch(() => false);
   const kc = await page.evaluate(() => ({ state: SC.G.state, style: SC.styles.ART.style.key }));
   await page.screenshot({ path: path.join(SHOTS, 'style-chalk-killcam.png') });
   await page.evaluate(() => SC.killcam.skip());

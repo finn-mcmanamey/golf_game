@@ -6,6 +6,7 @@
 // caps requestAnimationFrame at 30 fps in a cross-origin iframe until the first tap (and in Low Power Mode), which used
 // to lock iPads into Low. A capped clock is detected from the frame intervals (perfCapFps) and the tier is then judged
 // by render time alone; a Low measured under a cap is measured once more on a later launch.
+// It also runs the adaptive resolution (RES).
 
 const QUALITY_DEFAULTS = { quality: 'auto', fpsCounter: false };
 for (const k in QUALITY_DEFAULTS) {
@@ -23,7 +24,7 @@ const PERF_MIN_FRAMES = 20;   // a phase with fewer frames (hidden tab, stalled 
 const PERF_AUTO_DELAY = 1000;  // ms between a real gesture and an automatic run (the 30 fps iframe cap lifts on the tap)
 // last: the saved result { tier, fps, ms, fpsLow, msLow, capped, capFps, again, when, ua, ver }; samples: recent render
 // times (ms) for the live readout; gestureAt: the latest real tap or key; autoDone: the session's automatic run happened.
-const PERF = { on: false, samples: [], last: store.getObj('bench'), applying: false, job: null, fps: 0, ms: 0, win: { t0: 0, n: 0 },
+const PERF = { samples: [], last: store.getObj('bench'), applying: false, job: null, fps: 0, ms: 0, win: { t0: 0, n: 0 },
   gestureAt: 0, autoTimer: 0, autoDone: false, remeasure: false };
 
 // Called by the render wrap after every frame: a rolling half-second window feeds the readout and the FPS counter.
@@ -67,11 +68,10 @@ function perfRun(seconds = 2) {
   let resolve;
   const promise = new Promise(r => { resolve = r; });
   const job = { promise, resolve, seconds: clamp(+seconds || 2, .3, 10), phase: -1, phases: ['off', 'low', 'high'], res: {},
-    t0: performance.now(), keep: { bloom: SETTINGS.bloom, tier: BLOOM.tier }, hidden: false, modal: null, watchdog: 0,
+    t0: performance.now(), keep: { bloom: SETTINGS.bloom }, hidden: false, modal: null, watchdog: 0,
     again: PERF.remeasure };   // again: this run re-measures a Low that was taken under a frame cap (never twice)
   PERF.remeasure = false;
-  PERF.job = job; PERF.on = true;
-  BLOOM.tier = 0;   // measure the real cost of each level, not what the governor left behind
+  PERF.job = job;   // resStep pins step 3, full bloom
   job.modal = fxModalActions('Measuring performance…', [],
     el('p', { class: 'hint', text: 'A busy brawl runs for a moment to pick the effects level for this device. Change it any time in Settings → Performance.' }));
   startMatch({ mode: 'ffa', fighters: 8, demo: true, map: 'caldera', diff: 'hard' });
@@ -124,9 +124,9 @@ function perfTier(s, capped) {
 function perfFinish(aborted, quiet) {
   const job = PERF.job;
   if (!job) return;
-  PERF.job = null; PERF.on = false;
+  PERF.job = null;
   clearTimeout(job.watchdog);
-  SETTINGS.bloom = job.keep.bloom; BLOOM.tier = job.keep.tier;
+  SETTINGS.bloom = job.keep.bloom;
   const stats = {};
   let ok = !aborted && !job.hidden, capFps = 0;
   for (const q of job.phases) {
@@ -173,7 +173,6 @@ function perfAutoBlock(now = performance.now()) {
   if (navigator.webdriver) return 'test automation';
   return '';
 }
-const perfCanAutoRun = now => !perfAutoBlock(now);
 // Every real gesture (80-audio: pointerup, touchend, click, keydown) re-arms the one-second timer.
 function perfGesture() {
   PERF.gestureAt = performance.now();
@@ -195,9 +194,74 @@ function perfApplyTier(tier) {
   if (!t) return;
   PERF.applying = true;
   try { Object.assign(SETTINGS, t); saveSettings(); } finally { PERF.applying = false; }
+  resTier(tier);
 }
 
-// ---------- Settings → Performance ----------
+// ---------- adaptive resolution (ARCHITECTURE.md, "Rendering") ----------
+// Steps 0-3: a 6, 4, 3, 2.3 MP canvas, capped at the screen's own pixels (3 = the old cap); 4-6: bloom High -> Low,
+// half rate, off; 7: 1.6 MP. Tests keep the old canvas (auto off, at 3).
+const RES_PX = [6e6, 4e6, 3e6, 2.3e6, 2.3e6, 2.3e6, 2.3e6, 1.6e6], RES_TIERS = { high: [0, 0], medium: [1, 0], low: [3, 3] };   // [start, ceiling]
+const RES = { auto: !navigator.webdriver, shown: 3, avg: 0, clock: 0 };
+const resDpr = s => Math.max(.5, Math.min(window.devicePixelRatio || 1, s > 2 ? 2 : 9, Math.sqrt(RES_PX[s] / Math.max(1, innerWidth * innerHeight))));
+const resTierAt = s => Math.max(RES.floor, clamp(s - 3, 0, 3));   // bloom tier (84-postfx)
+// The nearest step from s toward d (+1 down, -1 up) that changes something on this screen; -1: none.
+function resNext(s, d) {
+  const q = { off: 3, low: 1 }[artNow().bloom ? SETTINGS.bloom : 'off'] || 0, key = n => resDpr(n).toFixed(3) + Math.max(q, resTierAt(n));
+  for (let n = s + d; n >= RES.ceil && n < 8; n += d) if (key(n) !== key(s)) return n;
+  return -1;
+}
+// Pins: the benchmark at 3 (the tiers keep their meaning), photos at 0 (sharper PNGs), highlight exports at 3.
+const resStep = () => PERF.job ? 3 : G_STATE.state === 'photo' ? 0 : typeof HL === 'object' && HL.rec ? 3 : RES.force ?? (RES.auto ? RES.step : 3);
+// Each render starts here: a resized canvas is blank until redrawn.
+function resApply() {
+  const s = resStep();
+  BLOOM.tier = PERF.job ? 0 : resTierAt(s);
+  if (s !== RES.shown) { RES.shown = s; resize(1); }
+}
+// A tier, or switching the governor on, starts over.
+function resTier(tier) {
+  const [step, ceil] = RES_TIERS[tier] || [1, 0];
+  Object.assign(RES, { tier, step, ceil, floor: 0, slow: 0, fast: 0, wait: 4e3, hold: 0, held: 0, dive: null, climb: null, failed: -1 });
+  ART.k = 0;   // the backdrop cache follows the ceiling (59-styles)
+}
+resTier(PERF_TIERS[SETTINGS.quality] ? SETTINGS.quality : PERF.last.tier);
+const resSet = s => Object.assign(RES, { step: s, cool: 30, slow: 0, fast: 0 });
+document.addEventListener('visibilitychange', () => { RES.cool = 30; });
+
+// A frame of real play (gap ms). iOS snaps to 60/30 fps: a step with no gain carries on to its group's end (3, 6).
+function resSample(gap) {
+  const R = RES, d = R.dive, c = R.climb, grp = s => (s > 3) + (s > 6);
+  R.clock += gap;
+  if (R.cool > 0) { R.cool--; R.avg = gap; return; }   // a new canvas or a returning tab settles first
+  R.avg += (gap - R.avg) * .05;
+  if (d) {
+    d.sum += gap;
+    if (++d.n < 60) return;
+    const n = resNext(R.step, 1);
+    if (d.sum / 60 < d.gap * .88) R.dive = null;   // 12% faster: stays
+    else if (n >= 0 && grp(n) === grp(R.step)) { d.n = d.sum = 0; resSet(n); }
+    else { R.dive = null; R.hold = R.held++ ? Infinity : R.clock + 3e4; resSet(d.from); }
+    return;
+  }
+  R.slow = R.avg > 20 ? R.slow + 1 : 0;
+  R.fast = R.avg < 17.5 ? R.fast + gap : 0;
+  if (R.fast >= R.wait) {   // up a pixel step; bloom stays down
+    R.floor = resTierAt(R.step); R.fast = 0;
+    const n = resNext(R.step, -1);
+    if (n >= 0) { R.climb = { from: R.step, to: n, at: R.clock }; resSet(n); }
+  } else if (R.slow >= 45) {
+    const n = resNext(R.step, 1);
+    if (n > 3 && n < 7 && R.slow < 150) return;
+    R.slow = 0; R.climb = null;
+    if (c && R.clock - c.at < 3e3) {
+      R.wait = Math.min(R.wait * 2, 6e4);
+      if (R.failed === c.to) R.ceil = c.from;
+      R.failed = c.to; resSet(c.from);
+    } else if (n >= 0 && R.clock >= R.hold) { R.dive = { from: R.step, gap: R.avg, n: 0, sum: 0 }; resSet(n); }
+  }
+}
+
+// ---------- Settings → Performance (the group is added by 87-juice) ----------
 const perfNowText = () => `Now: ${PERF.fps} fps · ${PERF.ms.toFixed(1)} ms`;
 function perfLastText() {
   const L = PERF.last;
@@ -228,10 +292,14 @@ function perfSettingsGroup() {
 on('boot', () => {
   // Every frame goes through here: timing for the readout and the benchmark, then the optional counter.
   const perfBase = render;   // 85-render's declaration: reassignable, like applySettings in 84-postfx
+  // A resolution step lands first; shadowBlur counts canvas pixels, so glows scale by VIEW.glowK.
   render = function (dt) {
-    const t0 = performance.now();
-    perfBase(dt);
+    resApply();
+    const t0 = performance.now(), g = GLOW_SCALE;
+    GLOW_SCALE *= VIEW.glowK;
+    try { perfBase(dt); } finally { GLOW_SCALE = g; }
     perfSample(performance.now() - t0, dt);
+    if (RES.auto && dt > 0 && G_STATE.state === 'play' && !G_STATE.demo) resSample(dt * 1000);
     if (SETTINGS.fpsCounter) perfDrawFps(ctx);
   };
   // A hand change to one of the tier settings means the player wants their own mix.
@@ -240,15 +308,10 @@ on('boot', () => {
     perfBaseSet(key, value);
     if (!PERF.applying && (key === 'bloom' || key === 'particles' || key === 'lights') && SETTINGS.quality !== 'custom') { SETTINGS.quality = 'custom'; saveSettings(); }
   };
-  if (typeof SCREENS !== 'undefined' && typeof SCREENS.settings === 'function') {
-    const build = SCREENS.settings;
-    SCREENS.settings = () => {
-      const node = build();
-      try { node.querySelector('.set-grid').append(perfSettingsGroup()); } catch (e) { report(e, 'perf settings'); }
-      return node;
-    };
-  }
   if (window.SC) window.SC.perf = { run: perfRun, PERF, tiers: PERF_TIERS, apply: perfApplyTier, tier: perfTier, cap: perfCapFps,
-    canAutoRun: perfCanAutoRun, autoBlock: perfAutoBlock, stale: perfStale };
+    canAutoRun: now => !perfAutoBlock(now), autoBlock: perfAutoBlock, stale: perfStale },
+  // Tests: force a step (null: the governor's again), switch the governor on or feed it frame gaps.
+  window.SC.res = { RES, force(s) { RES.force = s; }, auto(on) { RES.auto = !!on; resTier(RES.tier); },
+    feed(gap, n = 1) { for (let k = 0; k < n; k++) resSample(gap); return RES.step; } };
   // The automatic run waits for a real gesture (perfGesture): before one, Safari's frame cap would measure 'low'.
 });

@@ -11,16 +11,16 @@ let ctx = CTX_MAIN;   // the world pass points it at the art style's proxy (59-s
 // band = the letterbox strip above the viewport (canvas px, 0 in portrait); hudH = the HUD block's height; hudOver =
 // how much of it still overlaps the top of the viewport (0 when the band is tall enough, as on a 12.9" iPad);
 // inset = the top safe-area inset (canvas px): the status bar of a home-screen app, which the HUD stays below.
+// glowK = dpr / step-3 dpr (glows scale by it); w3 x h3 = the step-3 canvas size (fixed-size effect buffers).
 const VIEW = { s: 1, ox: 0, oy: 0, dpr: 1, vx: 0, vy: 0, vw: W, vh: H, cx: W / 2, cy: H / 2, hv: H, top: 0, zMin: 1, hudK: 1, hudW: W, hudY: 0,
-  band: 0, hudH: 0, hudOver: 0, inset: 0 };
+  band: 0, hudH: 0, hudOver: 0, inset: 0, glowK: 1, w3: W, h3: H };
 const VIEW_HUD_CSS = .72;      // smallest on-screen (CSS px) scale for HUD text: 15px HUD text stays ~11px
 const CAM = { x: W / 2, y: H / 2, z: 1, fx: 0, fy: 0, focusT: 0, follow: store.getBool('camera', true), maxZoom: 1.24,
   punch: 0 };   // punch: brief extra zoom on heavy hits (set by 87-juice, decays here)
 let BANNER = null;
 
 // The frame cost grows with pixels (sky gradients, glows, vignettes), and the arena is a fixed 1280x720 drawing, so
-// the backing store is capped at about 2.3 megapixels and CSS scales it up on big or high-DPI screens.
-const MAX_CANVAS_PIXELS = 2.3e6;
+// the backing store's size comes from the resolution step (84-quality; 3 = the old ~2.3 MP cap) and CSS scales it up.
 
 // A home-screen (standalone) app on iOS has the status bar laid over the page. A hidden probe measures
 // env(safe-area-inset-top) in CSS px (0 in a browser tab or an embedded viewer) so the HUD can start below the bar.
@@ -38,12 +38,12 @@ function safeInsetTop() {
   return Math.max(0, parseFloat(getComputedStyle(SAFE_PROBE).paddingTop) || 0);
 }
 
-function resize() {
-  const css = Math.max(1, innerWidth * innerHeight);
-  const dpr = Math.max(.5, Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(MAX_CANVAS_PIXELS / css)));
+// step 1: a resolution step (84-quality). A real resize also rebuilds the backdrop cache, once, 400 ms after the last.
+function resize(step) {
+  const dpr = resDpr(RES.shown), d3 = resDpr(3);
   cv.width = Math.round(innerWidth * dpr); cv.height = Math.round(innerHeight * dpr);
   cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
-  VIEW.dpr = dpr;
+  Object.assign(VIEW, { dpr, glowK: dpr / d3, w3: Math.round(innerWidth * d3), h3: Math.round(innerHeight * d3) });
   VIEW.inset = Math.round(safeInsetTop() * dpr);
   // Portrait (after "Play in portrait anyway"): a 16:9 strip would leave fighters tiny, so the viewport fills the
   // width and is taller (up to ~square, between the HUD band and the thumb buttons); the camera zooms in to fill it.
@@ -55,15 +55,21 @@ function resize() {
   VIEW.hv = vh / s; VIEW.top = (VIEW.vy - VIEW.oy) / s; VIEW.zMin = Math.max(1, VIEW.hv / H);
   VIEW.hudK = clamp(VIEW_HUD_CSS / (s / dpr), 1, 2.2); VIEW.hudW = W / VIEW.hudK;   // HUD layout width (centred)
   hudLayout();
+  RES.cool = 30;   // let the new canvas settle
+  if (step !== 1 && ART.k) { clearTimeout(ART.kt); ART.kt = setTimeout(() => { ART.k = 0; }, 400); }   // not at boot: no cache yet
 }
 addEventListener('resize', resize);
 
 // Height of the HUD block in canvas px (the card rows plus the round label), with the row maths drawHUD uses.
 function hudBlockPx() {
-  const n = Math.max(2, F.filter(f => !f.summon).length), Wh = VIEW.hudW, two = n === 2, compact = n > 4;
+  const g = hudGrid(Math.max(2, F.filter(f => !f.summon).length));
+  return (g.rows * g.rowH + 36) * VIEW.s * VIEW.hudK;
+}
+// Up to 4 fighters: full cards (2 per row on narrow screens). 5-8: compact cards, 4 per row (2 on narrow screens).
+function hudGrid(n) {
+  const Wh = VIEW.hudW, two = n === 2, compact = n > 4;
   const perRow = two ? 2 : compact ? clamp(Math.floor((Wh - 44) / 200), 2, 4) : clamp(Math.floor((Wh - 44) / 256), 1, n);
-  const rows = two ? 1 : Math.ceil(n / perRow), rowH = compact ? 46 : 84;
-  return (rows * rowH + 36) * VIEW.s * VIEW.hudK;
+  return { two, compact, perRow, rows: two ? 1 : Math.ceil(n / perRow), rowH: compact ? 46 : 84 };
 }
 // Where the HUD sits: in the letterbox band above the arena when there is one (4:3 iPads), else overlapping the top
 // of the viewport by hudOver px (16:9 screens), where the camera keeps fighters below it (updateCamera).
@@ -139,11 +145,6 @@ function setWorldTransform(sx = 0, sy = 0) {
   ctx.setTransform(s * L.q, 0, 0, s * L.q, Math.round((e - VIEW.vx) * L.q), Math.round((f - VIEW.vy) * L.q));   // pixel layer (59)
 }
 function setArenaTransform() { ctx.setTransform(VIEW.s, 0, 0, VIEW.s, VIEW.ox, VIEW.oy); }
-// CSS pixel -> arena coordinates through the current camera (for pointer features).
-function screenToWorld(px, py) {
-  const s = VIEW.s * CAM.z, X = px * VIEW.dpr, Y = py * VIEW.dpr;
-  return { x: (X - VIEW.cx) / s + CAM.x, y: (Y - VIEW.cy) / s + CAM.y };
-}
 
 // ---------- map drawing ----------
 function glowLine(c2, x1, y1, x2, y2, color, width = 3) {
@@ -152,57 +153,44 @@ function glowLine(c2, x1, y1, x2, y2, color, width = 3) {
   glow(c2, color, 12, () => lineXY(c2, x1, y1, x2, y2, color, width));
 }
 
-// Dark ground with a perspective grid and a neon edge (v1's look), reusable by any map.
+// Dark ground (fill: hex) with a perspective grid fading toward the horizon and a neon edge (v1's look), for any map.
 function drawGridFloor(c2, floor, fill, grid, edge) {
+  const fade = c2.createLinearGradient(0, floor, 0, H);
   c2.fillStyle = fill; c2.fillRect(0, floor, W, H - floor + 300);
   c2.strokeStyle = grid; c2.lineWidth = 1; c2.beginPath();
   for (let k = -12; k <= 12; k++) { c2.moveTo(W / 2 + k * 30, floor); c2.lineTo(W / 2 + k * 130, H); }
   for (let k = 1; k < 5; k++) { const y = floor + (H - floor) * (k / 5) ** 1.6; c2.moveTo(0, y); c2.lineTo(W, y); }
   c2.stroke();
+  fade.addColorStop(0, rgba(fill, .9)); fade.addColorStop(.5, rgba(fill, 0));
+  c2.fillStyle = fade; c2.fillRect(0, floor, W, (H - floor) / 2);
   glowLine(c2, 0, floor, W, floor, edge);
 }
 
 // A ready-made backdrop from the map palette (used when a map has no drawBg).
 function drawStdBackground(c2, m, t) {
-  const p = m.palette, bottom = m.floor ?? H, sky = c2.createLinearGradient(0, 0, 0, bottom);
-  sky.addColorStop(0, p.sky1); sky.addColorStop(1, p.sky2);
-  c2.fillStyle = sky; c2.fillRect(0, -H, W, 2 * H);   // a screen above the arena too: the camera may rise past its top
-  c2.fillStyle = 'rgba(255,255,255,.5)';
-  for (let k = 0; k < 40; k++) {
-    const x = (k * 233) % W, y = (k * 97) % (bottom * .6);
-    c2.globalAlpha = .25 + .25 * Math.sin(t * 1.3 + k);
-    c2.fillRect(x, y, 2, 2);
-  }
-  c2.globalAlpha = 1;
-  if (m.floor != null) drawGridFloor(c2, m.floor, p.ground, rgba(p.line, .2), p.line);
-  else {   // bottomless: a faint glow rising out of the void
-    const v = c2.createLinearGradient(0, H - 160, 0, H);
-    v.addColorStop(0, rgba(p.accent, 0)); v.addColorStop(1, rgba(p.accent, .18));
-    c2.fillStyle = v; c2.fillRect(0, H - 160, W, 160);
-  }
+  const p = m.palette, fl = m.floor;
+  mapSky(c2, fl ?? H, [p.sky1, p.sky2]);
+  mapStars(c2, t, 40, (fl ?? H) * .6);
+  if (fl != null) drawGridFloor(c2, fl, p.ground, rgba(p.line, .2), p.line);
+  else mapGlow(c2, W / 2, H, W / 2, p.accent, .18);   // bottomless: a faint glow rising out of the void
 }
 
 function drawSolid(c2, s, m, t) {
   if (s.draw) return hook(s, 'draw', c2, s, t);
   if (m.drawSolid) return hook(m, 'drawSolid', c2, s, t);
-  const p = m.palette;
-  c2.fillStyle = p.solid;
-  c2.fillRect(s.x, s.y, s.w, s.oneWay ? Math.min(s.h, 14) : s.h);
-  if (!s.oneWay) { c2.strokeStyle = rgba(p.line, .45); c2.lineWidth = 2; c2.strokeRect(s.x + 1, s.y + 1, s.w - 2, s.h - 2); }
-  glowLine(c2, s.x, s.y, s.x + s.w, s.y, s.move ? p.accent : p.line);
-  if (s.move) for (const x of [s.x + 10, s.x + s.w - 10]) circle(c2, x, s.y + 7, 3, p.accent);
+  mapSlab(c2, s, m.palette.solid, s.move ? m.palette.accent : m.palette.line);   // the shared slab (60-maps)
 }
 
-// Liquid pool with a wavy glowing surface and bubbles (lava, acid...).
+// Liquid pool (lava, acid...): a fainter wave rolling the other way behind the glowing one, a bright crest, bubbles.
 function drawLiquid(c2, hz, t, light, dark) {
-  const top = hz.y + 10, grad = c2.createLinearGradient(0, top, 0, hz.y + hz.h);
+  const top = hz.y + 10, bot = hz.y + hz.h, grad = c2.createLinearGradient(0, top, 0, bot);
+  const crest = (y, ph, a) => { for (let x = 0; x <= hz.w; x += 8) c2.lineTo(hz.x + x, y + Math.sin(x * .05 + ph) * a); };
+  const wave = (y, ph, a) => { c2.beginPath(); c2.moveTo(hz.x, bot); crest(y, ph, a); c2.lineTo(hz.x + hz.w, bot); };
   grad.addColorStop(0, light); grad.addColorStop(1, dark);
-  glow(c2, light, 24, () => {
-    c2.beginPath(); c2.moveTo(hz.x, hz.y + hz.h);
-    for (let x = 0; x <= hz.w; x += 8) c2.lineTo(hz.x + x, top + Math.sin(x * .05 + t * 3) * 3);
-    c2.lineTo(hz.x + hz.w, hz.y + hz.h); c2.closePath();
-    c2.fillStyle = grad; c2.fill();
-  });
+  wave(top - 3, 2 - t * 1.5, 4); c2.fillStyle = rgba(light, .5); c2.fill();
+  glow(c2, light, 24, () => { wave(top, t * 3, 3); c2.fillStyle = grad; c2.fill(); });
+  c2.save(); c2.globalCompositeOperation = 'lighter'; c2.beginPath(); crest(top, t * 3, 3);
+  c2.strokeStyle = light; c2.lineWidth = 2; c2.stroke(); c2.restore();
   for (let k = 0; k < 6; k++) {
     const ph = (t * .7 + k * .31) % 1, x = hz.x + 14 + ((k * 53) % Math.max(1, hz.w - 28));
     c2.globalAlpha = 1 - ph;
@@ -214,9 +202,15 @@ function drawLiquid(c2, hz, t, light, dark) {
 const HAZARD_DRAW = {
   lava: (c2, hz, t) => drawLiquid(c2, hz, t, hz.color || '#ff6a2a', '#5a0e02'),
   acid: (c2, hz, t) => drawLiquid(c2, hz, t, hz.color || '#8dff4a', '#103d06'),
-  spikes(c2, hz) {
-    const n = Math.max(1, Math.round(hz.w / 18)), w = hz.w / n;
-    for (let k = 0; k < n; k++) poly(c2, [[hz.x + k * w, hz.y + hz.h], [hz.x + k * w + w / 2, hz.y], [hz.x + (k + 1) * w, hz.y + hz.h]], '#c9cde6', '#5d6290', 1);
+  // Steel spikes of two heights with glowing tips in the hazard's colour, over a faint glow.
+  spikes(c2, hz, t) {
+    const n = Math.max(1, Math.round(hz.w / 20)), w = hz.w / n, base = hz.y + hz.h, col = hz.color || '#ff3d5a';
+    for (let k = 0; k < n; k++) {
+      const x = hz.x + k * w, tip = hz.y + (k % 2) * 6;
+      poly(c2, [[x, base], [x + w / 2, tip], [x + w, base]], '#8a90aa', '#4a4e66', 1);
+      poly(c2, [[x + w * .3, tip + 10], [x + w / 2, tip], [x + w * .7, tip + 10]], rgba(col, .6 + .3 * Math.sin(t * 4 + k)));
+    }
+    mapGlow(c2, hz.x + hz.w / 2, hz.y + 10, hz.w * .6, col, .12);
   },
   electric(c2, hz, t) {
     c2.fillStyle = 'rgba(90,160,255,.12)'; c2.fillRect(hz.x, hz.y, hz.w, hz.h);
@@ -410,10 +404,9 @@ function drawTags(f) {
   if (!f.summon) accessTagMark(f, head.x, y - (keys.length ? 20 : 0));   // colour-blind marker (92-access)
   keys.slice(0, 5).forEach((k, i) => {
     const def = STATUS[k], s = f.status[k], x = head.x + (i - (Math.min(keys.length, 5) - 1) / 2) * 19;
-    circle(ctx, x, y, 8, 'rgba(8,9,20,.82)');
+    hudBadge(x, y, 8, null, 0, def.color, 10, def.icon);
     ctx.strokeStyle = def.color; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(x, y, 8, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(s.t / s.max, 0, 1)); ctx.stroke();
-    ctx.fillStyle = def.color; ctx.font = `600 10px ${FONT_BODY}`; ctx.fillText(def.icon, x, y + .5);
   });
 }
 
@@ -470,12 +463,16 @@ function fillBar(x, y, w, h, frac, right) {
   ctx.fillRect(right ? x + w - fw : x, y, fw, h);
 }
 
+// A round HUD badge: a dark disc, a ring when given, the icon in the middle.
+function hudBadge(x, y, r, ring, lw, col, px, icon) {
+  circle(ctx, x, y, r, 'rgba(8,9,20,.85)', ring, lw);
+  ctx.fillStyle = col; ctx.font = `600 ${px}px ${FONT_BODY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(icon, x, y + .5);
+}
+
 function drawSkillIcon(f, k, x, y) {
   const def = SKILLS[f.skills[k]], cd = f.skillCd[k], frac = clamp(cd / def.cd, 0, 1), ready = cd <= 0, r = 13;
-  circle(ctx, x, y, r, 'rgba(8,9,20,.85)', rgba(def.color, ready ? .95 : .35), 2);
-  ctx.fillStyle = ready ? def.color : rgba(def.color, .4);
-  ctx.font = `600 13px ${FONT_BODY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(def.icon, x, y + 1);
+  hudBadge(x, y, r, rgba(def.color, ready ? .95 : .35), 2, ready ? def.color : rgba(def.color, .4), 13, def.icon);
   if (!ready) {
     ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.beginPath(); ctx.moveTo(x, y);
     ctx.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.closePath(); ctx.fill();
@@ -522,8 +519,7 @@ function hudTextShadow(on) {
 
 function drawCard(f, x, y, w, right) {
   f.hpShow = lerp(f.hpShow, f.hp, .08);
-  const dir = right ? -1 : 1, ax = right ? x + w : x, frac = f.hp / f.maxHp;
-  ctx.textBaseline = 'alphabetic'; ctx.textAlign = right ? 'right' : 'left';
+  const dir = right ? -1 : 1, ax = right ? x + w : x;
   const cw = drawClassIcon(f, ax + dir * 9, y - 14);
   hudTextShadow(true);
   ctx.font = `17px ${FONT_DISPLAY}`; ctx.fillStyle = f.color; ctx.textAlign = right ? 'right' : 'left'; ctx.textBaseline = 'alphabetic';
@@ -535,17 +531,10 @@ function drawCard(f, x, y, w, right) {
   const wlEnd = nw + 18 + ctx.measureText(wl).width;
   hudTextShadow(false);
   if (f.lvl > 1) drawLevelTag(f, ax + dir * wlEnd, y - 13, dir);
-  aiPersonaHudTag(f, ax + dir * (wlEnd + (f.lvl > 1 ? 34 : 2)), y - 13, dir);   // the CPU rival's title (67)
-  if (f.hcap) duoBadge(f, ax + dir * (wlEnd + (f.lvl > 1 ? 34 : 2)), y - 13, dir);   // handicap (73)
-  ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x - 3, y - 3, w + 6, 24);
-  ctx.fillStyle = 'rgba(255,255,255,.45)'; fillBar(x, y, w, 18, f.hpShow / f.maxHp, right);
-  ctx.fillStyle = f.alive ? f.color : '#444a66'; fillBar(x, y, w, 18, frac, right);
-  if (f.alive && frac < .25) { ctx.fillStyle = `rgba(255,60,90,${.25 + .2 * Math.sin(G_STATE.t * 10)})`; fillBar(x, y, w, 18, frac, right); }
-  accessCardMark(f, x, y, w, 18, right);   // colour-blind marker + pattern (92-access)
-  ctx.font = `700 12px ${FONT_BODY}`; ctx.textBaseline = 'middle'; ctx.textAlign = right ? 'left' : 'right';
-  ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(7,8,15,.85)'; ctx.fillStyle = '#ffffff'; ctx.lineJoin = 'round';
-  const hpText = f.alive ? String(Math.ceil(f.hp)) : 'K.O.', hx = right ? x + 6 : x + w - 6;
-  ctx.strokeText(hpText, hx, y + 10); ctx.fillText(hpText, hx, y + 10);
+  const tx = ax + dir * (wlEnd + (f.lvl > 1 ? 34 : 2));
+  aiPersonaHudTag(f, tx, y - 13, dir);   // the CPU rival's title (67)
+  if (f.hcap) duoBadge(f, tx, y - 13, dir);   // handicap (73)
+  hudHealth(f, x, y, w, 18, right);
   drawMeters(f, x, y + 21, w, right, 4);
   let cx = ax + dir * 13;
   const ry = y + 46;
@@ -557,13 +546,25 @@ function drawCard(f, x, y, w, right) {
   drawPips(f.team, right ? x + 7 : x + w - 7, ry, -dir);
 }
 
+// A card's health bar (h 18 full, 12 compact), its damage ghost, low-health pulse (full cards) and number.
+function hudHealth(f, x, y, w, h, right) {
+  const frac = f.hp / f.maxHp, big = h > 12, p = big ? 3 : 2;
+  ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x - p, y - p, w + p * 2, h + p * 2);
+  ctx.fillStyle = rgba('#ffffff', big ? .45 : .4); fillBar(x, y, w, h, f.hpShow / f.maxHp, right);
+  ctx.fillStyle = f.alive ? f.color : '#444a66'; fillBar(x, y, w, h, frac, right);
+  if (big && f.alive && frac < .25) { ctx.fillStyle = `rgba(255,60,90,${.25 + .2 * Math.sin(G_STATE.t * 10)})`; fillBar(x, y, w, h, frac, right); }
+  accessCardMark(f, x, y, w, h, right);   // colour-blind marker + pattern (92-access)
+  ctx.font = `700 ${big ? 12 : 10}px ${FONT_BODY}`; ctx.textBaseline = 'middle'; ctx.textAlign = right ? 'left' : 'right';
+  ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(7,8,15,.85)'; ctx.fillStyle = '#ffffff'; ctx.lineJoin = 'round';
+  const t = f.alive ? String(Math.ceil(f.hp)) : 'K.O.', hx = right ? x + 6 : x + w - p * 2, hy = y + h / 2 + p / 3;
+  ctx.strokeText(t, hx, hy); ctx.fillText(t, hx, hy);
+}
+
 // ---------- v3 HUD pieces ----------
 // Class badge before the name. Returns the width it took.
 function drawClassIcon(f, x, y) {
   if (!f.cls || f.cls.key === 'none') return 0;
-  circle(ctx, x, y, 9, 'rgba(8,9,20,.85)', f.cls.color, 1.5);
-  ctx.fillStyle = f.cls.color; ctx.font = `600 11px ${FONT_BODY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(f.cls.icon, x, y + .5);
+  hudBadge(x, y, 9, f.cls.color, 1.5, f.cls.color, 11, f.cls.icon);
   return 22;
 }
 function drawLevelTag(f, x, y, dir) {
@@ -592,9 +593,7 @@ function drawThrowIcons(f, cx, y, dir) {
     const def = THROWABLES[f.throws[k]];
     if (!def) continue;
     const n = f.throwN[k];
-    circle(ctx, cx, y, 10, 'rgba(8,9,20,.85)', rgba(def.color, n > 0 ? .9 : .25), 1.5);
-    ctx.fillStyle = n > 0 ? def.color : rgba(def.color, .3); ctx.font = `600 11px ${FONT_BODY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(def.icon, cx, y + .5);
+    hudBadge(cx, y, 10, rgba(def.color, n > 0 ? .9 : .25), 1.5, n > 0 ? def.color : rgba(def.color, .3), 11, def.icon);
     if (n > 1) { ctx.font = `700 9px ${FONT_BODY}`; ctx.fillStyle = '#ffffff'; ctx.fillText('×' + n, cx + 9, y + 9); }
     cx += dir * 25;
   }
@@ -602,18 +601,16 @@ function drawThrowIcons(f, cx, y, dir) {
 }
 function drawMountTimer(f, cx, y, dir) {
   const def = MOUNTS[f.mount.key], frac = clamp(f.mount.t / def.time, 0, 1);
-  circle(ctx, cx + dir * 4, y, 11, 'rgba(8,9,20,.85)');
+  hudBadge(cx + dir * 4, y, 11, null, 0, def.color, 12, def.icon);
   ctx.strokeStyle = def.color; ctx.lineWidth = 2.5;
   ctx.beginPath(); ctx.arc(cx + dir * 4, y, 11, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke();
-  ctx.fillStyle = def.color; ctx.font = `600 12px ${FONT_BODY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(def.icon, cx + dir * 4, y + .5);
   return cx + dir * 30;
 }
 
 // Small card for crowded matches (5-8 fighters): name, health, stamina + super, round pips.
 function drawCompactCard(f, x, y, w) {
   f.hpShow = lerp(f.hpShow, f.hp, .08);
-  const frac = f.hp / f.maxHp, cw = drawClassIcon(f, x + 9, y - 10);
+  const cw = drawClassIcon(f, x + 9, y - 10);
   ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
   hudTextShadow(true);
   ctx.font = `13px ${FONT_DISPLAY}`; ctx.fillStyle = f.color; ctx.fillText(f.name, x + cw, y - 5);
@@ -623,14 +620,7 @@ function drawCompactCard(f, x, y, w) {
   ctx.fillText(cwl, x + nw + 8, y - 5);
   hudTextShadow(false);
   aiPersonaHudTag(f, x + nw + 20 + ctx.measureText(cwl).width, y - 9, 1);   // the CPU rival's title (67)
-  ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x - 2, y - 2, w + 4, 16);
-  ctx.fillStyle = 'rgba(255,255,255,.4)'; fillBar(x, y, w, 12, f.hpShow / f.maxHp, false);
-  ctx.fillStyle = f.alive ? f.color : '#444a66'; fillBar(x, y, w, 12, frac, false);
-  accessCardMark(f, x, y, w, 12, false);   // colour-blind marker + pattern (92-access)
-  ctx.font = `700 10px ${FONT_BODY}`; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#ffffff';
-  ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(7,8,15,.85)';
-  const hpText = f.alive ? String(Math.ceil(f.hp)) : 'K.O.';
-  ctx.strokeText(hpText, x + w - 4, y + 6.5); ctx.fillText(hpText, x + w - 4, y + 6.5);
+  hudHealth(f, x, y, w, 12, false);
   drawMeters(f, x, y + 15, w, false, 3);
   const n = Math.min(G_STATE.winScore, 9), won = G_STATE.score[f.team] || 0;
   for (let k = 0; k < n; k++) circle(ctx, x + w - 4 - k * 11, y - 10, 3.5, k < won ? f.color : 'rgba(255,255,255,.14)');
@@ -639,10 +629,8 @@ function drawCompactCard(f, x, y, w) {
 function drawCardStatuses(f, x, y, dir) {
   let k = 0;
   for (const name in f.status) {
-    const def = STATUS[name], cx = x + dir * (k * 22 + 8);
-    circle(ctx, cx, y, 9, 'rgba(8,9,20,.85)', rgba(def.color, .8), 1.5);
-    ctx.fillStyle = def.color; ctx.font = `600 11px ${FONT_BODY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(def.icon, cx, y + .5);
+    const def = STATUS[name];
+    hudBadge(x + dir * (k * 22 + 8), y, 9, rgba(def.color, .8), 1.5, def.color, 11, def.icon);
     if (++k >= 5) break;
   }
 }
@@ -660,27 +648,18 @@ function drawHUD() {
   const n = cards.length;
   if (!n) return;
   // Scaled by VIEW.hudK around the top centre, so on small screens the cards fit in the narrower width Wh (in rows).
-  const k = VIEW.hudK, hs = VIEW.s * k, Wh = VIEW.hudW, L = (W - Wh) / 2, two = n === 2, compact = n > 4;
+  const k = VIEW.hudK, hs = VIEW.s * k, Wh = VIEW.hudW, L = (W - Wh) / 2, { two, compact, perRow, rows, rowH } = hudGrid(n);
   ctx.setTransform(hs, 0, 0, hs, VIEW.cx - W / 2 * hs, VIEW.hudY);
-  // Up to 4 fighters: full cards (2 per row on narrow screens). 5-8: compact cards, 4 per row (2 on narrow screens).
-  const perRow = two ? 2 : compact ? clamp(Math.floor((Wh - 44) / 200), 2, 4) : clamp(Math.floor((Wh - 44) / 256), 1, n);
-  const rows = two ? 1 : Math.ceil(n / perRow), rowH = compact ? 46 : 84;
   const cw = two ? Math.min(430, Math.floor((Wh - 92) / 2)) : Math.floor((Wh - 60 - (perRow - 1) * 16) / perRow);
   const cardX = (i) => two ? (i === 1 ? L + Wh - 34 - cw : L + 34) : L + 30 + (i % perRow) * (cw + 16);
   const cardY = (i) => (compact ? 26 : 30) + (two ? 0 : Math.floor(i / perRow)) * rowH;
   const plates = cards.map((f, i) => compact ? [cardX(i) - 8, cardY(i) - 24, cw + 16, 52] : [cardX(i) - 10, cardY(i) - 32, cw + 20, 100]);
-  const lblY = midGap0(two, Wh, cw) ? 52 : (compact ? 22 : 30) + rows * rowH;
-  plates.push([W / 2 - 62, lblY - 21, 124, G_STATE.roundLimit - G_STATE.roundT < 10 && !G_STATE.ending ? 56 : 28]);   // round label + countdown
+  const midGap = midGap0(two, Wh, cw), centre = W / 2, cy = midGap ? 52 : (compact ? 22 : 30) + rows * rowH;   // midGap: room for the round label between two cards
+  plates.push([W / 2 - 62, cy - 21, 124, G_STATE.roundLimit - G_STATE.roundT < 10 && !G_STATE.ending ? 56 : 28]);   // round label + countdown
   hudPlatePath(plates); ctx.fillStyle = 'rgba(8,9,22,.55)'; ctx.fill();
-  cards.forEach((f, i) => {
-    const right = two && i === 1, col = two ? i : i % perRow, row = two ? 0 : Math.floor(i / perRow);
-    if (compact) drawCompactCard(f, L + 30 + col * (cw + 16), 26 + row * rowH, cw);
-    else drawCard(f, two ? (right ? L + Wh - 34 - cw : L + 34) : L + 30 + col * (cw + 16), 30 + row * rowH, cw, right);
-  });
+  cards.forEach((f, i) => (compact ? drawCompactCard : drawCard)(f, cardX(i), cardY(i), cw, two && i === 1));
   hudTextShadow(false);
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.font = `15px ${FONT_DISPLAY}`; ctx.fillStyle = '#c4c9ee';
-  const midGap = midGap0(two, Wh, cw);   // room for the round label between two cards
-  const centre = W / 2, cy = midGap ? 52 : (compact ? 22 : 30) + rows * rowH;
   ctx.fillText(G_STATE.demo ? 'DEMO' : hook(G_STATE.mode, 'roundLabel') || 'ROUND ' + G_STATE.round, centre, cy);   // modes may relabel (WAVE 3)
   const left = G_STATE.roundLimit - G_STATE.roundT;
   wxDrawAnnounce(ctx, centre, cy + 14);   // weather card under the round label (58)

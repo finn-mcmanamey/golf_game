@@ -42,10 +42,7 @@ defMap('eruption', {
   drawBg(ctx, t) { eruptDrawBg(ctx, this, t); },
   drawFg(ctx, t) {
     const e = this.er;
-    if (e && e.st === 'rumble' && (SETTINGS.reduceFlash || Math.sin(t * 16) > -.2)) {
-      ctx.save(); ctx.fillStyle = '#ff7a3a'; ctx.font = `36px ${FONT_DISPLAY}`; ctx.textAlign = 'center';
-      glow(ctx, '#ff5a2a', 20, () => ctx.fillText('⚠ ERUPTION — GET TO THE MIDDLE', W / 2, 200)); ctx.restore();
-    }
+    if (e && e.st === 'rumble' && (SETTINGS.reduceFlash || Math.sin(t * 16) > -.2)) mapSign(ctx, '⚠ ERUPTION — GET TO THE MIDDLE', W / 2, 200, 36, '#ff7a3a', 20);
     if (e && e.st === 'erupt') mapParticles(ctx, t, 40, { vx: 20, vy: 90, sway: 20, size: 2.5, color: '#8a7a7a', alpha: .6, seed: 23 });   // ash fall
   },
   drawSolid(ctx, s, t) {
@@ -112,20 +109,16 @@ function eruptDrawBg(ctx, m, t) {
   mapGlow(ctx, 640, 160, 300, '#ff5a2a', .15 + hot * .35);
   poly(ctx, [[180, fl], [540, 170], [740, 170], [1100, fl]], '#24100c');          // the volcano
   poly(ctx, [[540, 170], [600, 190], [680, 190], [740, 170]], hot ? '#ff7a2a' : '#3a1a10');
-  if (e.st !== 'calm') for (let k = 0; k < 10; k++) {                                // smoke column
-    const life = mapWrap(t * .25 + k / 10, 1), r = 30 + life * 110;
-    circle(ctx, 640 + Math.sin(k * 2.3 + t * .3) * 40 * life, 170 - life * 260, r, `rgba(40,20,20,${(1 - life) * .55})`);
-  }
+  if (e.st !== 'calm') mapSmoke(ctx, t * 4, 640, 175, CALDERA_SMOKE);            // the smoke column (Caldera's plume, faster)
   if (e.st === 'erupt') {
     glow(ctx, '#ff7a2a', 30, () => {                                                   // the fountain and two lava streams
       ctx.fillStyle = '#ffb347';
       for (let k = 0; k < 14; k++) { const a = -Math.PI / 2 + Math.sin(k * 7.1) * .5, u = mapWrap(t * 1.2 + k / 14, 1); circle(ctx, 640 + Math.cos(a) * u * 220, 170 + Math.sin(a) * u * 220 + u * u * 200, 6 * (1 - u) + 2, '#ffb347'); }
     });
-    ctx.strokeStyle = 'rgba(255,120,40,.8)'; ctx.lineWidth = 6; ctx.beginPath();
+    mapPen(ctx, 'rgba(255,120,40,.8)', 6);
     ctx.moveTo(590, 185); ctx.quadraticCurveTo(450, 380, 300, fl); ctx.moveTo(690, 185); ctx.quadraticCurveTo(830, 380, 980, fl); ctx.stroke();
   }
-  ctx.fillStyle = '#1c1012'; ctx.fillRect(-40, fl, W + 80, H - fl + 40);
-  glowLine(ctx, 0, fl, W, fl, '#ff6a2a', 2 + hot * 2);
+  mapGround(ctx, fl, '#1c1012', '#ff6a2a', 2 + hot * 2);
 }
 
 function eruptDrawBomb(ctx, hz, t) {
@@ -272,8 +265,11 @@ function astroBrain(f, st) {
 
 function astroDrawBg(ctx, t) {
   mapSky(ctx, H, ['#02020a', '#0a0620', '#120a2a']);
-  mapGlow(ctx, 300, 160, 340, '#6a3aff', .12); mapGlow(ctx, 1000, 560, 380, '#ff3a8a', .08);
-  mapStars(ctx, t, 130, H, 3);
+  mapFar(ctx, .15, c => {                         // nebulae and deep stars far behind; the planets stay where they are
+    mapGlow(c, 300, 160, 340, '#6a3aff', .14); mapGlow(c, 1000, 560, 380, '#ff3a8a', .1); mapGlow(c, 760, 220, 240, '#3a9aff', .08);
+    mapStars(c, 0, 150, H, 3);
+  }, MAP);
+  mapStars(ctx, t, 40, H, 41);                    // nearer stars twinkle
   for (const pl of ASTRO_PLANETS) {
     ctx.strokeStyle = rgba(pl.c1, .08); ctx.lineWidth = 2;                        // pulsing gravity rings
     for (let k = 0; k < 3; k++) { const r = pl.r + 30 + mapWrap(t * 30 + k * 40, 120); ctx.globalAlpha = 1 - (r - pl.r - 30) / 120; ctx.beginPath(); ctx.arc(pl.x, pl.y, r, 0, TAU); ctx.stroke(); }
@@ -322,8 +318,8 @@ defMap('mansion', {
   },
   drawBg(ctx, t) { hauntDrawBg(ctx, this, t); },
   drawFg(ctx) {
-    ctx.strokeStyle = 'rgba(220,220,240,.25)'; ctx.lineWidth = 1; ctx.beginPath();   // cobwebs in the corners
-    for (const [x, d] of [[0, 1], [W, -1]]) for (let k = 0; k < 5; k++) { ctx.moveTo(x, 0); ctx.lineTo(x + d * (40 + k * 25), 120 - k * 22); }
+    mapPen(ctx, 'rgba(220,220,240,.25)', 1);   // cobwebs in the corners
+    for (const [x, d] of [[0, 1], [W, -1]]) for (let k = 0; k < 5; k++) mapSeg(ctx, x, 0, x + d * (40 + k * 25), 120 - k * 22);
     ctx.stroke();
   },
   drawSolid(ctx, s, t) {
@@ -354,26 +350,24 @@ function hauntStepLights(m, dt, t) {
 
 function hauntDrawBg(ctx, m, t) {
   const fl = m.floor;
-  ctx.fillStyle = '#1a1024'; ctx.fillRect(-40, -40, W + 80, fl + 40);
+  mapRect(ctx, '#1a1024', -40, -40, W + 80, fl + 40);
   ctx.fillStyle = 'rgba(184,154,255,.05)';                                        // damask wallpaper
   for (let y = 20; y < fl; y += 60) for (let x = (y / 60 % 2) * 40; x < W; x += 80) { ctx.beginPath(); ctx.ellipse(x, y, 10, 18, 0, 0, TAU); ctx.fill(); }
   const bolt = mapWrap(t, 9) < .15 && !SETTINGS.reduceFlash;                       // lightning through the windows
   for (const x of [470, 810]) {
-    ctx.fillStyle = bolt ? '#c8d8ff' : '#141a34'; ctx.beginPath(); ctx.roundRect(x - 60, 90, 120, 230, [60, 60, 0, 0]); ctx.fill();
+    mapBrush(ctx, bolt ? '#c8d8ff' : '#141a34'); ctx.roundRect(x - 60, 90, 120, 230, [60, 60, 0, 0]); ctx.fill();
     circle(ctx, x + 20, 150, 18, bolt ? '#ffffff' : '#d8e0ff');
     ctx.strokeStyle = '#2a1e30'; ctx.lineWidth = 6; ctx.strokeRect(x - 60, 150, 120, 170); lineXY(ctx, x, 90, x, 320, '#2a1e30', 6);
   }
   for (const [x, y] of [[200, 200], [1080, 200]]) {                                // portraits whose eyes follow you
-    ctx.fillStyle = '#4a3420'; ctx.fillRect(x - 46, y - 60, 92, 120); ctx.fillStyle = '#20162a'; ctx.fillRect(x - 36, y - 50, 72, 100);
+    mapRect(ctx, '#4a3420', x - 46, y - 60, 92, 120); mapRect(ctx, '#20162a', x - 36, y - 50, 72, 100);
     circle(ctx, x, y - 10, 22, '#3a2e3a');
     const foe = F.find(f => f.alive), look = foe ? clamp((foe.P[0].x - x) / 400, -1, 1) * 3 : 0;
     for (const ex of [-8, 8]) circle(ctx, x + ex + look, y - 14, 2.5, '#9affd8');
   }
   for (const [x, y] of HAUNT_CANDLES) circle(ctx, x, y, 4, '#ffd38a');
   poly(ctx, [[540, fl], [640, 420], [740, fl]], '#140c1a');                       // staircase in the shadows
-  ctx.fillStyle = '#1a1020'; ctx.fillRect(-40, fl, W + 80, H - fl + 40);
-  ctx.fillStyle = 'rgba(120,20,40,.35)'; ctx.fillRect(200, fl, 880, 12);          // runner rug
-  glowLine(ctx, 0, fl, W, fl, '#b89aff', 2);
+  mapGround(ctx, fl, '#1a1020', '#b89aff', 2, () => { mapRect(ctx, 'rgba(120,20,40,.35)', 200, fl, 880, 12); });   // runner rug
 }
 
 function hauntDrawGhost(ctx, hz, t) {
@@ -381,7 +375,7 @@ function hauntDrawGhost(ctx, hz, t) {
   const x = hz.x + hz.w / 2, y = hz.y + 26 + Math.sin(t * 3 + hz.y) * 5, a = .45 + (MAP && MAP.dark || 0) * .5;
   ctx.save(); ctx.globalAlpha = a;
   glow(ctx, '#9affd8', 22, () => {
-    ctx.fillStyle = '#d8fff0'; ctx.beginPath(); ctx.arc(x, y, 22, Math.PI, 0);
+    mapBrush(ctx, '#d8fff0'); ctx.arc(x, y, 22, Math.PI, 0);
     for (let k = 0; k <= 4; k++) ctx.lineTo(x + 22 - k * 11, y + 30 + (k % 2 ? -6 : 0) + Math.sin(t * 8 + k) * 3);
     ctx.fill();
   });
@@ -438,11 +432,7 @@ defMap('kitchen', {
   drawBg(ctx, t) { if (!artBg(ctx, this, t)) kitchenDrawBg(ctx, this, t, true); },
   drawFg(ctx, t) {
     const w = this.hazards.find(h => h.trap === 'roll' && h.role === 'warn');
-    if (w && w.st === 'warn' && (SETTINGS.reduceFlash || Math.sin(t * 18) > -.2)) {
-      const x = w.dir > 0 ? KITCHEN_LANE.x0 + 40 : KITCHEN_LANE.x1 - 40;
-      ctx.save(); ctx.fillStyle = '#ff8a2a'; ctx.font = `40px ${FONT_DISPLAY}`; ctx.textAlign = 'center';
-      glow(ctx, '#ff8a2a', 16, () => ctx.fillText(w.dir > 0 ? '›››' : '‹‹‹', x, 560)); ctx.restore();
-    }
+    if (w && w.st === 'warn' && (SETTINGS.reduceFlash || Math.sin(t * 18) > -.2)) mapSign(ctx, w.dir > 0 ? '›››' : '‹‹‹', w.dir > 0 ? KITCHEN_LANE.x0 + 40 : KITCHEN_LANE.x1 - 40, 560, 40, '#ff8a2a', 16);
     kitchenDrawJar(ctx, this, t);
   },
   drawSolid(ctx, s, t) { kitchenDrawSolid(ctx, s, this, t); },
@@ -474,9 +464,9 @@ function kitchenDrawBlades(ctx, hz, t) {
 
 function kitchenDrawJar(ctx, m, t) {
   const w = m.hazards.find(h => h.trap === 'blend' && h.role === 'warn'), st = w ? w.st : 'idle';
-  ctx.fillStyle = 'rgba(200,230,255,.12)'; ctx.fillRect(980, 490, 220, 160);
+  mapRect(ctx, 'rgba(200,230,255,.12)', 980, 490, 220, 160);
   ctx.strokeStyle = 'rgba(220,240,255,.6)'; ctx.lineWidth = 2; ctx.strokeRect(981, 490, 218, 160);
-  ctx.fillStyle = '#3a3a44'; ctx.fillRect(970, 650, 240, 70);
+  mapRect(ctx, '#3a3a44', 970, 650, 240, 70);
   const lit = st === 'hit' || (st === 'warn' && (SETTINGS.reduceFlash || Math.sin(t * 22) > 0));
   glow(ctx, lit ? '#ff3a3a' : '#3aff8a', lit ? 18 : 8, () => circle(ctx, 1090, 685, 9, lit ? '#ff3a3a' : '#3aff8a'));
   if (st !== 'hit') lineXY(ctx, 1010, 636, 1170, 636, '#9aa8b8', 4);                // resting blades
@@ -486,44 +476,42 @@ function kitchenDrawSolid(ctx, s, m, t) {
   if (s.jar) return;                                                                   // drawn with the jar in drawFg
   if (s.toaster) {
     const w = m.hazards.find(h => h.trap === 'toast' && h.role === 'warn'), hot = w && w.st === 'warn';
-    ctx.fillStyle = '#c8ccd8'; ctx.beginPath(); ctx.roundRect(s.x, s.y, s.w, 130, 22); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.fillRect(s.x + 16, s.y + 20, 8, 90);
-    for (const x of [s.x + 40, s.x + 125]) { ctx.fillStyle = hot ? `rgba(255,${100 + Math.sin(t * 20) * 60},40,.9)` : '#3a3a44'; ctx.fillRect(x, s.y + 4, 56, 8); }
-    ctx.fillStyle = '#2a2a34'; ctx.fillRect(s.x + s.w - 6, s.y + (hot ? 80 : 40), 22, 10);   // the lever
+    mapBrush(ctx, '#c8ccd8'); ctx.roundRect(s.x, s.y, s.w, 130, 22); ctx.fill();
+    mapRect(ctx, 'rgba(255,255,255,.4)', s.x + 16, s.y + 20, 8, 90);
+    for (const x of [s.x + 40, s.x + 125]) { mapRect(ctx, hot ? `rgba(255,${100 + Math.sin(t * 20) * 60},40,.9)` : '#3a3a44', x, s.y + 4, 56, 8); }
+    mapRect(ctx, '#2a2a34', s.x + s.w - 6, s.y + (hot ? 80 : 40), 22, 10);   // the lever
     glowLine(ctx, s.x + 10, s.y, s.x + s.w - 10, s.y, '#ff8a5a', 2);
     return;
   }
   const look = s.shelf ? ['#8a5a3a', '#ffd38a'] : s.plates ? ['#f4f4f8', '#5ab0ff'] : ['#c89a6a', '#ff8a5a'];
-  ctx.fillStyle = look[0]; ctx.beginPath(); ctx.roundRect(s.x, s.y, s.w, s.plates ? 22 : 14, 6); ctx.fill();
+  mapBrush(ctx, look[0]); ctx.roundRect(s.x, s.y, s.w, s.plates ? 22 : 14, 6); ctx.fill();
   if (s.plates) for (let k = 1; k < 3; k++) lineXY(ctx, s.x + 6, s.y + k * 7, s.x + s.w - 6, s.y + k * 7, '#c8d8e8', 1.5);
-  if (s.shelf) for (const [x, c] of [[s.x + 40, '#c84a3a'], [s.x + 110, '#e8c84a'], [s.x + 190, '#4ac86a']]) { ctx.fillStyle = c; ctx.fillRect(x, s.y - 40, 26, 40); }
-  glowLine(ctx, s.x, s.y, s.x + s.w, s.y, look[1], 2);
+  if (s.shelf) for (const [x, c] of [[s.x + 40, '#c84a3a'], [s.x + 110, '#e8c84a'], [s.x + 190, '#4ac86a']]) { mapRect(ctx, c, x, s.y - 40, 26, 40); }
+  mapEdge(ctx, s, look[1], 2);
 }
 
 function kitchenSteam(ctx, t) {
-  for (let k = 0; k < 3; k++) { ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(380 + k * 15, 350); ctx.quadraticCurveTo(370 + k * 15 + Math.sin(t * 2 + k) * 10, 320, 385 + k * 15, 290); ctx.stroke(); }
+  for (let k = 0; k < 3; k++) { mapPen(ctx, 'rgba(255,255,255,.4)', 4); ctx.moveTo(380 + k * 15, 350); ctx.quadraticCurveTo(370 + k * 15 + Math.sin(t * 2 + k) * 10, 320, 385 + k * 15, 290); ctx.stroke(); }
 }
 function kitchenDrawBg(ctx, m, t, steam) {
   const fl = m.floor;
-  ctx.fillStyle = '#b8a68a'; ctx.fillRect(-40, -40, W + 80, fl + 40);
-  ctx.strokeStyle = 'rgba(90,74,54,.35)'; ctx.lineWidth = 3; ctx.beginPath();        // giant wall tiles
-  for (let x = 0; x <= W; x += 160) { ctx.moveTo(x, 0); ctx.lineTo(x, fl); }
-  for (let y = 40; y < fl; y += 160) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+  mapRect(ctx, '#b8a68a', -40, -40, W + 80, fl + 40);
+  mapPen(ctx, 'rgba(90,74,54,.35)', 3);        // giant wall tiles
+  for (let x = 0; x <= W; x += 160) mapSeg(ctx, x, 0, x, fl);
+  for (let y = 40; y < fl; y += 160) mapSeg(ctx, 0, y, W, y);
   ctx.stroke();
-  ctx.fillStyle = '#9ad0ff'; ctx.fillRect(560, 40, 300, 200); ctx.strokeStyle = '#fff'; ctx.lineWidth = 10; ctx.strokeRect(560, 40, 300, 200);   // window
+  mapRect(ctx, '#9ad0ff', 560, 40, 300, 200); ctx.strokeStyle = '#fff'; ctx.lineWidth = 10; ctx.strokeRect(560, 40, 300, 200);   // window
   circle(ctx, 800, 90, 26, '#fff4c8');
-  ctx.fillStyle = '#a8784a'; ctx.fillRect(-40, -40, 520, 120); ctx.fillRect(900, -40, 420, 120);          // cabinets
+  mapRect(ctx, '#a8784a', -40, -40, 520, 120); ctx.fillRect(900, -40, 420, 120);          // cabinets
   for (const x of [100, 330, 1000, 1180]) circle(ctx, x, 60, 8, '#e8c87a');
-  ctx.fillStyle = '#c84a3a'; ctx.beginPath(); ctx.roundRect(360, 360, 70, 290, 16); ctx.fill();          // a giant mug behind the board
-  ctx.strokeStyle = '#c84a3a'; ctx.lineWidth = 14; ctx.beginPath(); ctx.arc(430, 470, 46, -1.2, 1.2); ctx.stroke();
+  mapBrush(ctx, '#c84a3a'); ctx.roundRect(360, 360, 70, 290, 16); ctx.fill();          // a giant mug behind the board
+  mapPen(ctx, '#c84a3a', 14); ctx.arc(430, 470, 46, -1.2, 1.2); ctx.stroke();
   if (steam) kitchenSteam(ctx, t);
-  const g = ctx.createLinearGradient(0, fl, 0, H);                                   // marble countertop
-  g.addColorStop(0, '#f4f0e8'); g.addColorStop(1, '#c8c0b0');
-  ctx.fillStyle = g; ctx.fillRect(-40, fl, W + 80, H - fl + 40);
-  ctx.strokeStyle = 'rgba(120,110,100,.25)'; ctx.lineWidth = 1.5; ctx.beginPath();
-  for (let k = 0; k < 6; k++) { const x = k * 230; ctx.moveTo(x, fl + 10); ctx.quadraticCurveTo(x + 60, fl + 40, x + 140, fl + 30); }
-  ctx.stroke();
-  glowLine(ctx, 0, fl, W, fl, '#ff8a5a', 2);
+  mapGround(ctx, fl, ['#f4f0e8', '#c8c0b0'], '#ff8a5a', 2, () => {     // marble countertop
+    mapPen(ctx, 'rgba(120,110,100,.25)', 1.5);
+    for (let k = 0; k < 6; k++) { const x = k * 230; ctx.moveTo(x, fl + 10); ctx.quadraticCurveTo(x + 60, fl + 40, x + 140, fl + 30); }
+    ctx.stroke();
+  });
 }
 
 // ====================================================================================================================

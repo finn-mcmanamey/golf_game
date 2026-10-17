@@ -122,6 +122,64 @@ const shown = e => !!e && !e.hidden && e.getClientRects().length > 0 && +getComp
 """
 
 
+def res_checks(d, check):
+    """v4.1 adaptive resolution in WebKit: every arena at the sharpest step, the governor stepping down, and what medium
+    smoothing costs the bloom copy here (the copy drops it on WebKit if it costs more than 0.3 ms)."""
+    if not d.run("return !!(window.SC && SC.res)"):
+        return check('resolution: SC.res (older build)', True, 'skipped')
+    d.inner_size(1800, 1300)   # big enough that step 0 is sharper than step 3 at this engine's pixel ratio of 1
+    d.run("resize()")
+    r = d.run("""
+      const bad = [];
+      SC.res.force(0);
+      for (const k of Object.keys(SC.reg.MAPS)) {
+        const e0 = SC.errors.length;
+        try { SC.start({ mode: 'watch', map: k }); SC.G.lock = 0; SC.sim(.5); SC.render(1 / 60); SC.render(1 / 60); }
+        catch (e) { bad.push(k + ': ' + e.message); }
+        if (SC.errors.length > e0) bad.push(k + ': ' + SC.errors[SC.errors.length - 1].msg);
+      }
+      const size = [cv.width, cv.height, Math.round(innerWidth * resDpr(0)), Math.round(innerHeight * resDpr(0))];
+      SC.res.force(null); SC.render(1 / 60);
+      return { n: Object.keys(SC.reg.MAPS).length, bad, size };
+    """)
+    check('resolution: all %d arenas render at step 0' % r['n'], not r['bad'] and r['size'][0] == r['size'][2] and r['size'][1] == r['size'][3],
+          ('; '.join(r['bad']) or json.dumps(r['size']))[:160])
+    # 25 ms frames in a neon arena with bloom High: the bloom steps change something at any pixel ratio, so it steps down.
+    r = d.run("""
+      const R = SC.res.RES, keep = SETTINGS.bloom;
+      SETTINGS.bloom = 'high'; SC.res.auto(true);
+      SC.start({ mode: 'versus', map: 'neon' }); SC.G.lock = 0; SC.G.state = 'paused';
+      Object.assign(R, { step: 0, cool: 0, avg: 0 }); SC.render(0); R.cool = 0;
+      const seen = [R.step];
+      for (let k = 0; k < 900; k++) { const s = SC.res.feed(25); if (s !== seen[seen.length - 1]) seen.push(s); }
+      SC.render(0);
+      const out = { seen, shown: R.shown, tier: SC.postfx.bloom.tier, held: R.held, errors: SC.errors.map(e => e.msg).slice(-3) };
+      SC.res.auto(false); SETTINGS.bloom = keep; SC.render(0);
+      return out;
+    """)
+    check('resolution: SC.res.feed steps down', len(r['seen']) > 1 and r['seen'][1] > r['seen'][0] and not r['errors'], json.dumps(r))
+    # The bloom copy at the sharpest step: low vs medium smoothing, ms per copy (60 copies timed together, as WebKit's
+    # clock is coarse; read back so the work is counted), alternating three times.
+    r = d.run("""
+      SC.start({ mode: 'watch', fighters: 8, map: 'neon' }); SC.G.lock = 0; SC.sim(1); SC.G.state = 'paused';
+      SC.res.force(0); SC.render(1 / 60);
+      const c = document.createElement('canvas'), out = { canvas: cv.width + 'x' + cv.height, low: [], medium: [] };
+      c.width = Math.ceil(VIEW.w3 / 4); c.height = Math.ceil(VIEW.h3 / 4);
+      const g = c.getContext('2d');
+      for (let rep = 0; rep < 3; rep++) for (const q of ['low', 'medium']) {
+        g.imageSmoothingQuality = q; g.getImageData(0, 0, 1, 1);
+        const t0 = performance.now();
+        for (let k = 0; k < 60; k++) { g.drawImage(cv, 0, 0, c.width, c.height); g.getImageData(0, 0, 1, 1); }
+        out[q].push(+((performance.now() - t0) / 60).toFixed(3));
+      }
+      SC.res.force(null); SC.render(1 / 60);
+      return out;
+    """)
+    check('resolution: bloom copy smoothing cost (informational)', True, json.dumps(r))
+    d.inner_size(1280, 720)
+    d.run("resize()")
+
+
 def v4_checks(d, check):
     """Arena art styles, iPad table mode, the Compact 2P laptop layout, the controls card and the rule vote in WebKit."""
     # Every art style renders with 8 fighters; the pixel layer is scaled up without smoothing.
@@ -299,6 +357,7 @@ def main():
           return { n: Object.keys(SC.reg.MAPS).length, bad };
         """)
         check('arenas: all %d render' % r['n'], not r['bad'], '; '.join(r['bad'])[:160])
+        res_checks(d, check)
 
         # Every menu screen builds.
         r = d.run("""

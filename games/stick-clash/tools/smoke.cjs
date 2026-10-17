@@ -593,7 +593,8 @@ async function testV3Screens(browser) {
     await page.evaluate(() => { SC.G.score[0] = SC.G.winScore - 1; damage(SC.F[1], 999, { src: SC.F[0], kind: 'melee', nx: 1, ny: -.3 }); });
     const live = await page.evaluate(() => SHARDS.length > 0 && KC.events.some(e => e.kind === 'shatter'));
     // The replay starts after the K.O. delay; wait until its clock passes the K.O. so the pieces are re-spawned.
-    await page.waitForFunction(() => KC.play && KC.play.clock > KC.play.ko.t + .15, null, { timeout: 9000 });
+    // The slow-motion lead-up alone takes ~9 s on a slow 2-core runner, so allow 15.
+    await page.waitForFunction(() => KC.play && KC.play.clock > KC.play.ko.t + .15, null, { timeout: 15000 });
     const replay = await page.evaluate(() => ({ state: SC.G.state, shards: SHARDS.length, hidden: SC.F.some(f => !f.alive && f.shatterT > 0) }));
     await page.screenshot({ path: path.join(SHOTS, 'v3-killcam-shatter.png') });
     await page.evaluate(() => SC.killcam.skip());
@@ -824,6 +825,7 @@ function summary(r) {
     if (fs.existsSync(path.join(__dirname, 'smoke-feel.cjs'))) await require('./smoke-feel.cjs').run(browser, { check, rows });   // v4 feel: silly bodies upright, hit-stop + knockback, guns vs melee, distinct blades, CPU slips + ladder
     if (fs.existsSync(path.join(__dirname, 'smoke-2p.cjs'))) await require('./smoke-2p.cjs').run(browser, { check, rows, SHOTS });   // v4 two players: rivalry, handicap, quick rematch, co-op waves + quest, silly vote, tag team, round length
     if (fs.existsSync(path.join(__dirname, 'smoke-sound.cjs'))) await require('./smoke-sound.cjs').run(browser, { check, rows, SHOTS });   // v4 sound: per-weapon sounds, grunts + limits, lead melodies, voice settings, no-audio match, voice cap
+    if (fs.existsSync(path.join(__dirname, 'smoke-res.cjs'))) await require('./smoke-res.cjs').run(browser, { check, rows });   // v4.1 adaptive resolution: forced steps, governor down/up/holds, pins, fixed buffers + backdrop cache
   } catch (e) {
     failures.push('smoke crashed: ' + (e.stack || e.message));
   } finally {

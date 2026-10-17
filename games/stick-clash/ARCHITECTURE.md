@@ -284,8 +284,9 @@ HUD band (v3.1): on a landscape screen taller than 16:9 (4:3 iPads) the letterbo
 HUD block (`VIEW.hudH = hudBlockPx()`, the same row maths as `drawHUD`) and puts it in the band (`VIEW.hudY =
 max(0, vy − hudH)`); whatever doesn't fit still overlaps the top of the viewport by `VIEW.hudOver` px (0 on a 12.9"
 iPad, ~45 on an 11", the whole block on 16:9). The `MUTED (M)` note sits at the viewport's bottom corner.
-`ctx` is the 2D context; its backing store is capped at ~2.3 megapixels (`MAX_CANVAS_PIXELS`) and CSS scales it up,
-because the frame cost grows with pixels while the arena is a fixed 1280x720 drawing. `VIEW.inset` (v3.2) is the top
+`ctx` is the 2D context; its backing store follows the **resolution step** of 84-quality's ladder (v4.1, see
+"Adaptive resolution" under "v4.1 graphics"): up to the screen's own pixels while frames keep up, step 3 being the old
+~2.3 MP cap; CSS scales it to the window. `VIEW.inset` (v3.2) is the top
 safe-area inset in canvas px, measured by a hidden probe (`#safe-probe`, `padding-top: env(safe-area-inset-top)`): a
 home-screen (standalone) app has the status bar over the page, so `hudLayout` keeps `VIEW.hudY` below it in both
 orientations (`hudOver` grows by whatever that pushes into the viewport). Every `getContext('2d')` in the UI and
@@ -402,8 +403,8 @@ muffles while paused / slow-mo / replaying, and adds hats when someone is low or
   swells with `CROWD.hype`; `SETTINGS.crowd` (also gates the K.O. cheer in 80).
 - **Post-fx** (84): `SETTINGS.bloom` `off|low|high`: the frame is copied to a small canvas, uploaded to WebGL (threshold,
   separable blur, output on `#bloom`, blended with CSS `mix-blend-mode: screen`). No hardware WebGL (or software
-  rendering) → a 2D glow (tiny self-multiplied copy screened back). A governor steps down (High→Low→half rate→off) after
-  ~3 s under 50 fps. `SETTINGS.lights`: additive glows for `fire`, `explode`, projectiles, burning fighters, glowing
+  rendering) → a 2D glow (tiny self-multiplied copy screened back). Steps 4-6 of the v4.1 resolution ladder step bloom
+  down (High→Low→half rate→off) when frames are slow; the old bloom governor is gone. `SETTINGS.lights`: additive glows for `fire`, `explode`, projectiles, burning fighters, glowing
   weapons/elements/Lv3, ultimates and lava/acid. `postfxImpact(x, y, nx, ny, amt, color, id)` (on every direct hit ≥ 5;
   recorded for the kill-cam) = direction sparks, flash, shockwave, squash-and-stretch (`postfxSquash` in `drawFighter`).
   `SETTINGS.juice` `calm|normal|chaos` scales particles/shake (wraps `applySettings`), slow-mo, flashes (chaos adds
@@ -863,6 +864,203 @@ sets `crowd: [min, max, default]` to get a "Fighters" stepper on the arena scree
   Test hook `SC.quest = { nodes(), challenges(), start(kind, id, extra), win(), run(), dialogue() }`;
   `tools/smoke-quest.cjs` runs every node and challenge. Win rates of the late nodes for an autopilot (Normal) hero with
   no / mid / full skill tree are in `tmp/balance.md` (bench: `tmp/lead2/camp.cjs`).
+
+## v4.1 graphics (sharper, richer, same file size)
+
+Drawing only: no game state, physics, hitboxes or timing changed. The shipped file did not grow (1,503,614 B against
+v4's 1,504,328 B): new drawing code was paid for by consolidating repeated code into shared helpers.
+
+### Rendering (`85-render.js`)
+
+`ctx`'s backing store follows the **resolution step** of 84-quality's ladder (below): up to the screen's own pixels while
+frames keep up, step 3 being the old cap (~2.3 MP, at most 2x). `MAX_CANVAS_PIXELS` is gone (`RES_PX[3]`). `resize(step)`
+sizes the canvas for `RES.shown`; `step === 1` means the ladder changed the step, anything else (the window, a rotation,
+92-device, tests) is a real resize, which also redraws the backdrop cache once, 400 ms after the last one. Either sets a
+30-frame cool-down for the governor. New `VIEW` fields: `glowK` = dpr ÷ step-3 dpr (the render wrap multiplies
+`GLOW_SCALE` by it, because `shadowBlur` counts canvas pixels: glows keep their size at every step), and `w3 x h3` = the
+step-3 canvas size, which fixed-size effect buffers use (bloom, the K.O. colour split), so a step never reallocates them
+or changes their cost. `screenToWorld` was removed (unused).
+Shared hazards: `HAZARD_DRAW.spikes(ctx, hz, t)` has Spike Pit's old look (steel spikes of two heights, glowing tips in
+`hz.color`, a faint glow; agent B removes `spikeDraw`); `drawLiquid` draws a fainter wave rolling the other way behind the glowing
+one and an additive highlight along its crest; `drawGridFloor`'s grid fades toward the horizon (a gradient of the floor
+colour over the floor's top half, cheaper in software rendering than a gradient on the lines; its `fill` must be hex);
+the default `drawSolid` is 60's `mapSlab(ctx, s, palette.solid, move ? accent : line)`; `drawStdBackground` is
+`mapSky` + `mapStars` + `drawGridFloor` (a bottomless map gets a `mapGlow` at the bottom). HUD helpers: `hudBadge` (a dark
+disc, ring and icon: skills, class, throwables, mount, statuses), `hudHealth` (the full and compact health bars) and
+`hudGrid(n)` (the card grid, shared by `drawHUD` and `hudBlockPx`).
+
+### Adaptive resolution (`84-quality.js`)
+
+One ladder, cheapest last: steps 0-3 give the canvas 6, 4, 3 and 2.3 MP (`RES_PX`), each capped at `devicePixelRatio`
+(only step 3 also at 2x, the old formula exactly); 4-6 step bloom down (High -> Low, half rate, off: `BLOOM.tier` 1-3,
+set by `resApply` every frame); 7 is an emergency 1.6 MP. `resNext` skips steps that change nothing on this screen (same
+canvas scale and bloom level). The tier sets the start and ceiling steps (`RES_TIERS`): High 0/0, Medium 1/0, Low 3/3,
+no benchmark yet 1/0 (`resTier`, called by `perfApplyTier`).
+- **Measured:** the frame gap the render wrap already sees (an average, `RES.avg`), only in `'play'` with `dt > 0` and the
+  governor on: never in a pause, the kill-cam, photo mode, results, the menu demo or the benchmark.
+- **Down:** an average over 20 ms for 45 frames (150 before a bloom step) dives one step, judged on the mean of its next
+  60 frames. A dive's step at least 12% faster than where the dive began stays. iOS snaps to 60/30 fps, so a smaller
+  gain shows as none: a step with no gain carries on to the end of its group (pixel steps to 3, bloom steps to 6); past
+  that, the dive is undone (back to its start) and dives hold for 30 s, then for the session. A steady 30 fps is
+  measured like any rate, never assumed to be a cap.
+- **Up:** 4 s of play under 17.5 ms climbs one pixel step; bloom stays down for the session (`RES.floor`). 50-57 fps is a
+  dead band. A climb undone within 3 s (slow again) doubles the wait (up to 60 s); when the climb to the same step is
+  undone twice, the step it fell back to becomes the session's ceiling.
+- Changes land at the start of the next render (`resApply`; a resized canvas is blank until redrawn), then 30 frames
+  settle; a hidden tab coming back settles too (`visibilitychange`).
+- **Pins** (`resStep`): the benchmark measures at step 3 with full bloom (the tier thresholds keep their meaning), photo
+  mode draws at step 0 (sharper PNGs) and is back on the governor's step on exit, a highlight export records at step 3.
+- **Tests:** under `navigator.webdriver` the governor is off and the canvas is step 3, so every older test sees the old
+  canvas. `SC.res = { RES, force(step | null), auto(on), feed(gapMs, n) }`: force a step, switch the governor on (from
+  the tier's start, nothing learned) or feed it frame gaps. `tools/smoke-res.cjs` covers it (also run by smoke.cjs).
+- Memory: a 2732x2048 canvas at step 0 on a 12.9" iPad; the bloom buffers and the K.O. scratch stay at their step-3 size.
+
+### Post-fx (`84-postfx.js`)
+
+The bloom governor is gone: steps 4-6 of the resolution ladder do that job (above). The bright pass weighs
+`.6 · max channel + .4 · luma`, so saturated colours (pure blue) no longer bloom like white. The bloom copy uses medium
+image smoothing above step 3 (where it shrinks the canvas most and thin lines shimmered); at step 3 and below it keeps
+low smoothing (medium costs 2-3 ms a frame in Chromium's software rendering; in WebKit it measured no extra cost, so it
+is kept there). The 2D fallback glow reuses `bloomCopy(8)`, and the WebGL path sizes its targets from its copy. Neon's
+(and pixel's) impacts are drawn by `artImpact` too, with `PFX_NEON`'s spark, flash and ring (additive, so the drawing
+order doesn't matter).
+
+### Particles (`35-effects.js`)
+
+Particles batch by colour and 8 alpha steps (was 4). In neon, moving particles are velocity streaks: 1/80 s of travel,
+at most 4 sizes long (a huge hit's sparks would otherwise be long lines, and a streak's cost grows with its length), one
+stroke per group at the group's mean size, butt ends (round ends cost about 2.5x as much in software rendering).
+Particles that have nearly stopped (resting on the floor) stay squares; each colour keeps 16 lists (squares, then
+streaks, by alpha).
+The art styles keep their own shapes (59's proxy turns each `rect` into the style's `dot`).
+A particle with `soft: 1` is drawn as a swelling, fading `postfxSprite` (87's landing dust). `fxCompact(list, keep)`
+takes an optional filter (84-postfx's `fxCompactBy` was folded into it).
+
+### Game feel (`87-juice.js`)
+
+The K.O. colour split is a true split: the red copy and the cyan copy (shifted over an unshifted one, so its edge stays
+filled) are combined in one scratch canvas (a quarter of the step-3 pixels, two halves tall) and laid over the frame
+once with normal blending: no brightening, one full-screen pass instead of two. Hard landings throw soft dust puffs
+(sprites that swell and fade). `juiceSettingsExtras` now also adds 59's "Arena art" row (Effects) and 84's Performance
+group, the only Settings wrapper of the effect slices.
+
+### Art styles (`59-styles.js`)
+
+- `artBackdrop(m, st)`: its scale `ART.k` comes from the session ceiling's step (84-quality; step 3 when the governor is
+  off), rounded up to .25, at most 4.2 MP (2.4 MP on Low), so resolution steps never redraw it; a real resize redraws it
+  once, 400 ms after the last one (the old image is drawn stretched meanwhile). `ART.cache.n` counts the redraws.
+- `artWorld`: `ART.tier` is the quality tier's glow scale (`GLOW_SCALE` without `VIEW.glowK`); the pixel layer draws with
+  it (its size doesn't follow the step), and paper's card shadows blur by `3 · z · ART.tier` (Low: hard shadows).
+- The pixel layer's pixels are a whole number of canvas pixels (even blocks at any step).
+- Chalk grain stays a 64px tile at pattern scale 1: a 128px tile at scale .5 was crisper when zoomed in, but cost about
+  10% of a chalk arena's frame in software rendering (Spike Pit), so it was cut. The pattern cache drops its oldest
+  entry past 200 instead of clearing.
+- `artColor` gives glowless styles (ink, paper, chalk, mono) transparent shadows itself; their `map`s no longer do.
+
+### GLOW_SCALE
+
+Inside `render` it also carries `VIEW.glowK`. The direct `shadowBlur` uses in 22-moves (guard arc), 33-power (Lv3
+sparks), 36-shatter (limb pieces) and 56-fusion (element glow) multiply by it now (61-maps-hazard's is agent B's).
+
+### Testing (resolution)
+
+`node tools/smoke-res.cjs` (also run by smoke.cjs): forced steps at 1366x1024@2 and 844x390@3 (canvas sizes, glowK,
+bloom tiers, skipped steps, fixed bloom buffers), the governor (down, no-gain carry-on, undo and hold, gain stops a dive,
+climb, doubled wait, ceiling, dead band), holds and pins (pause, results, photo, export, kill-cam, benchmark) and the
+backdrop cache (no redraw across steps, one redraw 400 ms after a resize). `tools/fx-perf.cjs` flags: `--map`,
+`--size WxH@dpr`, `--step`, `--rows`, `--bench N`, `--free` (unthrottled frames), `--sync` (render time including
+raster), `--json`. `tools/webkit-check.py` also renders every arena at step 0, runs an `SC.res.feed` dive and times the
+bloom copy's smoothing.
+
+### Map toolkit (`60-maps.js`)
+
+```js
+mapPen(c, color, width)          // strokeStyle + lineWidth + beginPath (shared shorthand, every arena slice uses it)
+mapRect(c, color, x, y, w, h)    // fillStyle + fillRect          mapBrush(c, color)  // fillStyle + beginPath
+mapSeg(c, x1, y1, x2, y2)        // moveTo + lineTo               mapEdge(c, s, color, w) // glowLine along a solid's top
+mapSign(ctx, text, x, y, size, color, blur)   // big warning text; its glow goes through glow() (quality tiers)
+mapVGrad(c2, x, y, w, h, colors) // vertical gradient, stops evenly spaced top to bottom (mapGrad builds a real one)
+mapGround(c2, floorY, fill | stops, edge, width = 3, deco)   // the ground: fill, deco(), depth falloff, lit lip, edge
+mapFar(c2, d, draw, m)           // parallax decoration layer at depth d (see below)
+mapHaze(c2, horizonY, h, color, alpha)        // haze between depth layers, thickening down to the horizon
+mapSun(c2, x, y, r, stops, bandColor, t)      // banded sun; t slides the bands (0 = still, for a cached layer)
+mapSkyline(c2, baseY, n, seed, hMax, body, windowColor?, t)   // seeded towers (40 px skirt), slowly switching windows
+mapSoft(c2, y0, y1, draw)        // dense soft decoration at quarter resolution (see below)
+mapPuff(c2, x, y, rx, ry, color, alpha)       // one soft puff: 84's postfxSprite stretched to an ellipse (hex colour)
+mapClouds(c2, t, { y, n, sp, rx, ry, col, a, puffs, seed })   // a drifting, wrapping row of puffy clouds
+mapSmoke(c2, t, x, y, { n, rate, r0, r1, h, sway, drift, col, a })   // a rising plume (CALDERA_SMOKE: Caldera + Eruption)
+```
+- **Strips.** `mapVGrad` draws a vertical gradient from a cached 1x64 canvas stretched over the rect (`MAP_STRIPS`):
+  on a software-rendered canvas (measured in headless Chromium) that is about a tenth of a gradient fill (0.3 vs 3.5 ms
+  for a full-screen sky) and looks the same. `mapSky`, `mapGround`, `mapHaze`, `mapSun` and `mapSlab` use it. Style proxies (`artRaw(c2) !== c2`,
+  the pixel layer, paper/ink/chalk backdrop builds) and the neon look of a styled arena (`MAP.style` set) keep a real
+  gradient: styles are timed against that neon look (smoke-styles), so it must not get cheaper.
+- `mapSlab` (same signature) adds a soft contact shadow under the slab and a bevel (lit top fading to a dark base).
+  ink/paper/chalk still use their own `style.slab`.
+- `mapParticles` takes `x0`/`x1` (a horizontal band) and draws in three alpha groups, one path and one fill (or
+  stroke) each, instead of one fill per speck.
+- `mapGround` replaced the copied floor fills: `deco()` is the arena's own floor detail (planks, seams, belts), drawn
+  before the falloff so it fades with depth. Pass `edge = null` for split edges (Spike Pit, Robo Factory).
+
+### Parallax and the world-lock rule
+`mapFar(c2, d, draw, m)` shifts a decoration layer by `((CAM.x - W/2)·d, (CAM.y - H/2)·d/2)`, so it moves less than
+the world. Only on the live canvas (`c2 === ctx`, or mapSoft's layer): arena thumbnails draw it flat; the kill-cam and
+photo mode set `CAM`, so it follows them. With `m`, `draw` must be static: it is drawn once into 59's single backdrop
+cache through `artBackdrop({ key: m.key + '~', art: { bg: draw } }, STYLES.neon)` (a style proxy draws it live).
+**World-lock rule:** anything a fighter can stand on, touch, be hurt by, grab or must read stays in world space and is
+never shifted: solids, hazards and their warnings, walls, vines, pads, zones, breakables and whatever holds them up
+(Storm's tower and billboard), the floor line and ground, the planets. Only decoration behind all of it may move, and
+any layer that reaches the horizon runs 40 px below the floor (its "skirt"), so the shift never opens a gap.
+Depths used: Neon City sun/towers .25, lit windows .12; Foundry gears .2, chimneys .1; Caldera volcano and plume .2;
+Sky Islands clouds .35/.2/.1, isles .3; Rainbow Bounce stars .25, rainbow .2, balloons .15; Asteroid nebulae and deep
+stars .15 (cached); Storm clouds .3/.2/.1, city in rain haze .15.
+**When to cache (`m`).** The cached layer is drawn scaled every frame (camera zoom and parallax are never a whole
+pixel), which a software-rasterised canvas pays per covered pixel: about 4.3 ms for a full 1280x720 view in headless
+Chromium, against 0.4 ms for a 1:1 blit. Only a layer that costs more than that live is worth caching. Measured with
+`arena-perf --vs` (cached vs live, same fights): Asteroid -8% (three large nebula glows: cached), Neon City +1%,
+Foundry +5%, Caldera +10%, Rainbow Bounce +16% (cheap after the strips: drawn live).
+
+`mapSoft(c2, y0, y1, draw)` draws `draw(g)` at quarter resolution into 58's layer canvas (`worldLayer()`), then lays
+rows y0..y1 over the arena in one stretched draw: overlapping soft puffs cost a sixteenth. `mapFar` inside it still
+shifts (the layer is tagged `live`). Thumbnails and style proxies draw straight onto their canvas. Used by the Storm's
+cloud deck and Sky Islands' clouds.
+
+### World (`58-world.js`)
+- Rain: `wxRain(ctx, t)` draws two depth layers (fine, faint, slower streaks behind; long ones in front) slanting with
+  `PHYS.windX`; the rain weather and the Storm Rooftop share it. Snow falls in two depth layers (three fills each).
+- Shade layer: `worldLayer()` is the quarter-resolution canvas; `worldDrawShade(ctx, color, alpha, holes, paint)`.
+  A light (`{ x, y, r, a, c }`) with a hex colour `c` also tints its pool (an additive postfxGlow into the layer, so it
+  costs next to nothing; styles with additive light only): lanterns, lava and acid, shots. `paint(g)` adds soft extras in
+  world units after the holes: the fog weather's banks, and a map's `mist(g, t)` hook.
+- Darkness (`MAP.dark` or night) in chalk arenas uses a slate shade; the fighters' own additive glow is drawn only for
+  styles with additive light (neon, pixel), like 84's lights.
+- Map fields: `lights(t)` entries may carry `c` (colour); `mist(g, t)` paints into the dark layer (Haunted Graveyard's
+  fog banks). The Haunted Graveyard now uses `dark: .8` + `lights()` + `mist()` instead of its own darkness canvas.
+
+### Arenas
+- Spike Pit's spikes use `HAZARD_DRAW.spikes` (85); its own `spikeDraw` is gone.
+- Neon City: no random skyline array or `skyTop` (it paints with `mapSky`); its sun is a banded `mapSun`.
+- The Storm billboard and the tunnel / eruption / gust / fruit warnings draw through `mapSign` (no raw shadowBlur).
+
+### Interfaces between the map, style and render slices
+- `mapSlab(ctx, s, fill, edge, alpha)` keeps its signature; 85's default `drawSolid` gets the shadow and bevel by
+  delegating to it. `mapGround` / `mapVGrad` are there for `drawStdBackground` too.
+- `artBackdrop(m, st)` is called with a stand-in map `{ key, art: { bg } }` and `STYLES.neon`: it must keep reading only
+  `m.key`, `m.art.bg` and `st.key` (whatever it sizes the cache from).
+- `postfxSprite(color)` / `postfxGlow` are called with `#rrggbb` colours only (puffs, fog banks, coloured pools).
+- 85's `glowLine` and `drawGridFloor` and `HAZARD_DRAW.spikes` are called unchanged (Neon City and the Foundry keep
+  `drawGridFloor`; Spike Pit's hazard has no `draw` of its own any more).
+- Arena thumbnails stay flat. The Haunted Graveyard's thumbnail no longer shows the darkness (it comes from the shade
+  layer in `worldDrawTop`, which thumbnails don't draw).
+
+### Testing (arenas)
+`node tools/arena-perf.cjs` (standalone, not in smoke.cjs) times every arena with 8 fighters, the Eruption mid-eruption
+and Neon City in each weather: median ms per frame over a frozen scene, each frame read back so rasterising counts.
+A scene repeats exactly: `Math.random` is seeded and `G_STATE.t` pinned before `SC.start` (game time is never reset
+between matches, and fights drift with it), so two builds render the same fight.
+`--vs other.html` measures a second build alternately in the same browser (the reliable way to compare: absolute
+times drift by several % between runs); `--base file.json` compares with a saved run; `--styles` adds smoke-styles'
+styled-vs-neon ratios. Wrap it in the shared lock when another agent measures too.
 
 ## Content defs
 

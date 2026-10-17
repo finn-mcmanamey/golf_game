@@ -131,15 +131,21 @@ function worldDrawTop(ctx, t) {
   if (k === 'night') wxDrawMoon(ctx, t);
 }
 
-function wxDrawRain(ctx, t) {
-  const slant = clamp(PHYS.windX / 1500, -1, 1) * 16 - 3;
-  ctx.strokeStyle = 'rgba(170,205,255,.32)'; ctx.lineWidth = 1.5; ctx.beginPath();
-  for (let k = 0; k < 120; k++) {
-    const sp = 900 + mapHash(k) * 500, x = mapWrap(mapHash(k + 3) * 1400 + slant * t * 45, 1400) - 60;
-    const y = mapWrap(mapHash(k + 7) * 820 + t * sp, 820) - 50;
-    ctx.moveTo(x, y); ctx.lineTo(x + slant, y + 22);
+// Rain in two depth layers (fine and slow behind, long streaks in front) slanting with the wind; Storm uses it too.
+function wxRain(ctx, t) {
+  const slant = clamp(PHYS.windX / 1500, -1, 1) * 18 - 3;
+  for (const [n, a, lw, len, sp, seed] of [[80, .2, 1, 14, 620, 0], [64, .36, 1.6, 26, 1000, 300]]) {
+    mapPen(ctx, `rgba(170,205,255,${a})`, lw);
+    for (let k = seed; k < seed + n; k++) {
+      const x = mapWrap(mapHash(k + 3) * 1400 + slant * t * sp / 20, 1400) - 60, y = mapWrap(mapHash(k + 7) * 820 + t * sp * (1 + mapHash(k) * .5), 820) - 50;
+      mapSeg(ctx, x, y, x + slant * len / 22, y + len);
+    }
+    ctx.stroke();
   }
-  ctx.stroke();
+}
+
+function wxDrawRain(ctx, t) {
+  wxRain(ctx, t);
   const surf = wxSurfaces();                       // ripples in puddles on the ground and ledges
   ctx.strokeStyle = 'rgba(170,215,255,.45)'; ctx.lineWidth = 1;
   for (let k = 0; k < 14; k++) {
@@ -160,7 +166,10 @@ function wxSurfaces() {
 function wxDrawSnow(ctx, t) {
   ctx.fillStyle = 'rgba(245,250,255,.85)';
   for (const s of wxSurfaces()) { ctx.beginPath(); ctx.roundRect(s.x - 2, s.y - 4, s.w + 4, 6, 3); ctx.fill(); }
-  mapParticles(ctx, t, 110, { vx: PHYS.windX * .04 + 12, vy: 75, sway: 26, size: 2.6, color: '#ffffff', alpha: .9, seed: 31, shape: 'circle' });
+  // Two depth layers: small slow flakes behind, big fast ones in front.
+  for (const [n, size, vy, alpha, seed] of [[70, 1.7, 50, .6, 31], [44, 3.2, 95, .95, 57]]) {
+    mapParticles(ctx, t, n, { vx: PHYS.windX * .04 * vy / 75 + 12, vy, sway: 26, size, color: '#ffffff', alpha, seed, shape: 'circle' });
+  }
 }
 
 function wxDrawLeaves(ctx, t) {
@@ -168,13 +177,11 @@ function wxDrawLeaves(ctx, t) {
   mapParticles(ctx, t, 26, { vx: 60 + (g.k || 0) * 900 * (g.dir || 1), vy: 30, sway: 40, size: 4, color: '#9fdc7a', alpha: .7, seed: 77, shape: 'petal' });
 }
 
+// Fog: the shade layer with clear room around the players, and soft fog banks drifting through it.
 function wxDrawFog(ctx, t) {
-  worldDrawShade(ctx, '#8d99ad', .84, wxViewers().map(f => { const c = chest(f); return { x: c.x, y: c.y, r: WX.def.sight * .85, a: 1 }; }));
-  ctx.fillStyle = 'rgba(200,210,225,.08)';          // drifting fog banks
-  for (let k = 0; k < 6; k++) {
-    const x = mapWrap(mapHash(k) * W + t * (18 + k * 6), W + 600) - 300, y = 120 + mapHash(k + 9) * 480;
-    ctx.beginPath(); ctx.ellipse(x, y, 260, 50, 0, 0, TAU); ctx.fill();
-  }
+  worldDrawShade(ctx, '#8d99ad', .84, wxViewers().map(f => { const c = chest(f); return { x: c.x, y: c.y, r: WX.def.sight * .85, a: 1 }; }), g => {
+    for (let k = 0; k < 6; k++) mapPuff(g, mapWrap(mapHash(k) * W + t * (18 + k * 6), W + 600) - 300, 120 + mapHash(k + 9) * 480, 340, 70, '#c8d2e1', .5);
+  });
 }
 
 // Whose eyes the fog and announcements follow: real players, or everyone when only CPUs fight.
@@ -196,7 +203,7 @@ function wxDrawAnnounce(ctx, x, y) {
   if (!a || a.t <= 0) return;
   ctx.save();
   ctx.globalAlpha = clamp(a.t, 0, 1) * clamp((WX_ANN_LEN - a.t) * 4, 0, 1);
-  ctx.fillStyle = 'rgba(8,10,24,.8)'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - 140, y - 4, 280, 46, 12) : ctx.rect(x - 140, y - 4, 280, 46); ctx.fill();
+  mapBrush(ctx, 'rgba(8,10,24,.8)'); ctx.roundRect ? ctx.roundRect(x - 140, y - 4, 280, 46, 12) : ctx.rect(x - 140, y - 4, 280, 46); ctx.fill();
   ctx.strokeStyle = 'rgba(160,200,255,.5)'; ctx.lineWidth = 1.5; ctx.stroke();
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#e8f2ff'; ctx.font = `19px ${FONT_DISPLAY}`; ctx.fillText(a.text, x, y + 19);
   ctx.font = `13px ${FONT_BODY}`; ctx.fillStyle = 'rgba(210,225,255,.9)'; ctx.fillText(a.sub, x, y + 36);
@@ -204,32 +211,41 @@ function wxDrawAnnounce(ctx, x, y) {
 }
 
 // One quarter-resolution layer covering the arena (plus the shake margin): filled with shade, then lights cut holes.
-// The shade is soft, so the low resolution doesn't show, and it keeps the cost of a dark frame small.
+// The shade is soft, so the low resolution doesn't show, and it keeps the cost of a dark frame small. A light with a
+// colour (c) tints its pool (additive, styles with lights only); paint(g) adds soft extras such as fog banks.
 const WORLD_SHADE_K = .25, WORLD_SHADE_W = 1360 * WORLD_SHADE_K, WORLD_SHADE_H = 800 * WORLD_SHADE_K;
 let WORLD_SHADE = null;
-function worldDrawShade(ctx, color, alpha, holes) {
+function worldLayer() {   // the layer canvas (60's mapSoft borrows it for soft clouds)
   const c = WORLD_SHADE || (WORLD_SHADE = document.createElement('canvas'));
   if (c.width !== WORLD_SHADE_W) { c.width = WORLD_SHADE_W; c.height = WORLD_SHADE_H; c.g = c.getContext('2d'); }
-  const g = c.g, k = WORLD_SHADE_K;
+  return c;
+}
+function worldDrawShade(ctx, color, alpha, holes, paint) {
+  const c = worldLayer(), g = c.g, k = WORLD_SHADE_K;
   g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over';
-  g.clearRect(0, 0, c.width, c.height); g.fillStyle = rgba(color, alpha); g.fillRect(0, 0, c.width, c.height);
+  g.clearRect(0, 0, c.width, c.height); mapRect(g, rgba(color, alpha), 0, 0, c.width, c.height);
   g.setTransform(k, 0, 0, k, 40 * k, 40 * k);       // world (-40..1320, -40..760) -> layer pixels
   g.globalCompositeOperation = 'destination-out';
   for (const L of holes) {
     if (!(L.r > 0) || !Number.isFinite(L.x + L.y)) continue;
     const gr = g.createRadialGradient(L.x, L.y, 0, L.x, L.y, L.r), a = L.a ?? 1;
     gr.addColorStop(0, `rgba(0,0,0,${a})`); gr.addColorStop(.55, `rgba(0,0,0,${a * .7})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = gr; g.fillRect(L.x - L.r, L.y - L.r, L.r * 2, L.r * 2);
+    mapRect(g, gr, L.x - L.r, L.y - L.r, L.r * 2, L.r * 2);
   }
-  g.globalCompositeOperation = 'source-over';
+  g.globalCompositeOperation = 'lighter';
+  if (artNow().lights) for (const L of holes) if (L.c) postfxGlow(g, L.x, L.y, L.r * .8, L.c, (L.a ?? 1) * .4);
+  g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  if (paint) paint(g);
   ctx.drawImage(c, -40, -40, 1360, 800);
 }
 
 function worldDrawDark(ctx, dark, t) {
-  worldDrawShade(ctx, '#03040c', dark, worldLights(t));
-  ctx.save(); ctx.globalCompositeOperation = 'lighter';      // fighters glow in their own colour
-  for (const f of F) if (f.alive) { const c = chest(f); mapGlow(ctx, c.x, c.y, 80 * f.scale, f.color, .3 * dark); }
-  ctx.restore();
+  worldDrawShade(ctx, artIs('chalk') ? '#0c1414' : '#03040c', dark, worldLights(t), MAP.mist && (g => hook(MAP, 'mist', g, t)));   // chalk: slate dark
+  if (artNow().lights) {                                     // fighters glow in their own colour (additive light)
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const f of F) if (f.alive) { const c = chest(f); mapGlow(ctx, c.x, c.y, 80 * f.scale, f.color, .3 * dark); }
+    ctx.restore();
+  }
   if (!MAP.lights && WX.key === 'night') for (const L of wxLamps()) wxDrawLamp(ctx, L.x, L.y + 30, t);
 }
 
@@ -241,11 +257,11 @@ function worldLights(t) {
     const c = chest(f), tp = f.P[f.tip];
     out.push({ x: c.x, y: c.y, r: 150 * f.scale, a: .9 }, { x: tp.x, y: tp.y, r: 70, a: .6 });
   }
-  for (const p of PROJ) if (!p.dead && !p.zone) out.push({ x: p.x, y: p.y, r: 60, a: .7 });
+  for (const p of PROJ) if (!p.dead && !p.zone) out.push({ x: p.x, y: p.y, r: 60, a: .7, c: p.color });
   for (const o of ORB_LIST) out.push({ x: o.x, y: o.y, r: 80, a: .7 });
   for (const hz of MAP.hazards) {
     if (!hz.dps || mapParked(hz) || hz.w > 1400) continue;
-    out.push({ x: hz.x + hz.w / 2, y: hz.y + Math.min(hz.h, 80) / 2, r: Math.max(90, Math.min(hz.w, 400) * .75), a: .65 });
+    out.push({ x: hz.x + hz.w / 2, y: hz.y + Math.min(hz.h, 80) / 2, r: Math.max(90, Math.min(hz.w, 400) * .75), a: .65, c: hz.color });
   }
   const own = MAP.lights ? hook(MAP, 'lights', t) : (WX.key === 'night' ? wxLamps() : null);
   if (own) out.push(...own);
@@ -255,11 +271,11 @@ function worldLights(t) {
 // Night on an arena without its own lamps: a lantern hangs under the middle of each wide platform.
 function wxLamps() {
   return MAP.solids.filter(s => !mapParked(s) && s.w >= 120 && s.y > 120 && s.y < H - 40).slice(0, 5)
-    .map(s => ({ x: s.x + s.w / 2, y: s.y - 30, r: 190, a: .75 }));
+    .map(s => ({ x: s.x + s.w / 2, y: s.y - 30, r: 190, a: .75, c: '#ffc070' }));
 }
 function wxDrawLamp(ctx, x, y, t) {
   lineXY(ctx, x, y - 30, x, y - 14, '#3a3a4a', 2);
-  glow(ctx, '#ffd38a', 18, () => { ctx.fillStyle = `rgba(255,214,140,${.85 + .15 * Math.sin(t * 7 + x)})`; ctx.fillRect(x - 5, y - 14, 10, 12); });
+  glow(ctx, '#ffd38a', 18, () => { mapRect(ctx, `rgba(255,214,140,${.85 + .15 * Math.sin(t * 7 + x)})`, x - 5, y - 14, 10, 12); });
 }
 
 // ---------- breakables ----------
@@ -389,41 +405,41 @@ function brkDraw(ctx, s, t) {
   else if (s.brk === 'pillar') brkDrawPillar(ctx, s, look);
   else brkDrawCrate(ctx, s, look);
   if (hurt > .05) brkDrawCracks(ctx, s, hurt);
-  if (s.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${s.flash * 4})`; ctx.fillRect(s.x, s.y, s.w, brkVisH(s)); }
+  if (s.flash > 0) { mapRect(ctx, `rgba(255,255,255,${s.flash * 4})`, s.x, s.y, s.w, brkVisH(s)); }
   ctx.restore();
 }
 
 function brkDrawCrate(ctx, s, c) {
-  ctx.fillStyle = c.fill; ctx.fillRect(s.x, s.y, s.w, s.h);
+  mapRect(ctx, c.fill, s.x, s.y, s.w, s.h);
   ctx.strokeStyle = rgba(c.edge, .55); ctx.lineWidth = 3; ctx.strokeRect(s.x + 2, s.y + 2, s.w - 4, s.h - 4);
   ctx.lineWidth = 2; ctx.beginPath();
-  ctx.moveTo(s.x + 4, s.y + 4); ctx.lineTo(s.x + s.w - 4, s.y + s.h - 4); ctx.moveTo(s.x + s.w - 4, s.y + 4); ctx.lineTo(s.x + 4, s.y + s.h - 4);
+  mapSeg(ctx, s.x + 4, s.y + 4, s.x + s.w - 4, s.y + s.h - 4); mapSeg(ctx, s.x + s.w - 4, s.y + 4, s.x + 4, s.y + s.h - 4);
   ctx.stroke();
-  glowLine(ctx, s.x, s.y, s.x + s.w, s.y, c.edge, 2);
+  mapEdge(ctx, s, c.edge, 2);
 }
 
 function brkDrawGlass(ctx, s, c) {
-  ctx.fillStyle = c.fill; ctx.fillRect(s.x, s.y, s.w, s.h);
+  mapRect(ctx, c.fill, s.x, s.y, s.w, s.h);
   ctx.strokeStyle = rgba(c.edge, .8); ctx.lineWidth = 2; ctx.strokeRect(s.x + 1, s.y + 1, s.w - 2, s.h - 2);
   ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.beginPath();
   const d = Math.min(s.w, s.h) * .6;
-  ctx.moveTo(s.x + s.w * .2, s.y + s.h * .2 + d * .5); ctx.lineTo(s.x + s.w * .2 + d * .5, s.y + s.h * .2); ctx.stroke();
+  mapSeg(ctx, s.x + s.w * .2, s.y + s.h * .2 + d * .5, s.x + s.w * .2 + d * .5, s.y + s.h * .2); ctx.stroke();
 }
 
 function brkDrawPillar(ctx, s, c) {
-  ctx.fillStyle = c.fill; ctx.fillRect(s.x + 3, s.y, s.w - 6, s.h);
+  mapRect(ctx, c.fill, s.x + 3, s.y, s.w - 6, s.h);
   ctx.fillStyle = rgba(c.edge, .25);
   for (let x = s.x + 8; x < s.x + s.w - 6; x += 8) ctx.fillRect(x, s.y + 10, 2, s.h - 20);
-  ctx.fillStyle = c.fill; ctx.fillRect(s.x - 3, s.y, s.w + 6, 9); ctx.fillRect(s.x - 3, s.y + s.h - 9, s.w + 6, 9);
+  mapRect(ctx, c.fill, s.x - 3, s.y, s.w + 6, 9); ctx.fillRect(s.x - 3, s.y + s.h - 9, s.w + 6, 9);
   glowLine(ctx, s.x - 3, s.y, s.x + s.w + 3, s.y, c.edge, 2);
 }
 
 function brkDrawCracks(ctx, s, hurt) {
-  ctx.strokeStyle = s.brk === 'glass' ? 'rgba(255,255,255,.8)' : 'rgba(0,0,0,.55)'; ctx.lineWidth = 1.5; ctx.beginPath();
+  mapPen(ctx, s.brk === 'glass' ? 'rgba(255,255,255,.8)' : 'rgba(0,0,0,.55)', 1.5);
   const n = Math.ceil(hurt * 6), cx = s.x + s.w * .5, cy = s.y + s.h * .45;
   for (let k = 0; k < n; k++) {
     const a = mapHash(k + s.x) * TAU, L = (.3 + mapHash(k * 3 + s.y) * .5) * Math.min(s.w, s.h) * (.4 + hurt);
-    ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * L * .5 + 3, cy + Math.sin(a) * L * .5); ctx.lineTo(cx + Math.cos(a) * L, cy + Math.sin(a) * L);
+    mapSeg(ctx, cx, cy, cx + Math.cos(a) * L * .5 + 3, cy + Math.sin(a) * L * .5); ctx.lineTo(cx + Math.cos(a) * L, cy + Math.sin(a) * L);
   }
   ctx.stroke();
 }

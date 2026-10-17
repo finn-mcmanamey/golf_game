@@ -151,8 +151,9 @@ async function run(browser, { check, rows, SHOTS }) {
       const keep = { speed: SETTINGS.practiceSpeed, profile: JSON.stringify(PROFILE) }, m0 = PROFILE.stats.matches;
       SETTINGS.practiceSpeed = .25;
       SC.start({ mode: 'versus', weapons: ['blade', 'blade'], killcam: false }); SC.G.lock = 0;
+      for (const f of SC.F) if (f.ctrl === 'cpu') { f.ai.behave = 'idle'; f.ai.t = 1e9; }   // no dodge i-frames at the blow
       advance(1 / 60);                                        // a real-time step records the slowed speed for this match
-      SC.G.score[0] = SC.G.winScore - 1; damage(SC.F[1], 999, { src: SC.F[0], kind: 'melee', unblockable: true });
+      SC.F[1].inv = 0; SC.G.score[0] = SC.G.winScore - 1; damage(SC.F[1], 999, { src: SC.F[0], kind: 'melee', unblockable: true });
       for (let i = 0; i < 6000 && SC.G.state !== 'over'; i++) advance(.05);
       const card = document.querySelector('#over .results-card');
       const out = { state: SC.G.state, slowed: ACCESS_MATCH.minSpeed, counted: PROFILE.stats.matches === m0 + 1,

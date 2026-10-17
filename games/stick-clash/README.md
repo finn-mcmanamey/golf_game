@@ -32,6 +32,9 @@ secret extras stay hidden until you find them (see **Secrets** below). None of i
   (Settings → Sound → Voice grunts).
 - **Simpler progress:** no coins, shop, levels or quests. Everything is unlocked; trophies and Ranked stay, and old saves
   keep them.
+- **Sharper graphics (v4.1):** the game draws at up to your screen's full resolution (it used to draw at about half on
+  an iPad and stretch it), stepping down for a moment if it ever starts to slow. Arenas gained depth, haze, soft clouds
+  and smoke, rain falls in two layers, and sparks and bloom look cleaner. The file is no bigger.
 
 ## Controls
 

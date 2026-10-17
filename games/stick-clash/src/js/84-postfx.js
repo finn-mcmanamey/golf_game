@@ -109,16 +109,13 @@ function postfxDrawWorld(c2) {
   FX.flashA = Math.min(FX.flashA, .9 * fxFlashMul());       // calm / reduced flashing: cap full-screen flashes
   const st = artNow();
   c2.save();
-  if (st.flash) artImpact(artRaw(c2), PFX);
-  else {
-    c2.globalCompositeOperation = 'lighter';
+  if (!st.flash) {   // additive, so drawing order doesn't matter
+    c2.globalCompositeOperation = 'lighter'; c2.lineCap = 'round';
     if (SETTINGS.lights !== false && st.lights) postfxDrawLights(c2);
-    postfxDrawWaves(c2);
-    postfxDrawSparks(c2);
-    postfxDrawFlashes(c2);
   }
+  artImpact(st.flash ? artRaw(c2) : c2, PFX, st.flash ? st : PFX_NEON);
   c2.restore();
-  for (const k of ['lights', 'waves', 'sparks', 'flashes']) fxCompactBy(PFX[k], e => postfxAge(e) < e.life && postfxAge(e) > -1);
+  for (const k of ['lights', 'waves', 'sparks', 'flashes']) fxCompact(PFX[k], e => postfxAge(e) < e.life && postfxAge(e) > -1);
 }
 
 // A soft round light sprite per colour (white-hot centre fading out), drawn scaled.
@@ -167,18 +164,6 @@ function postfxFighterLights(c2, f, flick) {
   postfxGlow(c2, (tip.x + hand.x) / 2, (tip.y + hand.y) / 2, 95, col, .3 * flick(f.id + 1));
 }
 
-function postfxDrawWaves(c2) {
-  for (const w of PFX.waves) {
-    const e = postfxAge(w), k = e / w.life;
-    if (k < 0 || k > 1) continue;
-    const r = w.r * (.2 + .8 * Math.sqrt(k));
-    c2.globalAlpha = (1 - k) * .8;
-    circle(c2, w.x, w.y, r, null, w.color, 6 * (1 - k) + 1);
-    c2.globalAlpha = (1 - k) * .45;
-    circle(c2, w.x, w.y, r * .82, null, '#ffffff', 2);
-  }
-}
-
 // Where a spark is e seconds after the hit: it slows down and falls.
 const PFX_AT = { x: 0, y: 0 };
 function postfxSparkAt(s, e) {
@@ -186,62 +171,45 @@ function postfxSparkAt(s, e) {
   PFX_AT.x = s.x + s.vx * e * slow; PFX_AT.y = s.y + s.vy * e * slow + 900 * e * e;
   return PFX_AT;
 }
-function postfxDrawSparks(c2) {
-  c2.lineCap = 'round';
-  for (const s of PFX.sparks) {
-    const e = postfxAge(s);
-    if (e < 0 || e > s.life) continue;
-    const { x, y } = postfxSparkAt(s, e);
-    c2.globalAlpha = 1 - e / s.life;
-    lineXY(c2, x, y, x - s.vx * .025, y - s.vy * .025, s.c, 2.2);
-  }
-}
-
-function postfxDrawFlashes(c2) {
-  for (const f of PFX.flashes) {
-    const e = postfxAge(f), k = e / f.life;
-    if (k < 0 || k > 1) continue;
+// Neon's (and pixel's) spark streak, flash and shockwave, for artImpact (59-styles).
+const PFX_NEON = {
+  spark: (c, p, s) => lineXY(c, p.x, p.y, p.x - s.vx * .025, p.y - s.vy * .025, s.c, 2.2),
+  flash(c, f, k) {
     const r = f.r * (.6 + k * .6), a = (1 - k) * fxFlashMul();
-    postfxGlow(c2, f.x, f.y, r * 1.6, f.color, a);
-    postfxGlow(c2, f.x, f.y, r * .7, '#ffffff', a);
-    c2.globalAlpha = a;
+    postfxGlow(c, f.x, f.y, r * 1.6, f.color, a);
+    postfxGlow(c, f.x, f.y, r * .7, '#ffffff', a);
+    c.globalAlpha = a;
     for (let q = 0; q < 4; q++) {      // a four-point star, turned to the hit direction
       const ang = f.a + q * Math.PI / 2, L = r * (q % 2 ? .8 : 1.6);
-      lineXY(c2, f.x, f.y, f.x + Math.cos(ang) * L, f.y + Math.sin(ang) * L, '#ffffff', 3 * (1 - k) + 1);
+      lineXY(c, f.x, f.y, f.x + Math.cos(ang) * L, f.y + Math.sin(ang) * L, '#ffffff', 3 * (1 - k) + 1);
     }
-  }
-}
-
-// Keeps the entries that pass `keep`, in place.
-function fxCompactBy(list, keep) {
-  let n = 0;
-  for (let i = 0; i < list.length; i++) if (keep(list[i])) list[n++] = list[i];
-  list.length = n;
-}
+  },
+  ring(c, x, y, r, w, color, a) { c.globalAlpha = a; circle(c, x, y, r, null, color, w - 1); c.globalAlpha = a * .56; circle(c, x, y, r * .82, null, '#ffffff', 2); },
+};
 
 // ---------- bloom ----------
-// locked: the governor found bloom is not what makes frames slow (or the device caps at 30 fps), so it stays at Low
-// for the session instead of going off. probe: a 60-frame measurement with bloom off, before any step down.
+// tier: from the resolution ladder (84-quality): 1 High -> Low, 2 half rate, 3 off. Bloom works at the step-3 canvas
+// size (VIEW.w3 x h3) at every step: the same cost, no textures reallocated.
 const BLOOM = { gl: null, cv: null, mode: 'none', failed: false, progs: null, src: null, fb: [], w: 0, h: 0,
-  small: null, half: null, allowSoftware: false, ms: 0, dtAvg: 1 / 60, slowFrames: 0, tier: 0, frame: 0,
-  locked: false, probe: null, cap: { n: 0, hits: 0 } };
+  half: null, allowSoftware: false, tier: 0, frame: 0 };
 const BLOOM_Q = { low: { ds: 4, thr: .6, k: .8, passes: 1 }, high: { ds: 3, thr: .55, k: 1.05, passes: 2 } };
 
 const BLOOM_VS = 'attribute vec2 p;varying vec2 uv;void main(){uv=p*.5+.5;gl_Position=vec4(p,0.,1.);}';
+// bright: .6 max channel + .4 luma, so saturated colours (pure blue) don't bloom like white.
 const BLOOM_FS = {
   bright: 'precision mediump float;uniform sampler2D t;uniform vec2 px;uniform float thr;varying vec2 uv;void main(){' +
     'vec3 c=(texture2D(t,uv+px*vec2(-1.,-1.)).rgb+texture2D(t,uv+px*vec2(1.,-1.)).rgb+texture2D(t,uv+px*vec2(-1.,1.)).rgb+texture2D(t,uv+px).rgb)*.25;' +
-    'float l=max(c.r,max(c.g,c.b));gl_FragColor=vec4(c*smoothstep(thr,thr+.3,l),1.);}',
+    'float l=.6*max(c.r,max(c.g,c.b))+.4*dot(c,vec3(.2126,.7152,.0722));gl_FragColor=vec4(c*smoothstep(thr,thr+.3,l),1.);}',
   blur: 'precision mediump float;uniform sampler2D t;uniform vec2 px;varying vec2 uv;void main(){' +
     'vec3 c=texture2D(t,uv).rgb*.227+(texture2D(t,uv+px*1.385).rgb+texture2D(t,uv-px*1.385).rgb)*.316' +
     '+(texture2D(t,uv+px*3.231).rgb+texture2D(t,uv-px*3.231).rgb)*.07;gl_FragColor=vec4(c,1.);}',
   out: 'precision mediump float;uniform sampler2D t;uniform float thr;varying vec2 uv;void main(){gl_FragColor=vec4(texture2D(t,uv).rgb*thr,1.);}',
 };
 
-// Wanted quality right now ('off' | 'low' | 'high'); the frame governor (bloomGovern) may step it down.
+// Wanted quality right now ('off' | 'low' | 'high'); the resolution ladder (84-quality) may step it down.
 function bloomWanted() {
   const q = SETTINGS.bloom || 'off';
-  if (q === 'off' || BLOOM.tier >= 3 || BLOOM.probe) return 'off';   // probe: a moment without bloom, to measure
+  if (q === 'off' || BLOOM.tier >= 3) return 'off';
   return q === 'high' && BLOOM.tier >= 1 ? 'low' : q;
 }
 
@@ -327,10 +295,10 @@ function bloomPass(gl, prog, srcTex, target, px, thr) {
 function bloomRenderGL(q) {
   if (!bloomInit()) return false;
   const gl = BLOOM.gl, P = BLOOM.progs, Q = BLOOM_Q[q];
-  bloomTargets(gl, Math.max(1, Math.ceil(cv.width / Q.ds)), Math.max(1, Math.ceil(cv.height / Q.ds)));
+  const half = bloomCopy(Q.ds);            // uploading a small copy is far cheaper than the full canvas
+  bloomTargets(gl, half.width, half.height);
   gl.enableVertexAttribArray(0);
   gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-  const half = bloomCopy(Q.ds);            // uploading a small copy is far cheaper than the full canvas
   gl.bindTexture(gl.TEXTURE_2D, BLOOM.src);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, half);
   const [A, B] = BLOOM.fb, tx = 1 / BLOOM.w, ty = 1 / BLOOM.h;
@@ -343,26 +311,21 @@ function bloomRenderGL(q) {
   return true;
 }
 
-// A 1/ds-size copy of the game canvas (still well above the ~128x128 size under which browsers keep a canvas on the
-// CPU, which would force a slow read-back).
+// A 1/ds-size copy of the step-3 canvas (still well above the ~128x128 size under which browsers keep a canvas on the
+// CPU, which would force a slow read-back). Sharper steps shrink more: medium smoothing stops thin lines shimmering.
 function bloomCopy(ds) {
   const h = BLOOM.half || (BLOOM.half = document.createElement('canvas'));
-  const w = Math.max(1, Math.ceil(cv.width / ds)), hh = Math.max(1, Math.ceil(cv.height / ds));
+  const w = Math.max(1, Math.ceil(VIEW.w3 / ds)), hh = Math.max(1, Math.ceil(VIEW.h3 / ds));
   if (h.width !== w || h.height !== hh) { h.width = w; h.height = hh; }
   const g = h.getContext('2d');
-  g.globalCompositeOperation = 'copy';
+  g.globalCompositeOperation = 'copy'; g.imageSmoothingQuality = VIEW.glowK > 1 ? 'medium' : 'low';
   g.drawImage(cv, 0, 0, w, hh);
   return h;
 }
 
 // The 2D fallback: a tiny copy of the frame, multiplied by itself (keeps only bright colours), screened back on top.
 function bloomRender2D(q) {
-  const k = BLOOM_Q[q].k * (SETTINGS.reduceFlash ? .6 : 1) * .55;
-  const s = BLOOM.small || (BLOOM.small = document.createElement('canvas'));
-  const sw = Math.max(1, Math.round(cv.width / 8)), sh = Math.max(1, Math.round(cv.height / 8));
-  if (s.width !== sw || s.height !== sh) { s.width = sw; s.height = sh; }
-  const g = s.getContext('2d');
-  g.globalCompositeOperation = 'copy'; g.drawImage(cv, 0, 0, sw, sh);
+  const k = BLOOM_Q[q].k * (SETTINGS.reduceFlash ? .6 : 1) * .55, s = bloomCopy(8), g = s.getContext('2d');
   g.globalCompositeOperation = 'multiply'; g.drawImage(s, 0, 0); g.drawImage(s, 0, 0);
   ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = k;
@@ -373,8 +336,7 @@ function bloomRender2D(q) {
 // Called by render() once the arena is drawn, before the HUD (so the HUD never glows).
 function postfxFrame(dt) {
   if (typeof document === 'undefined') return;
-  const t0 = performance.now(), q = artNow().bloom ? bloomWanted() : 'off';   // bloom is neon's (59-styles)
-  bloomGovern(dt, q);
+  const q = artNow().bloom ? bloomWanted() : 'off';   // bloom is neon's (59-styles)
   let shown = false;
   BLOOM.frame++;
   if (q !== 'off' && BLOOM.gl && BLOOM.tier >= 2 && BLOOM.frame % 2 && dt > 0) shown = true;   // half rate: keep the last glow
@@ -383,44 +345,6 @@ function postfxFrame(dt) {
     if (!shown) { bloomRender2D(q); BLOOM.mode = '2d'; }
   }
   if (BLOOM.cv) BLOOM.cv.style.display = shown ? '' : 'none';
-  BLOOM.ms += (performance.now() - t0 - BLOOM.ms) * .05;
-}
-
-// Keeps the frame rate up. While bloom is on and frames stay slow (< 50 fps) for ~3 s, a probe turns bloom off for
-// 60 frames: if that barely helps (< 12% faster), bloom isn't the cost (a slow CPU, a frame cap) and it is locked at
-// Low for the session instead of being switched off; otherwise it steps down for the session: High -> Low, then glow
-// at half rate, then off (software-rendered WebGL, e.g. without a GPU, needs this). A steady 30 fps (iOS Low Power
-// Mode caps there) locks straight away, without a probe.
-function bloomGovern(dt, q) {
-  if (!(dt > 0) || G_STATE.state !== 'play') { BLOOM.slowFrames = 0; return; }
-  if (BLOOM.probe) return bloomProbeStep(dt);
-  if (q === 'off') { BLOOM.slowFrames = 0; return; }
-  BLOOM.dtAvg += (dt - BLOOM.dtAvg) * .05;
-  bloomCapCheck(dt);
-  BLOOM.slowFrames = BLOOM.dtAvg > 1 / 50 ? BLOOM.slowFrames + 1 : 0;
-  if (BLOOM.slowFrames < 180) return;
-  BLOOM.slowFrames = 0;
-  if (BLOOM.locked) { BLOOM.dtAvg = 1 / 60; return; }
-  BLOOM.probe = { frames: 0, dtOn: BLOOM.dtAvg, dtOff: BLOOM.dtAvg, q };
-}
-function bloomProbeStep(dt) {
-  const p = BLOOM.probe;
-  p.dtOff += (dt - p.dtOff) * .1;
-  if (++p.frames < 60) return;
-  BLOOM.probe = null; BLOOM.dtAvg = 1 / 60;
-  if (p.dtOn - p.dtOff < .12 * p.dtOn) bloomLock();
-  else BLOOM.tier = p.q === 'high' && BLOOM.tier < 1 ? 1 : BLOOM.tier + 1;
-}
-// Bloom isn't what makes frames slow: keep it, at Low, and stop stepping down.
-function bloomLock() { BLOOM.locked = true; BLOOM.tier = 1; }
-// 90% of 180 frames within 2 ms of 1/30 s is a device frame cap, not a struggling renderer.
-function bloomCapCheck(dt) {
-  const c = BLOOM.cap;
-  c.n++;
-  if (Math.abs(dt - 1 / 30) < .002) c.hits++;
-  if (c.n < 180) return;
-  if (c.hits >= 162 && !BLOOM.locked) bloomLock();
-  c.n = c.hits = 0;
 }
 
 on('boot', () => {

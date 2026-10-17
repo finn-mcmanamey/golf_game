@@ -58,7 +58,7 @@ function fusionDraw(f) {
   const el = ELEMENTS[f.element];
   if (!el) return;
   ctx.save();
-  ctx.lineCap = 'round'; ctx.shadowColor = el.color; ctx.shadowBlur = 18; ctx.globalAlpha = .55;
+  ctx.lineCap = 'round'; ctx.shadowColor = el.color; ctx.shadowBlur = 18 * GLOW_SCALE; ctx.globalAlpha = .55;
   for (const rig of rigsOf(f)) for (const [a, b] of rig.ws) line(ctx, f.P[a], f.P[b], el.color, (rig.w.width + 5) * f.scale);
   const t = f.P[f.tip], k = G_STATE.t;
   ctx.globalAlpha = .9;

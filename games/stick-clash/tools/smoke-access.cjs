@@ -187,8 +187,8 @@ async function testTouch(browser, SHOTS, w, h) {
   await page.screenshot({ path: path.join(SHOTS, `access-stick-${w}x${h}.png`) });
   const j0 = await page.evaluate(() => SC.F[0].stats.jumps);
   await touch('touchMove', [{ x: sx + dir * 20, y: sy - 50, id: 1 }]);
-  await page.waitForTimeout(150);
-  const jumped = (await page.evaluate(() => SC.F[0].stats.jumps)) > j0;
+  // CDP's emulated touches arrive 100+ ms late (see the attack check below), so wait for the jump instead of 150 ms.
+  const jumped = await page.waitForFunction(j => SC.F[0].stats.jumps > j, j0, { timeout: 1500 }).then(() => true, () => false);
   // A second finger taps the right side while the stick is held (multitouch): attack.
   await touch('touchStart', [{ x: sx + dir * 20, y: sy - 50, id: 1 }, { x: w * .62, y: h * .3, id: 2 }]);
   await page.waitForTimeout(40);

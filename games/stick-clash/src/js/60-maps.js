@@ -13,6 +13,13 @@ const mapLive = () => G_STATE.roundT > MAP_SAFE_START && !G_STATE.ending;
 // Stateless pseudo-random in [0, 1) for scenery that must look the same every frame.
 const mapHash = k => { const s = Math.sin(k * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 const mapWrap = (v, span) => ((v % span) + span) % span;
+// Shorthands shared by every arena drawing: a stroke colour and width on a fresh path, a filled rect, a fill colour
+// on a fresh path, a line segment added to the path, a platform's top edge.
+function mapPen(c, col, w) { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); }
+function mapRect(c, col, x, y, w, h) { c.fillStyle = col; c.fillRect(x, y, w, h); }
+function mapBrush(c, col) { c.fillStyle = col; c.beginPath(); }
+function mapSeg(c, x1, y1, x2, y2) { c.moveTo(x1, y1); c.lineTo(x2, y2); }
+const mapEdge = (c, s, col, w) => glowLine(c, s.x, s.y, s.x + s.w, s.y, col, w);
 
 function mapPlace(o, r) { o.x = r.x; o.y = r.y; o.w = r.w; o.h = r.h; }
 function mapPark(o) { o.x = MAP_PARK; o.y = -MAP_PARK; o.w = 1; o.h = 1; }
@@ -23,9 +30,8 @@ const mapStoodOn = s => F.some(f => f.alive && (f.P[8].gs === s || f.P[10].gs ==
 // top under a tall HUD) and a little past the sides (screen shake). When it paints the live arena it also records the
 // top colour, which the renderer's void fill uses (mapSkyTop in 85-render).
 function mapSky(c2, bottom, colors) {
-  const g = c2.createLinearGradient(0, 0, 0, bottom);
-  colors.forEach((c, i) => g.addColorStop(i / (colors.length - 1), c));
-  c2.fillStyle = g; c2.fillRect(-40, -H, W + 80, bottom + H);
+  mapRect(c2, colors[0], -40, -H, W + 80, H + 2);
+  mapVGrad(c2, -40, 0, W + 80, bottom, colors);
   if (MAP && c2 === ctx) MAP.skyTopLive = colors[0];
 }
 
@@ -33,7 +39,7 @@ function mapSky(c2, bottom, colors) {
 function mapGlow(ctx, x, y, r, color, alpha) {
   const g = ctx.createRadialGradient(x, y, 0, x, y, r);
   g.addColorStop(0, rgba(color, alpha)); g.addColorStop(1, rgba(color, 0));
-  ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  mapRect(ctx, g, x - r, y - r, r * 2, r * 2);
 }
 
 // Twinkling star field in the top `h` pixels.
@@ -47,26 +53,29 @@ function mapStars(ctx, t, n, h, seed = 0) {
   ctx.globalAlpha = 1;
 }
 
-// Wrapping particle field (snow, ash, petals, sand, bubbles). o: { vx, vy, y0, y1, size, color, sway, alpha, seed, shape }
+// Wrapping particle field (snow, ash, petals, sand, bubbles, embers). o: { vx, vy, x0, x1, y0, y1, size, color, sway,
+// alpha, seed, shape }. Drawn in three alpha groups of one path each: three fills instead of one per speck.
 function mapParticles(ctx, t, n, o) {
-  const y0 = o.y0 ?? -20, span = (o.y1 ?? H + 20) - y0, seed = o.seed || 0;
-  ctx.fillStyle = o.color;
-  for (let k = 0; k < n; k++) {
-    const r1 = mapHash(k + seed), r2 = mapHash(k * 5 + seed + 3), sp = .6 + r2 * .8;
-    const x = mapWrap(r1 * (W + 80) + (o.vx || 0) * sp * t + Math.sin(t * 1.3 + k) * (o.sway || 0), W + 80) - 40;
-    const y = y0 + mapWrap(r2 * span + (o.vy || 0) * sp * t, span), s = (o.size || 3) * (.6 + r1 * .8);
-    ctx.globalAlpha = (o.alpha ?? .8) * (.5 + .5 * r2);
-    if (o.shape === 'circle') { ctx.beginPath(); ctx.arc(x, y, s, 0, TAU); ctx.fill(); }
-    else if (o.shape === 'ring') circle(ctx, x, y, s, null, o.color, 1.2);
-    else if (o.shape === 'petal') { ctx.beginPath(); ctx.ellipse(x, y, s * 1.4, s * .7, t * 2 + k, 0, TAU); ctx.fill(); }
-    else ctx.fillRect(x, y, s, s);
+  const x0 = o.x0 ?? -40, xs = (o.x1 ?? W + 40) - x0, y0 = o.y0 ?? -20, span = (o.y1 ?? H + 20) - y0, seed = o.seed || 0, sh = o.shape;
+  for (let g = 0; g < 3; g++) {
+    ctx.beginPath();
+    for (let k = g; k < n; k += 3) {
+      const r1 = mapHash(k + seed), r2 = mapHash(k * 5 + seed + 3), sp = .6 + r2 * .8;
+      const x = x0 + mapWrap(r1 * xs + (o.vx || 0) * sp * t + Math.sin(t * 1.3 + k) * (o.sway || 0), xs);
+      const y = y0 + mapWrap(r2 * span + (o.vy || 0) * sp * t, span), s = (o.size || 3) * (.6 + r1 * .8), a = t * 2 + k;
+      if (sh === 'petal') { ctx.moveTo(x + Math.cos(a) * s * 1.4, y + Math.sin(a) * s * 1.4); ctx.ellipse(x, y, s * 1.4, s * .7, a, 0, TAU); }
+      else if (sh) { ctx.moveTo(x + s, y); ctx.arc(x, y, s, 0, TAU); }
+      else ctx.rect(x, y, s, s);
+    }
+    ctx.globalAlpha = (o.alpha ?? .8) * (.5 + g * .25);
+    if (sh === 'ring') { ctx.strokeStyle = o.color; ctx.lineWidth = 1.2; ctx.stroke(); } else { ctx.fillStyle = o.color; ctx.fill(); }
   }
   ctx.globalAlpha = 1;
 }
 
 // Layered hill/dune/mountain silhouette along the bottom: a sum of sines between yBase - amp and yBase.
 function mapRidge(ctx, yBase, amp, freq, phase, color, bottom = H) {
-  ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(-40, bottom);
+  mapBrush(ctx, color); ctx.moveTo(-40, bottom);
   for (let x = -40; x <= W + 40; x += 16) {
     const y = yBase - amp * (.55 + .3 * Math.sin(x * freq + phase) + .15 * Math.sin(x * freq * 2.7 + phase * 1.7));
     ctx.lineTo(x, y);
@@ -74,17 +83,111 @@ function mapRidge(ctx, yBase, amp, freq, phase, color, bottom = H) {
   ctx.lineTo(W + 40, bottom); ctx.closePath(); ctx.fill();
 }
 
-// A platform slab with a neon top edge (the house style); fill/edge colours per arena.
+// A platform slab with a neon top edge (the house style); fill/edge colours per arena. Shaded like a block (a lit top
+// fading to a dark base) over a soft contact shadow.
 function mapSlab(ctx, s, fill, edge, alpha = 1) {
   const st = artNow();
   if (st.slab) return st.slab(artRaw(ctx), s, fill, edge, alpha);   // ink, paper or chalk (59-styles)
   const h = s.oneWay ? Math.min(s.h, 14) : s.h;
   ctx.globalAlpha = alpha;
-  ctx.fillStyle = fill; ctx.fillRect(s.x, s.y, s.w, h);
+  mapVGrad(ctx, s.x + 6, s.y + h, s.w - 12, 14, ['rgba(0,0,0,.3)', 'rgba(0,0,0,0)']);
+  mapRect(ctx, fill, s.x, s.y, s.w, h);
+  mapVGrad(ctx, s.x, s.y, s.w, h, [rgba(edge, .22), 'rgba(0,0,0,0)', 'rgba(0,0,0,.34)']);
   if (!s.oneWay) { ctx.strokeStyle = rgba(edge, .4); ctx.lineWidth = 2; ctx.strokeRect(s.x + 1, s.y + 1, s.w - 2, h - 2); }
-  glowLine(ctx, s.x, s.y, s.x + s.w, s.y, edge, 3);
+  mapEdge(ctx, s, edge, 3);
   if (s.move) for (const x of [s.x + 10, s.x + s.w - 10]) circle(ctx, x, s.y + 7, 3, edge);
   ctx.globalAlpha = 1;
+}
+
+// Big warning text centred at (x, y); its glow goes through glow(), so quality tiers scale it.
+function mapSign(ctx, text, x, y, size, col, blur = 0) {
+  ctx.save(); ctx.fillStyle = col; ctx.font = `${size}px ${FONT_DISPLAY}`; ctx.textAlign = 'center';
+  glow(ctx, col, blur, () => ctx.fillText(text, x, y)); ctx.restore();
+}
+
+// ---------- depth and atmosphere ----------
+// Vertical gradients (stops evenly spaced) from a cached 1x64 strip: a tenth of a gradient fill's cost on a software
+// canvas. Style proxies and styled arenas' neon look (which styles are timed against) keep real gradients.
+const MAP_STRIPS = new Map();
+function mapGrad(c2, y0, y1, colors) {
+  const g = c2.createLinearGradient(0, y0, 0, y1);
+  colors.forEach((c, i) => g.addColorStop(i / (colors.length - 1), c));
+  return g;
+}
+function mapVGrad(c2, x, y, w, h, colors) {
+  let s = artRaw(c2) === c2 && !(MAP && MAP.style) && MAP_STRIPS.get(colors + '');
+  if (s === undefined && (s = artCanvas(1, 64))) { const g = s.getContext('2d'); mapRect(g, mapGrad(g, 0, 64, colors), 0, 0, 1, 64); MAP_STRIPS.set(colors + '', s); }
+  if (s) c2.drawImage(s, x, y, w, h); else mapRect(c2, mapGrad(c2, y, y + h, colors), x, y, w, h);
+}
+
+// The ground (to 40 px under the arena, for shake): fill (colour or stops), deco(), a depth falloff, a lit lip, the edge.
+function mapGround(c2, fl, fill, edge, w = 3, deco) {
+  const h = H + 40 - fl;
+  if (fill.map) mapVGrad(c2, -40, fl, W + 80, h, fill); else mapRect(c2, fill, -40, fl, W + 80, h);
+  if (deco) deco();
+  mapVGrad(c2, -40, fl, W + 80, h, ['rgba(0,0,0,0)', 'rgba(0,0,0,.42)']);
+  if (edge) { mapVGrad(c2, -40, fl, W + 80, 20, [rgba(edge, .3), rgba(edge, 0)]); glowLine(c2, 0, fl, W, fl, edge, w); }
+}
+
+// Parallax: decoration at depth d shifts by d of the camera's offset (half as much vertically); thumbnails draw flat.
+// With m, a static draw() is cached once in 59's backdrop canvas. World-lock rule: never for what fighters touch or read.
+function mapFar(c2, d, draw, m) {
+  if (c2 !== ctx && !c2.live) return draw(c2);
+  c2.save(); c2.translate((CAM.x - W / 2) * d, (CAM.y - H / 2) * d / 2);
+  const img = m && artRaw(c2) === c2 && artBackdrop({ key: m.key + '~', art: { bg: draw } }, STYLES.neon);
+  if (img) c2.drawImage(img, ART_BOX.x, ART_BOX.y, ART_BOX.w, ART_BOX.h); else draw(c2);
+  c2.restore();
+}
+// Haze between depth layers: col thickening to alpha a at the horizon y.
+const mapHaze = (c2, y, h, col, a) => mapVGrad(c2, -40, y - h, W + 80, h + 40, [rgba(col, 0), rgba(col, a)]);
+
+// A banded sun (stops top to bottom); t slides the bands down (0 keeps them still).
+function mapSun(c2, x, y, r, stops, band, t) {
+  c2.save(); c2.beginPath(); c2.arc(x, y, r, 0, TAU); c2.clip();
+  mapVGrad(c2, x - r, y - r, r * 2, r * 2, stops);
+  c2.fillStyle = band;
+  for (let k = 0; k < 7; k++) c2.fillRect(x - r, y + r * (.18 + k * .118) + (t * 8) % (r * .118), r * 2, 3 + k);
+  c2.restore();
+}
+
+// A seeded skyline on base (towers reach 40 px below it); with win, windows that switch slowly with t.
+function mapSkyline(c2, base, n, seed, hMax, body, win, t = 0) {
+  const step = (W + 80) / n;
+  for (let k = 0; k < n; k++) {
+    const x = k * step - 40, w = step * (.6 + .35 * mapHash(k + seed)), top = base - hMax * (.3 + .7 * mapHash(k * 3 + seed));
+    mapRect(c2, body, x, top, w, base - top + 40);
+    if (win) for (let y = top + 12, i = k * 40; y < base - 12; y += 22) for (let wx = x + 5; wx < x + w - 9; wx += 13) if (Math.sin(seed + i++ * 7.3 + t * .3) > .55) mapRect(c2, win, wx, y, 5, 8);
+  }
+}
+
+// Dense soft decoration drawn at quarter resolution into 58's layer canvas, then laid over rows y0..y1 in one stretched
+// draw: overlapping puffs cost a sixteenth, and they are blurry anyway. Layers in it still get their parallax (live).
+function mapSoft(c2, y0, y1, draw) {
+  if (c2 !== ctx || artRaw(c2) !== c2 || typeof document !== 'object') return draw(c2);
+  const L = worldLayer(), g = L.g, k = WORLD_SHADE_K, sy = (y0 + 40) * k, sh = (y1 - y0) * k;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, sy - 1, L.width, sh + 2);
+  g.setTransform(k, 0, 0, k, 40 * k, 40 * k); g.live = 1;
+  draw(g);
+  c2.drawImage(L, 0, sy, L.width, sh, -40, y0, 1360, y1 - y0);
+}
+// A soft puff: 84's light sprite stretched to an ellipse, for clouds, smoke and fog with soft edges.
+function mapPuff(c2, x, y, rx, ry, col, a) {
+  const s = postfxSprite(col);
+  if (s && a > 0) { c2.globalAlpha = Math.min(1, a); c2.drawImage(s, x - rx, y - ry, rx * 2, ry * 2); c2.globalAlpha = 1; }
+}
+// A drifting, wrapping row of n clouds of `puffs` puffs. o: { y, n, sp, rx, ry, col, a, puffs, seed }
+function mapClouds(c2, t, o) {
+  for (let k = 0, p = o.puffs || 3; k < o.n * p; k++) {
+    const c = k / p | 0, x = mapWrap(mapHash(c + o.seed) * (W + 400) + t * o.sp, W + 400) - 200 + (k % p - (p - 1) / 2) * o.rx * .9;
+    mapPuff(c2, x, o.y + (mapHash(c * 3 + o.seed) - .5) * 26 + Math.sin(k * 2) * o.ry * .3, o.rx * (1 - k % 2 * .25), o.ry, o.col, o.a);
+  }
+}
+// A plume rising from (x, y): puffs grow, drift and fade. o: { n, rate, r0, r1, h, sway, drift, col, a }
+function mapSmoke(c2, t, x, y, o) {
+  for (let k = 0; k < o.n; k++) {
+    const u = mapWrap(t * o.rate + k / o.n, 1), r = o.r0 + u * o.r1;
+    mapPuff(c2, x + Math.sin(k * 2.3 + t * .3) * o.sway * u + u * (o.drift || 0), y - u * o.h, r, r, o.col, Math.min(1, u * 6) * (1 - u) * o.a);
+  }
 }
 
 // ---------- telegraphed traps (lightning, geysers, crushers) ----------
@@ -131,12 +234,12 @@ function mapDrawWarn(c2, hz, t) {
   const st = artNow(), ctx = artRaw(c2), k = 1 - hz.tt / hz.max, on = SETTINGS.reduceFlash || Math.sin(t * (12 + k * 34)) > -.2;
   const col = st.warn || hz.warnColor || '#ffd84a';
   const bx = hz.x + hz.w / 2, by = hz.y + hz.h;
-  ctx.fillStyle = rgba(col, .05 + .12 * k); ctx.fillRect(hz.x, hz.y, hz.w, hz.h);
+  mapRect(ctx, rgba(col, .05 + .12 * k), hz.x, hz.y, hz.w, hz.h);
   if (on) {
     ctx.strokeStyle = rgba(col, .35 + .4 * k); ctx.lineWidth = 2; ctx.setLineDash([10, 8]); ctx.lineDashOffset = -t * 60;
     ctx.strokeRect(hz.x, hz.y, hz.w, hz.h); ctx.setLineDash([]);
     glow(c2, col, 16, () => {   // c2: the style scales or drops the glow
-      ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.beginPath();
+      mapPen(ctx, col, 3);
       ctx.ellipse(bx, by - 3, hz.w * .5 * (1.3 - k * .3), 9, 0, 0, TAU); ctx.stroke();
       ctx.fillStyle = col; ctx.font = `28px ${FONT_DISPLAY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
       ctx.fillText('!', bx, by - 22 - Math.sin(t * 10) * 4);
@@ -162,16 +265,13 @@ function mapStepWind(m, dt, o) {
 function mapDrawWind(ctx, m, t, color) {
   const g = m.gust;
   if (!g) return;
-  if (g.st === 'warn' && (SETTINGS.reduceFlash || Math.sin(t * 18) > -.3)) {
-    ctx.save(); ctx.fillStyle = rgba(color, .75); ctx.font = `30px ${FONT_DISPLAY}`; ctx.textAlign = 'center';
-    ctx.fillText(g.dir > 0 ? 'GUST  ›››' : '‹‹‹  GUST', W / 2, 150); ctx.restore();
-  }
+  if (g.st === 'warn' && (SETTINGS.reduceFlash || Math.sin(t * 18) > -.3)) mapSign(ctx, g.dir > 0 ? 'GUST  ›››' : '‹‹‹  GUST', W / 2, 150, 30, rgba(color, .75));
   if (g.k < .05) return;
-  ctx.strokeStyle = rgba(color, .35 * g.k); ctx.lineWidth = 2; ctx.beginPath();
+  mapPen(ctx, rgba(color, .35 * g.k), 2);
   for (let k = 0; k < 26; k++) {
     const len = 60 + mapHash(k) * 90, y = 40 + mapHash(k + 9) * 600;
     const x = mapWrap(mapHash(k + 4) * W + g.dir * t * (900 + mapHash(k) * 600), W + len) - len;
-    ctx.moveTo(x, y); ctx.lineTo(x + g.dir * len, y);
+    mapSeg(ctx, x, y, x + g.dir * len, y);
   }
   ctx.stroke();
 }
@@ -251,26 +351,20 @@ on('boot', () => {
 // ====================================================================================================================
 defMap('neon', {
   name: 'Neon City', desc: 'The classic rooftop arena. Three ledges, lots of room, no tricks.', order: 10,
-  floor: 650, skyTop: '#0a0b1d',   // what shows above the arena (drawBg paints its own sky, not with mapSky)
+  floor: 650,
   solids: [{ x: 150, y: 470, w: 250 }, { x: 880, y: 470, w: 250 }, { x: 515, y: 315, w: 250 }],
   spawns: [[330, 650], [950, 650], [275, 470], [1005, 470]],
-  skyline: Array.from({ length: 34 }, (_, k) => ({ x: k * 40 - 20, w: rnd(30, 60), h: rnd(40, 170), seed: Math.random() * 1000 })),
   drawBg(ctx, t) {
-    const sky = ctx.createLinearGradient(0, 0, 0, this.floor);
-    sky.addColorStop(0, '#0a0b1d'); sky.addColorStop(1, '#251744');
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, this.floor);
-    const sun = ctx.createRadialGradient(W / 2, 430, 20, W / 2, 430, 260);
-    sun.addColorStop(0, 'rgba(255,120,80,.55)'); sun.addColorStop(.45, 'rgba(255,60,140,.18)'); sun.addColorStop(1, 'rgba(255,60,140,0)');
-    ctx.fillStyle = sun; ctx.fillRect(0, 0, W, this.floor);
-    for (const b of this.skyline) {
-      ctx.fillStyle = '#120f26'; ctx.fillRect(b.x, this.floor - b.h, b.w, b.h);
-      ctx.fillStyle = 'rgba(255,200,120,.22)';      // a few lit windows that flicker slowly
-      for (let k = 0; k < 4; k++) {
-        const wy = this.floor - b.h + 12 + k * 22;
-        if (wy < this.floor - 8 && Math.sin(b.seed + k * 7.3 + t * .3) > .35) ctx.fillRect(b.x + 6 + (k % 2) * 14, wy, 6, 8);
-      }
-    }
-    drawGridFloor(ctx, this.floor, '#0c0d1a', 'rgba(120,100,255,.22)', '#8b7dff');
+    const fl = this.floor;
+    mapSky(ctx, fl, ['#0a0b1d', '#1c1340', '#2e1849']);
+    mapFar(ctx, .25, c => {                      // far: the banded sun and pale towers sinking into a pink haze
+      mapGlow(c, 640, 450, 280, '#ff3c8c', .26);
+      c.globalAlpha = .55; mapSun(c, 640, 450, 130, ['#ffc46a', '#ff5a6a', '#c8287a'], '#2e1849', 0); c.globalAlpha = 1;
+      mapSkyline(c, fl, 26, 3, 250, '#221a44');
+      mapHaze(c, fl, 170, '#ff4a8a', .2);
+    });
+    mapFar(ctx, .12, c => mapSkyline(c, fl, 34, 8, 170, '#120f26', 'rgba(255,200,120,.3)', t));   // near: lit windows
+    drawGridFloor(ctx, fl, '#0c0d1a', 'rgba(120,100,255,.22)', '#8b7dff');
   },
 });
 
@@ -296,25 +390,18 @@ defMap('dojo', {
     if (artBg(ctx, this, t)) return;
     const fl = this.floor;
     mapSky(ctx, fl, ['#12082a', '#4a1450', '#c23a5a', '#ff9a5a']);
-    // Banded setting sun.
-    ctx.save(); ctx.beginPath(); ctx.arc(640, 470, 170, 0, TAU); ctx.clip();
-    const sun = ctx.createLinearGradient(0, 300, 0, 640); sun.addColorStop(0, '#ffe08a'); sun.addColorStop(1, '#ff4a7a');
-    ctx.fillStyle = sun; ctx.fillRect(470, 300, 340, 340);
-    ctx.fillStyle = '#c23a5a';
-    for (let k = 0; k < 7; k++) ctx.fillRect(470, 500 + k * 20 + ((t * 8) % 20), 340, 3 + k);
-    ctx.restore();
+    mapSun(ctx, 640, 470, 170, ['#ffe08a', '#ff4a7a'], '#c23a5a', t);   // banded setting sun
     mapRidge(ctx, 560, 120, .006, 1.2, '#3a0f3a', fl);
     mapRidge(ctx, 600, 70, .011, 4, '#2a0a2c', fl);
     this.drawTorii(ctx, 640, fl);
     this.drawPagoda(ctx, 150, fl, 1); this.drawPagoda(ctx, 1130, fl, .8);
     for (let k = 0; k < 7; k++) this.drawLantern(ctx, 120 + k * 173, 40 + (k % 2) * 26, t, k);
-    // Wooden deck.
-    ctx.fillStyle = '#2a1410'; ctx.fillRect(-40, fl, W + 80, H - fl + 40);
-    ctx.strokeStyle = 'rgba(255,170,120,.12)'; ctx.lineWidth = 2; ctx.beginPath();
-    for (let y = fl + 14; y < H; y += 16) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
-    for (let k = 0; k < 18; k++) { const x = (k * 97) % W, y = fl + 14 + (k % 5) * 16; ctx.moveTo(x, y); ctx.lineTo(x, y + 16); }
-    ctx.stroke();
-    glowLine(ctx, 0, fl, W, fl, '#ff7ab8', 3);
+    mapGround(ctx, fl, '#2a1410', '#ff7ab8', 3, () => {        // wooden deck
+      mapPen(ctx, 'rgba(255,170,120,.12)', 2);
+      for (let y = fl + 14; y < H; y += 16) mapSeg(ctx, 0, y, W, y);
+      for (let k = 0; k < 18; k++) { const x = (k * 97) % W, y = fl + 14 + (k % 5) * 16; mapSeg(ctx, x, y, x, y + 16); }
+      ctx.stroke();
+    });
   },
   drawTorii(ctx, x, fl) {
     ctx.fillStyle = '#1a0618';
@@ -336,8 +423,8 @@ defMap('dojo', {
     ctx.save(); ctx.translate(x, 0); ctx.rotate(sw);
     lineXY(ctx, 0, -10, 0, y, 'rgba(40,10,30,.9)', 2);
     mapGlow(ctx, 0, y + 18, 60, '#ffb35a', .35);
-    glow(ctx, '#ff8a4a', 18, () => { ctx.fillStyle = '#ff6a4a'; ctx.beginPath(); ctx.ellipse(0, y + 18, 13, 18, 0, 0, TAU); ctx.fill(); });
-    ctx.fillStyle = '#2a0a1a'; ctx.fillRect(-7, y - 1, 14, 4); ctx.fillRect(-7, y + 34, 14, 4);
+    glow(ctx, '#ff8a4a', 18, () => { mapBrush(ctx, '#ff6a4a'); ctx.ellipse(0, y + 18, 13, 18, 0, 0, TAU); ctx.fill(); });
+    mapRect(ctx, '#2a0a1a', -7, y - 1, 14, 4); ctx.fillRect(-7, y + 34, 14, 4);
     ctx.restore();
   },
   drawFg(ctx, t) {
@@ -357,28 +444,28 @@ defMap('foundry', {
   hazards: [{ kind: 'lava', x: 480, y: 626, w: 320, h: 60, dps: 16, status: ['burn', 2, 1], launch: 1100, color: '#ff6a2a' }],
   spawns: [[280, 650], [1000, 650], [185, 455], [1095, 455]],
   drawBg(ctx, t) {
-    const p = this.palette;
-    mapSky(ctx, this.floor, [p.sky1, p.sky2]);
-    drawGear(ctx, 200, 210, 120, 14, t * .15, '#24100b');
-    drawGear(ctx, 1090, 160, 90, 11, -t * .2, '#24100b');
-    drawGear(ctx, 960, 330, 55, 9, t * .33, '#2c140d');
-    ctx.fillStyle = '#1d0c08';                                  // chimney stacks
-    for (const [x, w, h] of [[360, 70, 330], [450, 40, 260], [820, 60, 300], [900, 36, 220]]) ctx.fillRect(x, this.floor - h, w, h);
-    const heat = ctx.createRadialGradient(640, this.floor, 20, 640, this.floor, 420);
-    heat.addColorStop(0, 'rgba(255,110,40,.42)'); heat.addColorStop(1, 'rgba(255,60,20,0)');
-    ctx.fillStyle = heat; ctx.fillRect(0, 0, W, this.floor);
-    for (let k = 0; k < 26; k++) {                              // embers drifting up from the pit
-      const life = (t * .22 + k * .137) % 1, x = 480 + ((k * 97) % 320) + Math.sin(t + k) * 18, y = this.floor - life * 520;
-      ctx.globalAlpha = (1 - life) * .8; ctx.fillStyle = k % 3 ? '#ff8a3a' : '#ffd36b'; ctx.fillRect(x, y, 3, 3);
-    }
-    ctx.globalAlpha = 1;
-    drawGridFloor(ctx, this.floor, p.ground, 'rgba(255,120,60,.16)', p.line);
+    const p = this.palette, fl = this.floor;
+    mapSky(ctx, fl, [p.sky1, p.sky2]);
+    mapFar(ctx, .2, c => {                                      // gears turning far back
+      drawGear(c, 200, 210, 120, 14, t * .15, '#24100b');
+      drawGear(c, 1090, 160, 90, 11, -t * .2, '#24100b');
+      drawGear(c, 960, 330, 55, 9, t * .33, '#2c140d');
+    });
+    mapFar(ctx, .1, c => {                                      // smoking chimney stacks in the heat of the pit
+      c.fillStyle = '#1d0c08';
+      for (const [x, w, h] of FOUNDRY_STACKS) c.fillRect(x, fl - h, w, h + 40);
+      mapGlow(c, 640, fl, 420, '#ff6e28', .42);
+      for (const [x, w, h] of FOUNDRY_STACKS) mapSmoke(c, t + x, x + w / 2, fl - h, { n: 4, rate: .09, r0: 10, r1: w * .7, h: 150, sway: 14, drift: 40, col: '#5a382c', a: .9 });
+    });
+    mapParticles(ctx, t, 26, { x0: 480, x1: 800, y0: fl - 520, y1: fl, vy: -115, sway: 18, size: 3, color: '#ff9a40', alpha: .9, seed: 41 });   // embers
+    drawGridFloor(ctx, fl, p.ground, 'rgba(255,120,60,.16)', p.line);
   },
 });
+const FOUNDRY_STACKS = [[360, 70, 330], [450, 40, 260], [820, 60, 300], [900, 36, 220]];   // chimneys: x, width, height
 
 // A simple cog silhouette for industrial backdrops.
 function drawGear(ctx, x, y, r, teeth, ang, color, rim = 'rgba(255,120,60,.10)') {
-  ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.fillStyle = color; ctx.beginPath();
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang); mapBrush(ctx, color);
   for (let k = 0; k < teeth * 2; k++) {
     const a = k / (teeth * 2) * TAU, rr = k % 2 ? r : r * 1.14;
     ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
@@ -412,16 +499,12 @@ defMap('frost', {
       ctx.closePath(); ctx.fill();
     }
     this.drawMountains(ctx, fl);
-    // Glassy ice floor with reflections and cracks.
-    const ice = ctx.createLinearGradient(0, fl, 0, H);
-    ice.addColorStop(0, '#9fd8f5'); ice.addColorStop(.25, '#4a86b8'); ice.addColorStop(1, '#183a64');
-    ctx.fillStyle = ice; ctx.fillRect(-40, fl, W + 80, H - fl + 40);
-    ctx.fillStyle = 'rgba(255,255,255,.25)';
-    for (let k = 0; k < 6; k++) { const x = mapWrap(k * 230 + t * 12, W + 200) - 100; poly(ctx, [[x, fl + 6], [x + 60, fl + 6], [x + 20, H], [x - 40, H]], 'rgba(255,255,255,.07)'); }
-    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1; ctx.beginPath();
-    for (const [x, l] of [[210, 40], [520, 60], [760, 35], [1050, 55]]) { ctx.moveTo(x, fl + 8); ctx.lineTo(x + l * .6, fl + 22); ctx.lineTo(x + l, fl + 18); ctx.moveTo(x + l * .6, fl + 22); ctx.lineTo(x + l * .5, fl + 40); }
-    ctx.stroke();
-    glowLine(ctx, 0, fl, W, fl, '#bff4ff', 3);
+    mapGround(ctx, fl, ['#9fd8f5', '#4a86b8', '#2e5b89', '#183a64'], '#bff4ff', 3, () => {   // glassy ice: reflections, cracks
+      for (let k = 0; k < 6; k++) { const x = mapWrap(k * 230 + t * 12, W + 200) - 100; poly(ctx, [[x, fl + 6], [x + 60, fl + 6], [x + 20, H], [x - 40, H]], 'rgba(255,255,255,.07)'); }
+      mapPen(ctx, 'rgba(255,255,255,.35)', 1);
+      for (const [x, l] of [[210, 40], [520, 60], [760, 35], [1050, 55]]) { mapSeg(ctx, x, fl + 8, x + l * .6, fl + 22); ctx.lineTo(x + l, fl + 18); mapSeg(ctx, x + l * .6, fl + 22, x + l * .5, fl + 40); }
+      ctx.stroke();
+    });
   },
   drawMountains(ctx, fl) {
     const peaks = (pts, fill, snow) => {
@@ -463,30 +546,28 @@ defMap('moon', {
     const ex = 1010, ey = 150, er = 70;
     mapGlow(ctx, ex, ey, er * 1.8, '#5ab0ff', .25);
     ctx.save(); ctx.beginPath(); ctx.arc(ex, ey, er, 0, TAU); ctx.clip();
-    ctx.fillStyle = '#1f5fbf'; ctx.fillRect(ex - er, ey - er, er * 2, er * 2);
+    mapRect(ctx, '#1f5fbf', ex - er, ey - er, er * 2, er * 2);
     ctx.fillStyle = '#3fae5a';
     for (let k = 0; k < 5; k++) { const x = ex - er + mapWrap(k * 61 + t * 6, er * 3) - er * .5; ctx.beginPath(); ctx.ellipse(x, ey - 30 + k * 15, 24, 11, k, 0, TAU); ctx.fill(); }
     ctx.fillStyle = 'rgba(255,255,255,.5)';
     for (let k = 0; k < 4; k++) { const x = ex - er + mapWrap(k * 47 + t * 10, er * 3) - er * .5; ctx.fillRect(x, ey - 50 + k * 28, 50, 5); }
-    ctx.fillStyle = 'rgba(0,0,20,.55)'; ctx.beginPath(); ctx.arc(ex + 30, ey + 10, er, 0, TAU); ctx.fill();   // night side
+    mapBrush(ctx, 'rgba(0,0,20,.55)'); ctx.arc(ex + 30, ey + 10, er, 0, TAU); ctx.fill();   // night side
     ctx.restore();
     // Distant crater rim and the base dome.
     mapRidge(ctx, fl - 20, 70, .008, 2, '#2a2a3a', fl);
     this.drawDome(ctx, 230, fl, t);
-    ctx.fillStyle = '#1e1e2c'; ctx.fillRect(820, fl - 160, 8, 160);   // antenna mast with blinking light
+    mapRect(ctx, '#1e1e2c', 820, fl - 160, 8, 160);   // antenna mast with blinking light
     circle(ctx, 824, fl - 166, 5, Math.sin(t * 4) > 0 ? '#ff4a6a' : '#401018');
-    // Regolith floor with craters.
-    const g = ctx.createLinearGradient(0, fl, 0, H); g.addColorStop(0, '#8a8a9a'); g.addColorStop(1, '#3a3a4a');
-    ctx.fillStyle = g; ctx.fillRect(-40, fl, W + 80, H - fl + 40);
-    for (const [x, y, r] of [[160, 670, 30], [480, 695, 22], [760, 668, 40], [1110, 690, 26], [980, 708, 14]]) {
-      ctx.fillStyle = 'rgba(30,30,45,.45)'; ctx.beginPath(); ctx.ellipse(x, y, r, r * .3, 0, 0, TAU); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(x, y + 2, r, r * .3, 0, 0, Math.PI); ctx.stroke();
-    }
-    glowLine(ctx, 0, fl, W, fl, '#b6c3ff', 2);
+    mapGround(ctx, fl, ['#8a8a9a', '#3a3a4a'], '#b6c3ff', 2, () => {   // regolith with craters
+      for (const [x, y, r] of [[160, 670, 30], [480, 695, 22], [760, 668, 40], [1110, 690, 26], [980, 708, 14]]) {
+        mapBrush(ctx, 'rgba(30,30,45,.45)'); ctx.ellipse(x, y, r, r * .3, 0, 0, TAU); ctx.fill();
+        mapPen(ctx, 'rgba(255,255,255,.18)', 2); ctx.ellipse(x, y + 2, r, r * .3, 0, 0, Math.PI); ctx.stroke();
+      }
+    });
   },
   drawDome(ctx, x, fl, t) {
-    ctx.fillStyle = 'rgba(120,200,255,.10)'; ctx.beginPath(); ctx.arc(x, fl, 120, Math.PI, 0); ctx.fill();
-    ctx.strokeStyle = 'rgba(150,220,255,.4)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, fl, 120, Math.PI, 0); ctx.stroke();
+    mapBrush(ctx, 'rgba(120,200,255,.10)'); ctx.arc(x, fl, 120, Math.PI, 0); ctx.fill();
+    mapPen(ctx, 'rgba(150,220,255,.4)', 2); ctx.arc(x, fl, 120, Math.PI, 0); ctx.stroke();
     for (let k = 1; k < 4; k++) { ctx.beginPath(); ctx.ellipse(x, fl, 120 * k / 4, 120, 0, Math.PI, 0); ctx.stroke(); }
     for (let k = 0; k < 5; k++) circle(ctx, x - 80 + k * 40, fl - 12, 3, Math.sin(t * 3 + k) > 0 ? '#5ef2ff' : '#123040');
   },
@@ -510,18 +591,12 @@ defMap('sky', {
   spawns: [[260, 520], [1020, 520], [150, 520], [1130, 520]],
   drawBg(ctx, t) {
     mapSky(ctx, H, ['#0b1a3a', '#3a2a6a', '#c4508a', '#ffb07a']);
-    mapGlow(ctx, 640, 640, 420, '#ffd08a', .35);
-    for (let layer = 0; layer < 3; layer++) this.drawClouds(ctx, t, layer);
-    // Distant floating isles.
-    for (const [x, y, s] of [[200, 210, .5], [1080, 170, .4], [760, 120, .3]]) this.drawIsle(ctx, x + Math.sin(t * .3 + x) * 8, y, 120 * s, 'rgba(60,40,90,.55)');
-  },
-  drawClouds(ctx, t, layer) {
-    const y = 330 + layer * 120, sp = 8 + layer * 10, a = .10 + layer * .06;
-    ctx.fillStyle = `rgba(255,220,240,${a})`;
-    for (let k = 0; k < 7; k++) {
-      const x = mapWrap(k * 230 + t * sp + layer * 90, W + 300) - 150;
-      for (let b = 0; b < 4; b++) { ctx.beginPath(); ctx.ellipse(x + b * 36, y + Math.sin(b * 2) * 8, 50, 22, 0, 0, TAU); ctx.fill(); }
-    }
+    mapFar(ctx, .3, c => {                                 // the low sun and distant floating isles
+      mapGlow(c, 640, 640, 420, '#ffd08a', .35);
+      for (const [x, y, s] of [[200, 210, .5], [1080, 170, .4], [760, 120, .3]]) this.drawIsle(c, x + Math.sin(t * .3 + x) * 8, y, 120 * s, 'rgba(60,40,90,.55)');
+    });
+    mapSoft(ctx, 250, 640, g => [.35, .2, .1].forEach((d, k) => mapFar(g, d, c =>   // soft clouds, nearer and brighter layer by layer
+      mapClouds(c, t, { y: 330 + k * 120, n: 6, sp: 8 + k * 10, rx: 76, ry: 32, col: '#ffdcf0', a: .45 + k * .25, seed: k * 9 }))));
   },
   drawIsle(ctx, x, y, w, fill) {
     poly(ctx, [[x - w, y], [x + w, y], [x + w * .5, y + w * .5], [x + w * .1, y + w * .9], [x - w * .4, y + w * .5]], fill);
@@ -530,26 +605,20 @@ defMap('sky', {
     if (!s.oneWay) {                                       // big rocky island with grass, roots and a waterfall
       const cx = s.x + s.w / 2;
       poly(ctx, [[s.x, s.y], [s.x + s.w, s.y], [s.x + s.w - 30, s.y + s.h + 30], [cx + 40, s.y + s.h + 110], [cx - 50, s.y + s.h + 90], [s.x + 26, s.y + s.h + 20]], '#3a2a44', '#5a4064', 2);
-      ctx.fillStyle = '#2a6a4a'; ctx.fillRect(s.x, s.y, s.w, 12);
-      glowLine(ctx, s.x, s.y, s.x + s.w, s.y, '#7dffb0', 3);
-      ctx.strokeStyle = 'rgba(120,220,160,.5)'; ctx.lineWidth = 2; ctx.beginPath();
+      mapRect(ctx, '#2a6a4a', s.x, s.y, s.w, 12);
+      mapEdge(ctx, s, '#7dffb0', 3);
+      mapPen(ctx, 'rgba(120,220,160,.5)', 2);
       for (let k = 0; k < 5; k++) { const x = s.x + 40 + k * 60; ctx.moveTo(x, s.y + 14); ctx.quadraticCurveTo(x + 8, s.y + 40, x - 4, s.y + 60 + (k % 2) * 20); }
       ctx.stroke();
       const wx = s.x < W / 2 ? s.x + 14 : s.x + s.w - 24;
-      ctx.fillStyle = 'rgba(140,220,255,.35)'; ctx.fillRect(wx, s.y + 6, 10, 240);
+      mapRect(ctx, 'rgba(140,220,255,.35)', wx, s.y + 6, 10, 240);
       ctx.fillStyle = 'rgba(255,255,255,.5)';
       for (let k = 0; k < 6; k++) ctx.fillRect(wx + 2, s.y + 6 + mapWrap(t * 260 + k * 40, 240), 6, 14);
     } else {                                               // cloud platform
       ctx.fillStyle = 'rgba(255,240,250,.9)';
       for (let x = s.x + 10; x < s.x + s.w; x += 26) { ctx.beginPath(); ctx.arc(x, s.y + 6, 14, 0, TAU); ctx.fill(); }
-      glowLine(ctx, s.x, s.y, s.x + s.w, s.y, s.move ? '#ffd84a' : '#ffffff', 2);
+      mapEdge(ctx, s, s.move ? '#ffd84a' : '#ffffff', 2);
     }
   },
-  drawFg(ctx, t) {
-    ctx.fillStyle = 'rgba(255,230,245,.18)';
-    for (let k = 0; k < 6; k++) {
-      const x = mapWrap(k * 260 - t * 30, W + 300) - 150;
-      ctx.beginPath(); ctx.ellipse(x, 690 + (k % 2) * 16, 110, 30, 0, 0, TAU); ctx.fill();
-    }
-  },
+  drawFg(ctx, t) { mapSoft(ctx, 640, 760, g => mapClouds(g, t, { y: 700, n: 6, sp: -30, rx: 150, ry: 36, col: '#ffe6f5', a: .55, seed: 4 })); },
 });

@@ -38,11 +38,11 @@ function floatDropOne() {
 }
 
 // Moves a new label up above any fresh label it would overlap ("2 HIT COMBO" over a skill name, stacked K.O. texts).
+const floatHalfW = t => String(t.text).length * t.size * .3 + 6;
 function floatFreeY(x, y, text, size) {
-  const halfW = t => String(t.text).length * t.size * .3 + 6;
   for (let tries = 0; tries < 5; tries++) {
     const hit = FLOATS.find(t => t.life > .55 && Math.abs(t.y - y) < (t.size + size) * .5 &&
-      Math.abs(t.x - x) < halfW(t) + text.length * size * .3);
+      Math.abs(t.x - x) < floatHalfW(t) + text.length * size * .3);
     if (!hit) break;
     y = hit.y - (hit.size + size) * .55;
   }
@@ -54,10 +54,10 @@ function floatFreeY(x, y, text, size) {
 // one down, so every label stays readable. floatFreeY only places new labels; this keeps them apart afterwards.
 const FLOAT_NUDGE = 420;   // px/s: fast enough to clear within a few frames, slow enough to read as a glide
 function floatSeparate(dt) {
-  const n = FLOATS.length, halfW = t => String(t.text).length * t.size * .3 + 6, step = FLOAT_NUDGE * dt;
+  const n = FLOATS.length, step = FLOAT_NUDGE * dt;
   for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
     const a = FLOATS[i], b = FLOATS[j];       // b is the newer label
-    if (Math.abs(a.x - b.x) >= halfW(a) + halfW(b)) continue;
+    if (Math.abs(a.x - b.x) >= floatHalfW(a) + floatHalfW(b)) continue;
     const need = (a.size + b.size) * .5, gap = b.y - a.y;
     if (Math.abs(gap) >= need) continue;
     const push = Math.min((need - Math.abs(gap)) / 2, step), dir = gap > 0 ? 1 : -1;   // equal: the newer one rises
@@ -110,31 +110,40 @@ function fxStep(dt) {
   for (const b of BEAMS) b.life -= dt;
   fxCompact(PARTS); fxCompact(FLOATS); fxCompact(RINGS); fxCompact(BEAMS);
 }
-// Drops dead entries (life <= 0) in place, keeping order: no new array every step.
-function fxCompact(list) {
+// Keeps the entries that pass `keep` (default: alive) in place, in order: no new array every step.
+function fxCompact(list, keep = e => e.life > 0) {
   let n = 0;
-  for (let i = 0; i < list.length; i++) if (list[i].life > 0) list[n++] = list[i];
+  for (let i = 0; i < list.length; i++) if (keep(list[i])) list[n++] = list[i];
   list.length = n;
 }
 
-// Particles are batched by colour and a few alpha steps: one fill per group instead of one per particle.
-// The groups (colour -> 4 lists by alpha step) persist between frames and are only emptied, to avoid garbage.
+// Particles are batched by colour and 8 alpha steps: one fill per group instead of one per particle. The groups
+// (colour -> 16 lists: squares, then neon's velocity streaks, by alpha) persist and are only emptied, to avoid garbage.
+// Streaks: 1/80 s of travel, at most 4 sizes (no long lines), a group at its mean size, butt ends (round ones cost
+// 2.5x); styles keep shapes (59 turns rects into dots).
 const PART_GROUPS = new Map();
 function drawParticles(ctx) {
+  const streak = ART.style === STYLES.neon;
   if (PART_GROUPS.size > 300) PART_GROUPS.clear();
   for (const p of PARTS) {
-    const a = Math.ceil(clamp(p.life / p.max * 1.6, 0, 1) * 4);
+    if (p.soft) { const k = p.life / p.max; postfxGlow(ctx, p.x, p.y, p.s * (2.4 - k * 1.4), p.c, .4 * k); continue; }   // 87's dust
+    const a = Math.ceil(clamp(p.life / p.max * 1.6, 0, 1) * 8);
     if (!a) continue;
     let g = PART_GROUPS.get(p.c);
-    if (!g) PART_GROUPS.set(p.c, g = [[], [], [], []]);
-    g[a - 1].push(p);
+    if (!g) PART_GROUPS.set(p.c, g = Array.from({ length: 16 }, () => []));
+    g[a + (streak && Math.abs(p.vx) + Math.abs(p.vy) > 50 ? 7 : -1)].push(p);   // a resting one stays a square
   }
-  for (const [color, g] of PART_GROUPS) for (let k = 0; k < 4; k++) {
-    const list = g[k];
+  ctx.lineCap = 'butt';
+  for (const [color, g] of PART_GROUPS) for (let k = 0; k < 16; k++) {
+    const list = g[k], line = k > 7;
     if (!list.length) continue;
-    ctx.globalAlpha = (k + 1) / 4; ctx.fillStyle = color; ctx.beginPath();
-    for (const p of list) ctx.rect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
-    ctx.fill();
+    let w = 0;
+    ctx.globalAlpha = (k % 8 + 1) / 8; ctx.beginPath();
+    for (const p of list) {
+      if (line) { const l = Math.min(.0125, 4 * p.s / Math.hypot(p.vx, p.vy)); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * l, p.y - p.vy * l); w += p.s; }
+      else ctx.rect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
+    }
+    if (line) { ctx.lineWidth = w / list.length; ctx.strokeStyle = color; ctx.stroke(); } else { ctx.fillStyle = color; ctx.fill(); }
     list.length = 0;
   }
   ctx.globalAlpha = 1;

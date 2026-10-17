@@ -24,8 +24,8 @@ function artColor(st, str, kind) {
   const memo = st.memo || (st.memo = new Map()), key = kind + str;
   let v = memo.get(key);
   if (v === undefined) {
-    const c = skinParse(str);   // 78-outfits
-    v = c ? st.map(c, kind, artHsl(c), c[3]) : str;
+    const c = skinParse(str);   // 78-outfits; glowless styles drop shadows
+    v = !c ? str : kind === 'shadow' && !st.glow ? 'rgba(0,0,0,0)' : st.map(c, kind, artHsl(c), c[3]);
     if (memo.size > 900) memo.clear();
     memo.set(key, v);
   }
@@ -61,7 +61,7 @@ function artProxy(real, st) {
 }
 // Everything in one colour: silhouettes, paper weapon shadows.
 function artMono(g, color) {
-  const st = ART.monos[color] || (ART.monos[color] = { key: 'mono' + color, glow: 0, map: (c, kind) => kind === 'shadow' ? 'rgba(0,0,0,0)' : color });
+  const st = ART.monos[color] || (ART.monos[color] = { key: 'mono' + color, glow: 0, map: () => color });
   return artProxy(artRaw(g), st);
 }
 
@@ -86,7 +86,7 @@ function artGrainMask() {
   }
   return (ART.tex.grain = c);
 }
-// A chalk pattern of one colour (cached; 'fill' fainter).
+// A chalk pattern of one colour (cached, the oldest dropped first; 'fill' fainter).
 function artGrain(color, kind) {
   let p = ART.grains.get(kind + color);
   if (p !== undefined) return p;
@@ -98,7 +98,7 @@ function artGrain(color, kind) {
     g.globalAlpha = kind === 'fill' ? .7 : 1; g.fillStyle = color; g.fillRect(0, 0, 64, 64);
     p = g.createPattern(c, 'repeat') || color;
   }
-  if (ART.grains.size > 400) ART.grains.clear();
+  if (ART.grains.size > 200) ART.grains.delete(ART.grains.keys().next().value);
   ART.grains.set(kind + color, p);
   return p;
 }
@@ -144,9 +144,10 @@ function artStick(c, f, col, w, dx, dy, hm) {
 // ---------- the world pass (85-render): ctx = the style proxy (pixel: over the low-res layer)
 function artWorld(draw) {
   const st = ART.style = artNow(), keep = GLOW_SCALE;
+  ART.tier = keep / VIEW.glowK;   // the tier's glow scale alone
   if (st.key === 'neon') return draw();
   const L = st.pixel ? artLayerStart() : null;
-  GLOW_SCALE = st.glow > 0 ? keep : 0;
+  GLOW_SCALE = st.glow > 0 ? (L ? ART.tier : keep) : 0;   // the pixel layer doesn't follow the step
   if (L) st.blur = st.glow * L.q * VIEW.dpr * 2;   // shadowBlur ignores the transform: a layer pixel or two
   ctx = artProxy(L ? L.g : CTX_MAIN, st);
   ART.layerOn = L;
@@ -160,7 +161,7 @@ function artSurfaces(c, on) {
   if (!ART.style || !ART.style.shadow) return;
   const raw = artRaw(c), z = VIEW.s * CAM.z;
   if (!on) return raw.restore();
-  raw.save(); raw.shadowColor = 'rgba(80,40,40,.3)'; raw.shadowOffsetX = 3 * z; raw.shadowOffsetY = 4 * z; raw.shadowBlur = 3 * z;
+  raw.save(); raw.shadowColor = 'rgba(80,40,40,.3)'; raw.shadowOffsetX = 3 * z; raw.shadowOffsetY = 4 * z; raw.shadowBlur = 3 * z * ART.tier;
 }
 function artBody(f, color, sc) {
   const st = ART.style, hm = f.headMul || 1;
@@ -196,9 +197,8 @@ function artWeaponHalo(f, rig, view, color) {
   });
   try { hook(rig.w, 'draw', c, f, view); } finally { raw.restore(); }
 }
-// Hits (84-postfx) through the style's spark, flash and ring.
-function artImpact(c, P) {
-  const st = ART.style || artNow();
+// Hits (84-postfx) through the style's spark, flash and ring (neon's and pixel's: PFX_NEON).
+function artImpact(c, P, st) {
   for (const s of P.sparks) { const e = postfxAge(s); if (e >= 0 && e <= s.life) { c.globalAlpha = 1 - e / s.life; st.spark(c, postfxSparkAt(s, e), s); } }
   for (const f of P.flashes) { const k = postfxAge(f) / f.life; if (k >= 0 && k <= 1) st.flash(c, f, k, postfxAge(f)); }
   for (const w of P.waves) { const k = postfxAge(w) / w.life; if (k >= 0 && k <= 1) st.ring(c, w.x, w.y, w.r * (.2 + .8 * Math.sqrt(k)), 6 * (1 - k) + 2, w.color, (1 - k) * .8); }
@@ -206,16 +206,18 @@ function artImpact(c, P) {
 }
 
 // ---------- cached backdrops
-// The arena's static art in one reused canvas, redrawn when arena, style or view scale change.
+// The arena's static art in one reused canvas, redrawn for a new arena or style and once after a real resize (85).
+// Scaled for the ceiling step (84-quality), so steps never redraw it; rounded up to .25, <= 4.2 MP (Low 2.4).
 function artBackdrop(m, st) {
-  const k = Math.min(VIEW.s * Math.max(1.15, VIEW.zMin), Math.sqrt(2.4e6 / (ART_BOX.w * ART_BOX.h))), key = `${m.key}|${st.key}|${k.toFixed(3)}`;
-  const C = ART.cache || (ART.cache = { key: '', cv: artCanvas(1, 1) });
+  const c = RES.auto ? RES.ceil : 3, k = ART.k || (ART.k = Math.min(Math.ceil(VIEW.s * resDpr(c) / VIEW.dpr * Math.max(1.15, VIEW.zMin) * 4) / 4,
+    Math.sqrt((c > 2 ? 2.4e6 : 4.2e6) / (ART_BOX.w * ART_BOX.h)))), key = `${m.key}|${st.key}|${k}`;
+  const C = ART.cache || (ART.cache = { key: '', cv: artCanvas(1, 1), n: 0 });
   if (C.cv && C.key !== key) {
     C.cv.width = Math.ceil(ART_BOX.w * k); C.cv.height = Math.ceil(ART_BOX.h * k);
     const g = C.cv.getContext('2d');
     g.setTransform(k, 0, 0, k, -ART_BOX.x * k, -ART_BOX.y * k);
     try { m.art.bg(g, m); } catch (e) { report(e, 'art ' + m.key); }
-    C.key = key;
+    C.key = key; C.n++;
   }
   return C.cv;
 }
@@ -235,11 +237,12 @@ function artReset() {
 
 // ---------- pixel: the low-res world layer
 const ART_PIXEL = 4;   // CSS px per layer pixel
-// One layer canvas, resized only with the view; its text is queued, to be drawn crisp.
+// One layer canvas, resized only with the view, each pixel a whole number of canvas pixels (even blocks); its text is
+// queued, to be drawn crisp.
 function artLayerStart() {
   const L = ART.layer || (ART.layer = { cv: artCanvas(1, 1), texts: [], sizes: 0 });
   if (!L.cv) return null;
-  const w = Math.max(80, Math.round(VIEW.vw / VIEW.dpr / ART_PIXEL)), h = Math.max(45, Math.round(VIEW.vh / VIEW.dpr / ART_PIXEL));
+  const px = Math.max(1, Math.round(Math.min(ART_PIXEL * VIEW.dpr, VIEW.vw / 80, VIEW.vh / 45))), w = Math.ceil(VIEW.vw / px), h = Math.ceil(VIEW.vh / px);
   if (L.cv.width !== w || L.cv.height !== h) { L.cv.width = w; L.cv.height = h; L.sizes++; }
   if (!L.g) {
     L.g = L.cv.getContext('2d');
@@ -248,7 +251,7 @@ function artLayerStart() {
         lw: this.lineWidth, align: this.textAlign, base: this.textBaseline, a: this.globalAlpha });
     };
   }
-  L.q = w / VIEW.vw;
+  L.q = 1 / px;
   L.g.save(); L.g.setTransform(1, 0, 0, 1, 0, 0);
   L.g.fillStyle = artColor(STYLES.pixel, mapSkyTop(MAP), 'fill'); L.g.fillRect(0, 0, w, h);
   return L;
@@ -258,7 +261,7 @@ function artLayerEnd(L) {
   L.g.restore();
   c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
   c.imageSmoothingEnabled = false; L.smooth = c.imageSmoothingEnabled;
-  c.drawImage(L.cv, VIEW.vx, VIEW.vy, VIEW.vw, VIEW.vh);
+  c.drawImage(L.cv, VIEW.vx, VIEW.vy, L.cv.width / q, L.cv.height / q);
   c.lineJoin = 'round';
   for (const T of L.texts) {
     const m = T.m;
@@ -277,7 +280,6 @@ defStyle('neon', { glow: 1, bloom: true, lights: true });
 const inkTone = color => artColor(STYLES.ink, color, 'tone');
 defStyle('ink', { fxLife: 4, warn: '#c8322a', vignette: 'rgba(110,70,30,.3)', halo: ART_PAPER, frame: '#d6c9ad',
   map(c, kind, [h, s, l], a) {
-    if (kind === 'shadow') return 'rgba(0,0,0,0)';
     if (kind === 'tone') return artCss(h, s * .85, clamp(l * .82, .32, .56), a);
     if (kind === 'stroke') return l > .86 && s < .3 ? artCss(30, .2, .09, a) : artCss(h, s * .45, .16, a);
     if (l < .22) return artCss(h, s * .3, .1, a);
@@ -348,7 +350,6 @@ defStyle('pixel', { glow: .6, lights: true, pixel: true, warn: '#ffcc33', vignet
 // ---------- paper: flat card shapes with soft drop shadows
 defStyle('paper', { fxLife: 2.5, shadow: true, warn: '#e2412b', vignette: 'rgba(90,50,40,.2)', frame: '#d9c8ae',
   map(c, kind, [h, s, l], a) {
-    if (kind === 'shadow') return 'rgba(0,0,0,0)';
     return l > .9 ? artCss(42, .6, .96, a) : l < .16 ? artCss(h, s * .3, .19, a) : artCss(h, Math.min(s, .82) * .88, clamp(l, .3, .8), a);
   },
   // A cut-out puppet: flat limbs in the player's colour on a white card margin, over a drop shadow.
@@ -387,7 +388,6 @@ defStyle('paper', { fxLife: 2.5, shadow: true, warn: '#e2412b', vignette: 'rgba(
 const chalkTone = color => artColor(STYLES.chalk, color, 'tone');   // never sinks into the slate
 defStyle('chalk', { fxLife: 3, warn: '#ffe45c', vignette: 'rgba(0,0,0,.45)', frame: '#3a2a1e',
   map(c, kind, [h, s, l], a) {
-    if (kind === 'shadow') return 'rgba(0,0,0,0)';
     if (kind === 'tone') return artCss(h, s, clamp(.5 + l * .32, .6, .82), a);
     if (l < .2 && kind !== 'stroke') return artCss(165, .1, .15, a);
     const col = artCss(Math.round(h / 8) * 8, Math.round(s * 6) / 10, Math.round(clamp(.62 + l * .32, .62, .95) * 20) / 20, Math.ceil(a * 8) / 8);   // few patterns
@@ -500,17 +500,10 @@ function chalkLine(g, pts, color, w, seed = 0, close = false) {
 }
 const artArc = (x, y, r, a0, a1, n = 16) => Array.from({ length: n + 1 }, (_, i) => [x + Math.cos(a0 + (a1 - a0) * i / n) * r, y + Math.sin(a0 + (a1 - a0) * i / n) * r]);
 
-// ---------- Settings → Effects → "Arena art" (wrapped at boot, like 87-juice) + test hooks
+// ---------- the "Arena art" setting (its row in Settings → Effects comes from 87-juice) + test hooks
 on('boot', () => {
   SETTING_DEFAULTS.arenaArt = 'arena'; SETTING_CHOICES.arenaArt = ['arena', 'neon'];
   if (!SETTING_CHOICES.arenaArt.includes(SETTINGS.arenaArt)) SETTINGS.arenaArt = 'arena';
-  const build = typeof SCREENS === 'object' && SCREENS.settings;
-  if (typeof build === 'function') SCREENS.settings = () => {
-    const node = build(), h3 = [...node.querySelectorAll('.set-group h3')].find(h => h.textContent === 'Effects');
-    if (h3) h3.parentNode.append(segField('Arena art', [['arena', 'Per arena'], ['neon', 'Neon everywhere']], SETTINGS.arenaArt === 'neon' ? 'neon' : 'arena',
-      v => { setSetting('arenaArt', v); artReset(); }));
-    return node;
-  };
   if (window.SC) SC.styles = { STYLES, ART, of: key => artStyleOf(MAPS[key]).key, reset: artReset,
     layer: () => ART.layer && ART.layer.cv && { w: ART.layer.cv.width, h: ART.layer.cv.height, smooth: ART.layer.smooth, sizes: ART.layer.sizes } };
 });

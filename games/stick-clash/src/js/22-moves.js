@@ -125,7 +125,7 @@ function drawGuard(f) {
   const parryWin = G_STATE.t - f.blockStart < BLOCK.parryWin;
   ctx.save();
   ctx.globalAlpha = .35 + .4 * frac;
-  ctx.shadowColor = parryWin ? '#ffffff' : f.color; ctx.shadowBlur = 16;
+  ctx.shadowColor = parryWin ? '#ffffff' : f.color; ctx.shadowBlur = 16 * GLOW_SCALE;
   ctx.strokeStyle = parryWin ? '#ffffff' : f.color; ctx.lineWidth = 5 * f.scale;
   ctx.beginPath(); ctx.arc(c.x, c.y - 10 * f.scale, r, a0, a0 + 2.3); ctx.stroke();
   ctx.restore();

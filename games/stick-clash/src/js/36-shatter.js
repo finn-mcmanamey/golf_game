@@ -53,7 +53,7 @@ function shatterDraw(c2) {
     shatterMove(s, clamp(now - s.last, 0, .05)); s.last = now;
     const age = (now - s.t0) / s.life, a = age < .6 ? 1 : 1 - (age - .6) / .4;
     c2.globalAlpha = a;
-    c2.shadowColor = s.color; c2.shadowBlur = 16;
+    c2.shadowColor = s.color; c2.shadowBlur = 16 * GLOW_SCALE;
     if (s.head) shatterHead(c2, s);
     else {
       const dx = Math.cos(s.ang) * s.len / 2, dy = Math.sin(s.ang) * s.len / 2;

@@ -62,7 +62,7 @@ function levelDraw(f) {
   const el = ELEMENTS[LEVEL_ELEMENT[f.w.cat]], tip = f.P[f.tip];
   if (!el || f.element) return;
   ctx.save();
-  ctx.globalAlpha = .75; ctx.shadowColor = el.color; ctx.shadowBlur = 14;
+  ctx.globalAlpha = .75; ctx.shadowColor = el.color; ctx.shadowBlur = 14 * GLOW_SCALE;
   for (let k = 0; k < 4; k++) {
     const a = G_STATE.t * 9 + k * 1.7, r = 6 + 4 * Math.sin(G_STATE.t * 13 + k);
     circle(ctx, tip.x + Math.cos(a) * r, tip.y + Math.sin(a) * r, 2.2 * f.scale, el.color);

@@ -7,7 +7,7 @@
 // - dust puffs and a thud when a fighter lands hard; speed streaks behind fighters sent flying
 // - low-health heartbeat: a pulsing red vignette and a quiet heartbeat for a real player under 30% health
 // - hit effect colours: neon sparks in the fighter's colour (default) or red (SETTINGS.hitFx)
-// It also adds its settings (and the music toggle) to the Settings screen.
+// It also adds its settings (and the music toggle), 59's and 84's to the Settings screen.
 
 const JUICE_DEFAULTS = { hitFx: 'sparks', killcamAll: false, heartbeat: true, musicOn: true };
 for (const k in JUICE_DEFAULTS) {
@@ -15,7 +15,7 @@ for (const k in JUICE_DEFAULTS) {
   if (!(k in SETTINGS)) SETTINGS[k] = JUICE_DEFAULTS[k];
 }
 
-const JUICE = { chroma: 0, koFlash: 0, koColor: '#ff4a6a', beat: 0, beatPulse: 0, land: new WeakMap(), scratch: null, vignettes: new Map() };
+const JUICE = { chroma: 0, koFlash: 0, koColor: '#ff4a6a', beat: 0, land: new WeakMap(), scratch: null, vignettes: new Map() };
 const JUICE_RED = ['#ff2840', '#d3102a', '#ff5a5a'];
 
 // Colour of the sparks a hit throws (used by hitFeedback in 30-combat).
@@ -67,14 +67,13 @@ function juiceCheckLanding(f) {
   st.air = false; st.vy = 0;
 }
 
-// Dust that spreads sideways along the ground and drifts up.
+// Soft dust puffs (particles 35 draws as swelling sprites) that spread sideways along the ground and drift up.
 function juiceDust(x, y, power) {
   if (G_STATE.sim) return;
-  const n = Math.round((6 + 10 * power) * FX.partMul);
-  for (let k = 0; k < n; k++) {
-    const dir = k % 2 ? 1 : -1, life = rnd(.3, .55);
-    PARTS.push({ x: x + dir * rnd(2, 12), y: y - 2, vx: dir * rnd(90, 320) * power, vy: -rnd(20, 110) * power, life, max: life,
-      c: 'rgba(200,205,240,.75)', s: rnd(2.5, 5) * (.7 + power * .5), grav: -60 });
+  for (let k = 0, n = Math.round((3 + 5 * power) * FX.partMul); k < n; k++) {
+    const dir = k % 2 ? 1 : -1, life = rnd(.35, .6);
+    PARTS.push({ x: x + dir * rnd(2, 10), y: y - 5, vx: dir * rnd(60, 260) * power, vy: -rnd(10, 50) * power, life, max: life,
+      c: '#c8cdf0', s: rnd(7, 13) * (.7 + power * .5), grav: -60, soft: 1 });
   }
 }
 
@@ -101,21 +100,23 @@ function juiceDrawScreen(c2, dt) {
   juiceHeartbeat(c2, dt);
 }
 
-// Red and cyan copies of the frame pulled apart: a chromatic-aberration hit on K.O. The copies are made at a quarter
-// of the pixels (the split is a brief blur anyway), so a K.O. no longer costs several full-screen passes.
+// Red and cyan copies of the frame pulled apart: a chromatic-aberration hit on K.O., at a quarter of the step-3 pixels
+// (a brief blur anyway). The cyan half (shifted over an unshifted copy) is added onto the red, then laid over the frame
+// once with normal blending: a true split that doesn't brighten.
 const JUICE_CHROMA_RES = .5;
 function juiceChroma(c2, amount) {
   if (typeof document === 'undefined' || amount < .02) return;
   const c = JUICE.scratch || (JUICE.scratch = document.createElement('canvas'));
-  const sw = Math.max(1, Math.round(cv.width * JUICE_CHROMA_RES)), sh = Math.max(1, Math.round(cv.height * JUICE_CHROMA_RES));
-  if (c.width !== sw || c.height !== sh) { c.width = sw; c.height = sh; }
+  const sw = Math.max(1, Math.round(VIEW.w3 * JUICE_CHROMA_RES)), sh = Math.max(1, Math.round(VIEW.h3 * JUICE_CHROMA_RES));
+  if (c.width !== sw || c.height !== sh * 2) { c.width = sw; c.height = sh * 2; }
   const g = c.getContext('2d'), off = amount * 9 * VIEW.s;
-  c2.save(); c2.setTransform(1, 0, 0, 1, 0, 0);
-  for (const [color, dx] of [['#ff0000', off], ['#00ffff', -off]]) {
-    g.globalCompositeOperation = 'copy'; g.drawImage(cv, 0, 0, sw, sh);
-    g.globalCompositeOperation = 'multiply'; g.fillStyle = color; g.fillRect(0, 0, sw, sh);
-    c2.globalCompositeOperation = 'lighter'; c2.globalAlpha = .55 * amount; c2.drawImage(c, dx, 0, cv.width, cv.height);
-  }
+  if (!g) return;
+  g.globalCompositeOperation = 'copy'; g.drawImage(cv, 0, 0, sw, sh);
+  g.globalCompositeOperation = 'source-over'; g.drawImage(cv, 0, sh, sw, sh); g.drawImage(cv, -2 * off * sw / cv.width, sh, sw, sh);
+  g.globalCompositeOperation = 'multiply'; g.fillStyle = '#ff0000'; g.fillRect(0, 0, sw, sh); g.fillStyle = '#00ffff'; g.fillRect(0, sh, sw, sh);
+  g.globalCompositeOperation = 'lighter'; g.drawImage(c, 0, sh, sw, sh, 0, 0, sw, sh);
+  c2.save(); c2.setTransform(1, 0, 0, 1, 0, 0); c2.globalAlpha = .8 * amount;
+  c2.drawImage(c, 0, 0, sw, sh, off, 0, cv.width, cv.height);
   c2.restore();
 }
 
@@ -134,7 +135,7 @@ function juiceVignette(c2, color, alpha) {
 
 // The lowest-health real player under 30% hears and sees a heartbeat that quickens as health drops.
 function juiceHeartbeat(c2, dt) {
-  if (!SETTINGS.heartbeat || G_STATE.state !== 'play' || G_STATE.demo || G_STATE.ending) { JUICE.beatPulse = 0; return; }
+  if (!SETTINGS.heartbeat || G_STATE.state !== 'play' || G_STATE.demo || G_STATE.ending) return;
   let frac = 1;
   for (const f of F) if (f.alive && f.ctrl === 'human' && !f.autopilot && !f.summon) frac = Math.min(frac, f.hp / f.maxHp);
   if (frac >= .3) { JUICE.beat = 0; return; }
@@ -146,14 +147,15 @@ function juiceHeartbeat(c2, dt) {
 }
 
 // ---------- Settings screen additions ----------
-// Adds our options to the Settings screen built by 97-ui-pages (wrapped at boot, after it has registered).
+// Adds the effect slices' options to the Settings screen built by 97-ui-pages (wrapped at boot, after it has registered).
 function juiceSettingsExtras(node) {
   const groups = node.querySelectorAll ? node.querySelectorAll('.set-group') : [];
   const set = k => v => setSetting(k, v);
   for (const g of groups) {
     const title = g.querySelector('h3') && g.querySelector('h3').textContent;
     if (title === 'Effects') {
-      g.append(
+      g.append(segField('Arena art', [['arena', 'Per arena'], ['neon', 'Neon everywhere']], SETTINGS.arenaArt === 'neon' ? 'neon' : 'arena',
+        v => { setSetting('arenaArt', v); artReset(); }),
         toggleField('Replay every K.O.', SETTINGS.killcamAll, set('killcamAll'), 'Off: only the match-deciding K.O. is replayed.'),
         segField('Hit effects', [['sparks', 'Neon sparks'], ['red', 'Red']], SETTINGS.hitFx, set('hitFx')),
         toggleField('Low-health heartbeat', SETTINGS.heartbeat, set('heartbeat')),
@@ -168,6 +170,7 @@ function juiceSettingsExtras(node) {
         toggleField('Crowd', SETTINGS.crowd !== false, set('crowd'), 'Cheers, gasps and boos.'));
     }
   }
+  node.querySelector('.set-grid').append(perfSettingsGroup());   // 84-quality
   return node;
 }
 
