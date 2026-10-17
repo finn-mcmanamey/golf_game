@@ -5,7 +5,7 @@
 // - under test automation the governor is off and the canvas is the old one (step 3);
 // - 25 ms frames step down; a step with no gain carries on to step 3, then the dive is undone and dives hold (30 s,
 //   then for the session);
-// - 300 frames at 16.7 ms climb one step; a climb undone within 3 s doubles the wait; failing twice sets the ceiling;
+// - 300 frames at 16.7 ms climb one step; a climb undone within 30 s doubles the wait; failing twice sets the ceiling;
 // - nothing is measured in a pause, the kill-cam, photo mode or the benchmark; photo mode draws at step 0 and a
 //   highlight export at step 3;
 // - across steps the backdrop cache is never redrawn and the bloom buffers keep their size.
@@ -104,7 +104,7 @@ async function testGovernor(browser, { check, rows }) {
     out.dived = R.step;
     out.gain = __R.walk(19, 90);                         // in the dead band and 43% faster than the start: stays
     out.gainDive = R.dive;
-    // Up: 300 frames at 16.7 ms climb a step; undone within 3 s, the wait doubles; failing twice sets the ceiling.
+    // Up: 300 frames at 16.7 ms climb a step; undone within 30 s, the wait doubles; failing twice sets the ceiling.
     __R.fresh(3);
     out.up = __R.walk(16.7, 300);
     out.undo = __R.walk(25, 100);
@@ -114,6 +114,14 @@ async function testGovernor(browser, { check, rows }) {
     out.undo2 = __R.walk(25, 100);
     out.ceil = { ceil: R.ceil, wait: R.wait };
     out.capped = __R.walk(16.7, 2000);
+    // A borderline screen: step 0 misses ~18% of vsyncs at random, step 1 runs clean. A slowdown within 30 s of a climb
+    // counts as that climb failing, so the governor settles instead of flapping (a 3 s window switched 14 times here).
+    __R.fresh(1);
+    let seed = 5, flips = 0, last = R.step;
+    const rnd = () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    for (let k = 0; k < 18000; k++) { const st = SC.res.feed(R.step === 0 && rnd() < .18 ? 33.3 : 16.7); if (st !== last) { flips++; last = st; } }
+    out.flap = { flips, step: R.step, ceil: R.ceil };
     // The dead band (50-57 fps) changes nothing either way.
     __R.fresh(2);
     out.band = __R.walk(18.5, 1500);
@@ -130,6 +138,7 @@ async function testGovernor(browser, { check, rows }) {
     & check(r.notYet.join() === '3' && r.up2.join() === '3,2' && r.undo2.join() === '2,3' && r.ceil.ceil === 3 && r.ceil.wait === 16000 && r.capped.join() === '3',
       `res ceiling: ${JSON.stringify({ notYet: r.notYet, up2: r.up2, undo2: r.undo2, ceil: r.ceil, capped: r.capped })}`)
     & check(r.band.join() === '2', `res dead band: ${r.band}`)
+    & check(r.flap.flips <= 6 && r.flap.step === 1 && r.flap.ceil === 1, `res no flip-flop: ${JSON.stringify(r.flap)}`)
     & check(!r.errors.length && !errors.length, `res governor: errors ${r.errors.concat(errors).join(' | ')}`);
   rows.push({ kind: 'res', key: 'governor down / up / hold', ok: !!ok, note: `down ${r.down}, up ${r.up}, wait ${r.wait1} -> ${r.ceil.wait}, ceiling ${r.ceil.ceil}` });
   await page.close();

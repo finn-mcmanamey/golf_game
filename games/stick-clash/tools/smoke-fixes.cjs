@@ -64,14 +64,21 @@ async function run(_page, browser, { check, rows }) {
   // Mech Suit: a mounted fighter should be roughly even with an unmounted one, not a near-guaranteed kill.
   await step('Mech Suit is not overpowered', async () => {
     const r = await page.evaluate(() => {
-      let w = 0, l = 0, d = 0; const N = 16;
+      let w = 0, l = 0, d = 0; const N = 16, keep = Math.random;
       for (let k = 0; k < N; k++) {
+        // Seeded and isolated (learnt CPU moves and clash timers carry over between matches): the same 16 fights every run.
+        for (const x in AI_MOVES) delete AI_MOVES[x];
+        for (const x in CLASH_T) delete CLASH_T[x];
+        let s = (k + 1) * 7919; SC.G.t = 1000;
+        Math.random = () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s);
+          t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
         SC.start({ mode: 'watch', map: ['neon', 'foundry', 'frost'][k % 3], weapons: ['blade', 'blade'], classes: ['none', 'none'], diff: 'normal', winScore: 99, weather: 'clear', orbs: 0 });
         SC.G.state = 'play'; SC.sim(1.7);
         const A = SC.F[k % 2], B = SC.F[1 - k % 2]; mount(A, 'mech');
         for (let s = 0; s < 60 * 9; s++) { SC.sim(1 / 60); if (!A.alive || !B.alive) break; }
         if (!B.alive && A.alive) w++; else if (!A.alive && B.alive) l++; else d++;
       }
+      Math.random = keep;
       return { w, l, d, rate: (w + d / 2) / N, taken: MOUNTS.mech.takenMul, time: MOUNTS.mech.time };
     });
     return { ok: r.rate <= .8 && r.taken >= .7 && r.time <= 7, note: JSON.stringify(r) };

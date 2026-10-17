@@ -253,7 +253,7 @@ function resSample(gap) {
     const n = resNext(R.step, 1);
     if (n > 3 && n < 7 && R.slow < 150) return;
     R.slow = 0; R.climb = null;
-    if (c && R.clock - c.at < 3e3) {
+    if (c && R.clock - c.at < 3e4) {   // slow within 30 s of a climb: it failed (3 s let borderline screens flap)
       R.wait = Math.min(R.wait * 2, 6e4);
       if (R.failed === c.to) R.ceil = c.from;
       R.failed = c.to; resSet(c.from);

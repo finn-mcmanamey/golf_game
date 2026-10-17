@@ -168,6 +168,40 @@ async function testCompact(browser) {
   return r;
 }
 
+// ---------- dash off Shift (v4.1.1) ----------
+// Windows opens Sticky Keys after five Shift presses, so dash is Space (P1) and Enter (P2), and P2's super moved to
+// backslash. Real key presses drive them; saved binds with the old defaults move once; a player's own key stays.
+async function testDashKeys(browser) {
+  const { ctx, page, errors, sc } = await open(browser);
+  const r = {};
+  await page.evaluate(() => setKeyLayout('standard'));
+  await fight(page, { mode: 'pvp', weapons: ['katana', 'katana'] });
+  await place(page, [400, 880]);
+  await wait(400);
+  await page.evaluate(() => { window.__d = SC.F.map(f => f.stats.dashes); setScheme(1, 'advanced'); for (const f of SC.F) f.super = 100; window.__u = SC.F[1].stats.ults; });
+  await page.keyboard.press('Space'); await page.keyboard.press('Enter'); await wait(150);
+  r.dashes = await page.evaluate(() => SC.F.map((f, i) => f.stats.dashes > __d[i]).join());
+  await page.keyboard.press('Backslash'); await wait(150);
+  r.p2super = await page.evaluate(() => SC.F[1].stats.ults > __u);
+  r.keys = await page.evaluate(() => [BINDS[0].dash, BINDS[1].dash, BINDS[1].super].join());
+  // An older save (written from a second document: file:// can lose a first document's storage on reload).
+  const reloadWith = async kind => {
+    await page.goto(URL); await page.waitForFunction(() => window.SC && SC.G.state === 'menu');
+    await page.evaluate(k => {
+      const D = DEFAULT_BINDS, b = k === 'old' ? [Object.assign({}, D[0], { dash: 'ShiftLeft' }), Object.assign({}, D[1], { dash: 'ShiftRight', super: 'Enter' })]
+        : [Object.assign({}, D[0], { dash: 'KeyV' }), D[1]];
+      store.set('binds', b); store.set('bindsV', 0);
+    }, kind);
+    await page.reload(); await page.waitForFunction(() => window.SC && SC.G.state === 'menu');
+    return page.evaluate(() => ({ keys: [BINDS[0].dash, BINDS[1].dash, BINDS[1].super].join(), v: store.get('bindsV', 0) }));
+  };
+  r.migrated = await reloadWith('old');
+  r.own = await reloadWith('own');
+  r.errors = [...errors, ...await sc()];
+  await ctx.close();
+  return r;
+}
+
 // ---------- key strips ----------
 async function testStrips(browser, SHOTS) {
   const { ctx, page, errors, sc } = await open(browser);
@@ -398,6 +432,10 @@ async function run(browser, { check, rows, SHOTS }) {
     if (t.stray) add('table: a stray key or pad keeps both sets; table off frees the 2nd touch seat', !t.stray.hidden && t.stray.table && t.stray.sets === 2
       && t.lobby.list === 'TK' && /Player 2 needs a keyboard or pad/.test(t.lobby.toast), JSON.stringify({ stray: t.stray, lobby: t.lobby }));
   }
+  const dk = await testDashKeys(browser);
+  errs.push(...dk.errors);
+  add('dash off Shift: Space / Enter dash, \\ super; old saves move once', dk.dashes === 'true,true' && dk.p2super && dk.keys === 'Space,Enter,Backslash'
+    && dk.migrated.keys === 'Space,Enter,Backslash' && dk.migrated.v === 2 && dk.own.keys.startsWith('KeyV,'), JSON.stringify(dk).slice(0, 240));
   const tp = await testTablePhone(browser);
   errs.push(...tp.errors);
   add('table mode: not on a phone (844x390)', !tp.setup && !tp.settings && tp.seat === -1 && !tp.table, JSON.stringify(tp));

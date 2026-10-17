@@ -384,7 +384,10 @@ async function run(browser, { check, rows, SHOTS }) {
         return { t: t.slice(0, 24), lines: f.lines.length, px: f.px, w: Math.round(Math.max(...f.lines.map(l => ctx.measureText(l).width))) }; });
       // The banner's drawn width (pixels changed against a frame without it), early in its pop-in and at rest.
       const band = () => CTX_MAIN.getImageData(0, Math.round(VIEW.cy - 160 * VIEW.s), cv.width, Math.round(200 * VIEW.s));
-      const span = (a, b) => { let x0 = 1e9, x1 = -1; for (let i = 0; i < a.data.length; i += 4) if (Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) > 80) { const x = (i / 4) % a.width; x0 = Math.min(x0, x); x1 = Math.max(x1, x); } return [x0, x1]; };
+      // Only changed pixels in the banner's yellow count: a fighter or arena detail that moves between the two frames
+      // (it happened in a full run) must not widen the measured banner.
+      const span = (a, b) => { let x0 = 1e9, x1 = -1; for (let i = 0; i < a.data.length; i += 4) if (Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) > 80
+        && a.data[i] > 200 && a.data[i + 1] > 160 && a.data[i + 2] < 150) { const x = (i / 4) % a.width; x0 = Math.min(x0, x); x1 = Math.max(x1, x); } return [x0, x1]; };
       const drawn = (text, t) => { BANNER = null; SC.render(0); const base = band(); banner(text, '', 1.6, '#ffd84a'); BANNER.t = t; SC.render(0); const x = span(band(), base); BANNER = null; return x.map(v => Math.round((v - VIEW.vx) / VIEW.s)); };
       const keep = [SETTINGS.reduceFlash, GLOW_SCALE], out = { fits }, wide = x => x[1] - x[0];
       GLOW_SCALE = 0;   // glow() checks it: the drawn extent is then the text and its outline only

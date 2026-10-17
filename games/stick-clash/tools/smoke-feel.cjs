@@ -25,6 +25,16 @@ async function openPage(browser) {
 // Page-side helpers: a still duel (both CPUs idle) at a given hip gap, and plain CPU duels on an arena.
 const HELPERS = () => {
   window.__F = {
+    // A repeatable fight: seeded Math.random, pinned game time, and no learnt CPU moves or clash timers left by earlier
+    // matches (they carry over and skew short statistical checks from run to run).
+    seed(n) {
+      for (const k in AI_MOVES) delete AI_MOVES[k];
+      for (const k in CLASH_T) delete CLASH_T[k];
+      let s = n * 7919;
+      Math.random = () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+      SC.G.t = 1000;
+    },
     duel(wa, wb, gap = 200) {
       SC.start({ mode: 'watch', map: 'dojo', weapons: [wa, wb], classes: ['none', 'none'], skills: [['none', 'none'], ['none', 'none']],
         throws: [['none', 'none'], ['none', 'none']], orbs: false, winScore: 999 });
@@ -120,15 +130,17 @@ async function testGuns(page, { check, rows }) {
   const r = await page.evaluate(() => {
     const guns = ['pistol', 'shotgun', 'laser', 'crossbow'], melee = ['blade', 'hammer', 'spear', 'katana'];
     const maps = ['neon', 'dojo', 'frost', 'factory'];
-    let g = 0, n = 0;
+    let g = 0, n = 0; const keep = Math.random;   // the same 32 seeded fights every run, whatever ran before
     guns.forEach((a, i) => melee.forEach((b, j) => {
       for (let k = 0; k < 2; k++) {
+        __F.seed(1 + i * 8 + j * 2 + k);
         SC.start({ mode: 'watch', map: maps[(i + j + k) % 4], weapons: k ? [b, a] : [a, b], skills: [['none', 'none'], ['none', 'none']],
           classes: ['none', 'none'], throws: [['none', 'none'], ['none', 'none']], orbs: false, winScore: 999 });
         SC.G.state = 'play'; SC.sim(40);
         for (const l of SC.G.log) { if (l.winner < 0) continue; n++; if (l.winner === k) g++; }
       }
     }));
+    Math.random = keep;
     return { win: g / Math.max(1, n), rounds: n, errors: SC.errors.map(e => e.msg) };
   });
   const ok = check(r.win >= .3 && r.win <= .7, `guns: ranged vs melee ${(r.win * 100).toFixed(0)}% (want 35-65, short-sim tolerance 30-70)`)
@@ -192,6 +204,37 @@ async function testCpu(page, { check, rows }) {
     '; ladder ' + r.ladder.map(p => `${p.pair} ${(p.win * 100).toFixed(0)}% (${p.n})`).join(', ') });
 }
 
+// Pirate Ship fights that used to leave a CPU stuck off its feet for 4.7-9.8 s: a limp body hooked over a rail post
+// (10118, 20127, 72) and one flung through the deck by a broken crate's leftover sway path (52). Seeded and in a page
+// whose own frame loop is stopped, so each replays the same fight.
+async function testPirateStuck(browser, { check, rows }) {
+  const { page, errors } = await openPage(browser);
+  await page.evaluate(() => { window.requestAnimationFrame = () => 0; });
+  const worst = await page.evaluate(seeds => seeds.map(seed => {
+    for (const k in AI_MOVES) delete AI_MOVES[k];      // both carry over between matches
+    for (const k in CLASH_T) delete CLASH_T[k];
+    let s = seed;
+    Math.random = () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    SC.G.t = 1000;
+    SC.start({ mode: 'watch', map: 'pirate', weapons: ['random', 'random'], winScore: 999 }); SC.G.state = 'play';
+    let most = 0; const down = new Map();
+    for (let t = 0; t < 45; t += 1 / 30) {
+      const was = SC.F.map(f => f.upT);
+      SC.sim(1 / 30);
+      SC.F.forEach((f, i) => {
+        if (!f.alive || f.summon || SC.G.lock > 0 || f.upT > was[i]) { down.delete(f); return; }
+        const d = (down.get(f) || 0) + 1 / 30; down.set(f, d); most = Math.max(most, d);
+      });
+    }
+    return +most.toFixed(1);
+  }), [10118, 20127, 52, 72]);
+  const ok = check(worst.every(w => w < 4), `feel pirate: a fighter stuck off its feet ${worst.join(' / ')} s (rail hook or broken crate?)`)
+    & check(!errors.length, 'feel pirate console: ' + [...new Set(errors)].join(' | '));
+  rows.push({ kind: 'feel', key: 'pirate rails + broken crates', ok: !!ok, note: `longest down per seed ${worst.join(' / ')} s` });
+  await page.close();
+}
+
 async function run(browser, ctx) {
   const { page, errors } = await openPage(browser);
   await page.evaluate(HELPERS);
@@ -200,6 +243,7 @@ async function run(browser, ctx) {
   }
   ctx.check(!errors.length, 'feel console: ' + [...new Set(errors)].join(' | '));
   await page.close();
+  try { await testPirateStuck(browser, ctx); } catch (e) { ctx.check(false, `feel testPirateStuck crashed: ${e.message}`); }
 }
 
 module.exports = { run };

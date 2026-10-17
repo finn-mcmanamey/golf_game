@@ -35,6 +35,9 @@ secret extras stay hidden until you find them (see **Secrets** below). None of i
 - **Sharper graphics (v4.1):** the game draws at up to your screen's full resolution (it used to draw at about half on
   an iPad and stretch it), stepping down for a moment if it ever starts to slow. Arenas gained depth, haze, soft clouds
   and smoke, rain falls in two layers, and sparks and bloom look cleaner. The file is no bigger.
+- **Laptop fixes (v4.1.1):** dash is now Space (Player 1) and Enter (Player 2), so Windows' Sticky Keys box no longer
+  pops up mid-fight after five Shift presses; Player 2's super moved to backslash (\). Fighters no longer get stuck
+  hooked over the Pirate Ship's railings (you can climb back aboard over them).
 
 ## Controls
 
@@ -45,11 +48,11 @@ secret extras stay hidden until you find them (see **Secrets** below). None of i
 | Attack | S | ↓ | X |
 | Skill 1 | Q | . | B |
 | Skill 2 | E | / | Y |
-| Dash (or double-tap left/right) | Left Shift | Right Shift | RB |
+| Dash (or double-tap left/right) | Space | Enter | RB |
 | Block (hold; a fresh press just before a hit parries) | F | , | LT |
 | Grab, then again to throw (or block + attack) | C | L | RT |
 | Throwable | R | ; | LB |
-| Super (when the meter is full) | X | Enter | R3 (right stick click) or Back |
+| Super (when the meter is full) | X | \ (backslash) | R3 (right stick click) or Back |
 | Taunt (and your victory pose) | T | ' | D-pad up |
 | Pause | Esc or P | Esc or P | Start |
 | Mute | M | M | |

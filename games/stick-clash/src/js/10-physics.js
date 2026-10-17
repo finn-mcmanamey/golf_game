@@ -73,6 +73,10 @@ function collidePoint(p, friction, feetY = null) {
 
 function collideSolid(p, s, friction, feetY) {
   if (p.x < s.x || p.x > s.x + s.w || p.y < s.y) return;
+  if (s.rail) {   // pushes only toward mid-arena: you climb back aboard, and a limp body can't hook over the post
+    if (p.y <= s.y + s.h) { const L = s.x < W / 2; p.x = L ? s.x + s.w : s.x; p.ox = L ? Math.max(p.ox, p.x) : Math.min(p.ox, p.x); }
+    return;
+  }
   const prevTop = s.y - s.dy;
   if (s.oneWay) {   // only catches points coming down from above (jump up through it)
     if (p.oy <= prevTop + 1.5 && p.y < s.y + 40 && (feetY == null || feetY <= prevTop + 3)) land(p, s.y, friction, s);

@@ -904,7 +904,7 @@ no benchmark yet 1/0 (`resTier`, called by `perfApplyTier`).
   that, the dive is undone (back to its start) and dives hold for 30 s, then for the session. A steady 30 fps is
   measured like any rate, never assumed to be a cap.
 - **Up:** 4 s of play under 17.5 ms climbs one pixel step; bloom stays down for the session (`RES.floor`). 50-57 fps is a
-  dead band. A climb undone within 3 s (slow again) doubles the wait (up to 60 s); when the climb to the same step is
+  dead band. A climb undone within 30 s (slow again) doubles the wait (up to 60 s); when the climb to the same step is
   undone twice, the step it fell back to becomes the session's ceiling.
 - Changes land at the start of the next render (`resApply`; a resized canvas is blank until redrawn), then 30 frames
   settle; a hidden tab coming back settles too (`visibilitychange`).
@@ -1061,6 +1061,20 @@ between matches, and fights drift with it), so two builds render the same fight.
 `--vs other.html` measures a second build alternately in the same browser (the reliable way to compare: absolute
 times drift by several % between runs); `--base file.json` compares with a saved run; `--styles` adds smoke-styles'
 styled-vs-neon ratios. Wrap it in the shared lock when another agent measures too.
+
+## v4.1.1 fixes (laptop play)
+
+- **Dash off Shift:** the default dash keys are Space (P1) and Enter (P2), and P2's super is backslash: on Windows,
+  Shift pressed five times opens the Sticky Keys box and steals the keyboard mid-fight. `loadBinds` moves saved binds
+  that still hold the old defaults (`ShiftLeft`, `ShiftRight`, P2 super `Enter`) once (`store` key `bindsV` = 2), only
+  where the new key is free; a player's own choices stay. Results screens already ignore a held or mashed Enter/Space.
+- **Railings** (`rail: true` solids, only the Pirate Ship's two posts): `collideSolid` pushes points only toward
+  mid-arena, so a limp body can't hook itself over the 12px post and fighters climb back aboard from outside (fewer
+  ring-outs on that map). **Broken swaying crates** clear `s.move` before parking, so they no longer ride their sway
+  path back as an invisible solid that flung bodies through the deck. smoke-feel replays four Pirate seeds that left a
+  CPU down 4.7-9.8 s (all now under 2 s).
+- **Resolution governor:** a slowdown within 30 s of a climb (was 3 s) counts as that climb failing, so borderline
+  screens settle (a random 18% vsync-miss case went from 14 switches in 5 minutes to 4; smoke-res checks it).
 
 ## Content defs
 

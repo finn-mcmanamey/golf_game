@@ -9,12 +9,13 @@
 const BIND_ACTIONS = ['left', 'right', 'jump', 'attack', 'skill1', 'skill2', 'dash', 'block', 'grab', 'throw', 'super', 'taunt'];
 const ACTION_LABELS = { left: 'Move left', right: 'Move right', jump: 'Jump', attack: 'Attack', skill1: 'Skill 1', skill2: 'Skill 2', dash: 'Dash',
   block: 'Block (hold)', grab: 'Grab / throw', throw: 'Throwable', super: 'Super', taunt: 'Taunt' };
-// v3 actions sit next to each hand: P1 F block, C grab, R throwable, X super; P2 , block, L grab, ; throwable, Enter super.
+// v3 actions sit next to each hand: P1 F block, C grab, R throwable, X super; P2 , block, L grab, ; throwable, \ super.
+// Dash is Space / Enter: on Windows, pressing Shift five times opens Sticky Keys mid-fight.
 const DEFAULT_BINDS = [
-  { left: 'KeyA', right: 'KeyD', jump: 'KeyW', attack: 'KeyS', skill1: 'KeyQ', skill2: 'KeyE', dash: 'ShiftLeft',
+  { left: 'KeyA', right: 'KeyD', jump: 'KeyW', attack: 'KeyS', skill1: 'KeyQ', skill2: 'KeyE', dash: 'Space',
     block: 'KeyF', grab: 'KeyC', throw: 'KeyR', super: 'KeyX', taunt: 'KeyT' },
-  { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', attack: 'ArrowDown', skill1: 'Period', skill2: 'Slash', dash: 'ShiftRight',
-    block: 'Comma', grab: 'KeyL', throw: 'Semicolon', super: 'Enter', taunt: 'Quote' },
+  { left: 'ArrowLeft', right: 'ArrowRight', jump: 'ArrowUp', attack: 'ArrowDown', skill1: 'Period', skill2: 'Slash', dash: 'Enter',
+    block: 'Comma', grab: 'KeyL', throw: 'Semicolon', super: 'Backslash', taunt: 'Quote' },
 ];
 // Standard gamepad layout: A jump, B skill 1, X attack, Y skill 2, LB throwable, RB dash, LT block (hold), RT grab,
 // R3 (right stick click) super, Start pause, d-pad move. These are the defaults; PAD_MAPS holds each player's own map.
@@ -48,6 +49,11 @@ function loadBinds() {
       if (out.some((o, j) => BIND_ACTIONS.some(x => (j !== i || x !== a) && o[x] === b[a]))) b[a] = null;
     }
   });
+  if (store.get('bindsV', 0) < 2) {   // saved pre-v4.1.1 defaults move off Shift once (super first: it frees Enter)
+    for (const [i, a, old] of [[1, 'super', 'Enter'], [0, 'dash', 'ShiftLeft'], [1, 'dash', 'ShiftRight']])
+      if (out[i][a] === old && !out.some(b => Object.values(b).includes(DEFAULT_BINDS[i][a]))) out[i][a] = DEFAULT_BINDS[i][a];
+    store.set('binds', out); store.set('bindsV', 2);
+  }
   return out;
 }
 // Binds a key; if it was used elsewhere, the two actions swap keys so nothing is left unbound.

@@ -365,6 +365,7 @@ function brkBreak(s) {
   for (const c of look.debris) burst(cx, cy, c, Math.min(26, 8 + (s.w * s.h) / 300), 420, { life: .9, grav: 1, size: 4 });
   shake(s.brk === 'glass' ? 3 : 6); sfx(k.sfx, 1);
   for (const o of ORB_LIST) if (o.solid === s) o.solid = null;
+  s.move = null;   // else a parked crate rides its sway path back as an invisible, flinging solid
   mapPark(s);
   for (const t of MAP.brkList) {
     const rest = [].concat(t.restsOn || []);
