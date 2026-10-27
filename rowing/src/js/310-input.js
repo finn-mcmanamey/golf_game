@@ -32,21 +32,25 @@ function oneButtonRow(b) {
 // In a duel the arrow keys, Enter and right Shift belong to player 2; otherwise they're spare keys for player 1.
 /* Drive presses keep their own timestamps (F-108), so each 60 Hz step reads the drive as it was at that step's moment
    rather than when the next frame noticed it: at 30 fps (iOS Low Power Mode) a press could otherwise land 33 ms late. */
-const driveHist = { base: false, ev: [] };
+// One history per player; player 2 (a duel) drives with Enter.
+const driveHist = { base: false, ev: [], held: () => keys.has('Space') || keys.has('Mouse') || touchState.drive };
+const driveHist2 = { base: false, ev: [], held: () => keys.has('Enter') || keys.has('NumpadEnter') };
 let inputClock = null;   // real time (ms) of the step being simulated; null means "now"
 
 function driveChanged(t) {
   // Some older WebKit builds stamp events on a different clock; such a stamp can't be placed in time, so use now.
   if (!(Math.abs(t - performance.now()) < 1000)) t = performance.now();
-  const held = keys.has('Space') || keys.has('Mouse') || touchState.drive, ev = driveHist.ev;
-  if (held === (ev.length ? ev[ev.length - 1].down : driveHist.base)) return;
-  ev.push({ t, down: held });
-  while (ev.length > 32) driveHist.base = ev.shift().down;
+  for (const h of [driveHist, driveHist2]) {
+    const held = h.held(), ev = h.ev;
+    if (held === (ev.length ? ev[ev.length - 1].down : h.base)) continue;
+    ev.push({ t, down: held });
+    while (ev.length > 32) h.base = ev.shift().down;
+  }
 }
 
-function driveAt(t) {
-  let held = driveHist.base;
-  for (const e of driveHist.ev) { if (e.t > t) break; held = e.down }
+function driveAt(t, h = driveHist) {
+  let held = h.base;
+  for (const e of h.ev) { if (e.t > t) break; held = e.down }
   return held;
 }
 
@@ -54,7 +58,7 @@ function readInput() {
   applyPlan();
   const duel = !!race.player2;
   let bits = game.autopilot && race.started ? autoRow(race.player) : 0;
-  const held = inputClock == null ? keys.has('Space') || keys.has('Mouse') || touchState.drive : driveAt(inputClock);
+  const held = inputClock == null ? driveHist.held() : driveAt(inputClock);
   if (held || padState.drive) bits |= IN.DRIVE;
   if (keys.has('KeyA') || (!duel && keys.has('ArrowLeft')) || touchState.left || padState.left) bits |= IN.LEFT;
   if (keys.has('KeyD') || (!duel && keys.has('ArrowRight')) || touchState.right || padState.right) bits |= IN.RIGHT;
@@ -69,7 +73,7 @@ function readInput() {
 function readInput2() {
   if (!race.player2) return 0;
   let bits = 0;
-  if (keys.has('Enter') || keys.has('NumpadEnter')) bits |= IN.DRIVE;
+  if (inputClock == null ? driveHist2.held() : driveAt(inputClock, driveHist2)) bits |= IN.DRIVE;
   if (keys.has('ArrowLeft')) bits |= IN.LEFT;
   if (keys.has('ArrowRight')) bits |= IN.RIGHT;
   if (assistOn() && !(bits & (IN.LEFT | IN.RIGHT))) bits |= assistSteer(race.player2);
