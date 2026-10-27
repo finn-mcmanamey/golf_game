@@ -40,5 +40,11 @@ function timingChart() {
     return `<rect x="${10 + i * bw + 1}" y="${H - 14 - h}" width="${bw - 2}" height="${h}" rx="2" fill="${mid ? '#4ade80' : '#fb923c'}"/>`;
   }).join('');
   return `<svg viewBox="0 0 ${W} ${H}" class="chart">${bars}<text x="12" y="${H - 2}" style="text-anchor:start">early</text><text x="${W / 2}" y="${H - 2}">on time</text><text x="${W - 12}" y="${H - 2}" style="text-anchor:end">late</text></svg>
-    <div class="legend"><span>${tip}</span></div>`;
+    <div class="legend"><span>${tip}</span></div>${lateDeviceHint(mean, t.length)}`;
+}
+
+// A steady late lean on a device that was never calibrated is often its sound or screen delay, not the rower (F-101).
+function lateDeviceHint(mean, n) {
+  if (mean < 0.05 || n < 12 || STORE.get('calibrated', false)) return '';
+  return `<div class="legend"><span>Late by ${Math.round(mean * 1000)} ms on average: that can be this device's delay. </span><button class="sec mini tuneTiming">Tune timing · 7 s</button></div>`;
 }

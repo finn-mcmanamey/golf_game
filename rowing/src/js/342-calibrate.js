@@ -93,3 +93,6 @@ function showCalCard() {
   $('calCard').classList.toggle('hide', STORE.get('calibrated', false) || !rowed);
 }
 showCalCard();
+
+// The results can suggest the test when catches lean late (see lateDeviceHint).
+document.addEventListener('click', e => { if (e.target.closest('.tuneTiming')) openCalibration() });
