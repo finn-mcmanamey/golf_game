@@ -80,7 +80,7 @@ function handleEvents() {
         AU.play('catch');
         catchTimes.push(race.t);
         if (catchTimes.length > 8) catchTimes.shift();
-        if (b.strokes > 0) { if (e.grade === 'perfect') AU.play('perfect'); showGrade(e.grade) }
+        if (b.strokes > 0) { if (e.grade === 'perfect') { AU.play('perfect'); navigator.vibrate?.(12) } showGrade(e.grade) }
       } else if (e.type === 'release') {
         AU.play('release', 0.8);
         if (e.grade === 'crab') { showGrade('crab'); AU.play('crab'); cam.shake = 1 }

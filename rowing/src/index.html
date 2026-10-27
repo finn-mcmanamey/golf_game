@@ -34,10 +34,8 @@
     </div>
   </div>
   <div id="touch">
-    <button id="tLeft" aria-label="Steer left">◀</button>
-    <button id="tRight" aria-label="Steer right">▶</button>
-    <div id="tRate"><button id="tUp" aria-label="Rate up">＋</button><button id="tDn" aria-label="Rate down">－</button></div>
-    <button id="tPush">PUSH</button>
+    <div class="grp"><button id="tLeft" aria-label="Steer left">◀</button><button id="tRight" aria-label="Steer right">▶</button></div>
+    <div class="grp"><button id="tDn" aria-label="Rate down">−</button><button id="tPush">PUSH</button><button id="tUp" aria-label="Rate up">+</button></div>
   </div>
   <div id="tools"><span id="fps"></span><button id="btnCam" title="Camera (C)">TV</button><button id="btnPause" title="Pause (Esc)">II</button></div>
 </div>
@@ -55,6 +53,7 @@
     <details id="more"><summary>Settings</summary>
       <div class="row"><label>Steering</label><div class="seg" id="segAssist"></div></div>
       <div class="row"><label>Graphics</label><div class="seg" id="segQuality"></div></div>
+      <div class="row"><label>Catch beep</label><div class="seg" id="segCue"></div></div>
       <div class="row"><label>Cox voice</label><div class="seg" id="segVoice"></div></div>
     </details>
 
@@ -62,9 +61,9 @@
     <div id="pbLine" class="sub small"></div>
     <div id="careerBox"><div id="careerT"></div><div id="medals"></div><button id="btnCareer" class="sec"></button></div>
     <div id="friend" class="row hide"><span id="friendT"></span><button id="btnFriend" class="sec">Race their ghost</button></div>
-    <div class="help"><kbd>Space</kbd> hold to drive, release to recover · catch again as the slide reaches the front<br>
-      <kbd>W</kbd>/<kbd>S</kbd> stroke rate · <kbd>A</kbd>/<kbd>D</kbd> steer · <kbd>Shift</kbd> push · <kbd>C</kbd> camera · <kbd>G</kbd> graphics · <kbd>Esc</kbd> pause<br>
-      On a phone: hold anywhere to drive, buttons to steer, set the rate and push.</div>
+    <div class="help keys"><kbd>Space</kbd> hold to drive, release to recover · catch again as the slide reaches the front<br>
+      <kbd>W</kbd>/<kbd>S</kbd> stroke rate · <kbd>A</kbd>/<kbd>D</kbd> steer · <kbd>Shift</kbd> push · <kbd>C</kbd> camera · <kbd>G</kbd> graphics · <kbd>Esc</kbd> pause</div>
+    <div class="help tap">Touch and hold anywhere on the water to drive, let go to recover. ◀ ▶ steer, − + set the stroke rate, PUSH for a power ten.</div>
     <button id="btnSound" class="ghost"></button>
   </div>
 </div>

@@ -58,6 +58,7 @@ function updateHud(race) {
   const toFront = p.phase === 'recover' ? p.h / p.recSpeed : p.phase === 'front' ? 0 : 9;
   $('catchZone').classList.toggle('ready', race.started && toFront < 0.25);
 
+  catchCue(p);
   updateStandings(race);
   updateCourseStrip(race);
 }
@@ -133,4 +134,11 @@ function splitChart(race, winner) {
   return `<svg viewBox="0 0 ${W} ${H}" class="chart"><text x="2" y="${Y(lo + 2) + 4}" class="ax">${fmtSplit(lo + 2)}</text>
     <text x="2" y="${Y(hi - 2) + 4}" class="ax">${fmtSplit(hi - 2)}</text>${labels}${theirs.length ? line(theirs, 'w') : ''}${line(mine, 'me')}</svg>
     <div class="legend"><span class="me">You</span>${theirs.length ? `<span class="w">${winner.crewName}</span>` : ''}<span>pace per 500 m at each marker · higher is faster</span></div>`;
+}
+
+// A soft tick the moment the slide reaches the front: rowing by ear, the way a cox box beeps the rhythm.
+let cuePhase = '';
+function catchCue(p) {
+  if (settings.cue && cuePhase === 'recover' && p.phase === 'front') AU.play('cue');
+  cuePhase = p.phase;
 }

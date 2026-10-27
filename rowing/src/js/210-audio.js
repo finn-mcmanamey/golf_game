@@ -64,6 +64,7 @@ const AU = {
       case 'finish': [523, 659, 784, 1047].forEach((f, i) => this.tone(f, f, 0.3, 0.16, 'triangle', i * 0.1)); break;
       case 'win': [523, 659, 784, 1047, 1319].forEach((f, i) => this.tone(f, f, 0.45, 0.18, 'square', i * 0.11)); break;
       case 'ui': this.tone(900, 1100, 0.04, 0.08); break;
+      case 'cue': this.tone(1200, 1150, 0.035, 0.07, 'sine'); break;
       case 'tick': this.tone(1500, 1500, 0.025, 0.05, 'square'); break;
     }
   },

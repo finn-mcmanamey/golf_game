@@ -55,14 +55,15 @@ kbd { background: rgba(255, 255, 255, .12); border-radius: 4px; padding: 0 5px; 
 #swingB { background: #60a5fa !important }
 
 #touch { display: none }
-.touchy #touch { display: block }
-#touch button { position: absolute; pointer-events: auto; background: rgba(10, 22, 40, .55); border: 1px solid var(--line); border-radius: 50%;
-  width: 64px; height: 64px; font-size: 22px; color: #fff }
-#touch button.on { background: rgba(255, 210, 58, .6) }
-#tLeft { left: 14px; bottom: 150px } #tRight { left: 88px; bottom: 150px }
-#tRate { position: absolute; right: 14px; bottom: 150px; display: flex; flex-direction: column; gap: 8px }
-#tRate button { position: static !important; width: 52px !important; height: 52px !important }
-#tPush { right: 76px; bottom: 150px; font-size: 13px !important; font-weight: 800 }
+/* Phones: one row of thumb buttons above the stroke meter; holding anywhere else drives. */
+.touchy #touch { position: absolute; left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right));
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 118px); display: flex; justify-content: space-between; pointer-events: none }
+#touch .grp { display: flex; gap: 10px }
+#touch button { pointer-events: auto; background: rgba(10, 22, 40, .6); border: 1px solid var(--line); border-radius: 50%;
+  width: 62px; height: 62px; font-size: 22px; color: #fff; touch-action: none }
+#touch button.on { background: rgba(255, 210, 58, .65) }
+#tPush { border-radius: 31px !important; width: 84px !important; font-size: 14px !important; font-weight: 800 }
+#tUp, #tDn { width: 50px !important; height: 50px !important; margin-top: 6px }
 #tools { position: absolute; right: 12px; top: 50%; display: flex; flex-direction: column; gap: 8px; pointer-events: auto }
 #tools button { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 12px; font-weight: 700 }
 .touchy #standings { font-size: 11px; min-width: 150px }
@@ -96,7 +97,8 @@ input[type=number] { width: 110px; font: inherit; text-align: center; padding: 6
   padding: 10px 18px; border-radius: 12px; opacity: 0; transition: opacity .3s; pointer-events: none; font-weight: 600 }
 #toast.on { opacity: 1 }
 @media (max-width: 640px) {
-  #stats { gap: 8px } #stats b { font-size: 18px } #stats > div { min-width: 44px }
+  #stats { gap: 8px } #stats b { font-size: 18px } #stats > div { min-width: 44px } #stats > div:nth-child(3) { display: none }
+  .box { padding: 20px 16px 16px } .row label { min-width: 0 }
   #course { top: auto; bottom: 128px; width: 92vw }
   #topL b { font-size: 20px }
 }
@@ -106,7 +108,14 @@ input[type=number] { width: 110px; font: inherit; text-align: center; padding: 6
 #call small { display: block; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #5a6b80 }
 #call.pop { animation: callpop 3.2s ease-out }
 @keyframes callpop { 0% { opacity: 0; transform: translateY(8px) } 6% { opacity: 1; transform: none } 85% { opacity: 1 } 100% { opacity: 0 } }
-.touchy #call { bottom: 230px }
+.touchy #call { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 196px) }
+.touchy #grade { bottom: auto; top: 38% }
+.touchy #course { display: none }
+.touchy #tools { top: calc(max(12px, env(safe-area-inset-top)) + 74px); left: 12px; right: auto; flex-direction: row; align-items: center }
+.touchy #stroke { padding: 8px 12px 6px }
+.help.tap, .touchy .help.keys { display: none } .touchy .help.tap { display: block }
+/* Overlays: centred when they fit, scrolling from the top when they don't (short phone screens). */
+.ov { align-items: flex-start } .ov .box { margin: auto }
 #replayTag { position: absolute; top: 70px; left: 14px; color: #ff5a4a; font-weight: 900; letter-spacing: 2px; animation: blink 1s steps(2) infinite }
 @keyframes blink { 50% { opacity: .3 } }
 .chart { width: 100%; height: auto; margin: 4px 0 0 }
