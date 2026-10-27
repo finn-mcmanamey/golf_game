@@ -19,3 +19,4 @@ Build order follows `Depends on`. Status: idea → spec'd → approved → build
 | F-107 | Codes that travel: bare code when the link can't be opened; paste box on the menu | shipped | P1 | Fair | F-002 | Artifact pages run in a sandboxed frame whose URL friends can't open |
 | F-108 | Timestamped presses: each 60 Hz step reads the drive as of its own moment | shipped | P0 | Feel | F-001 | At 30 fps (iOS Low Power Mode, lead: WebKit 215745) a press used to land up to 33 ms late; recorded inputs unchanged |
 | F-109 | Stream lines: head-race streams fastest mid-river, slack by the banks (rules 5) | shipped | P2 | Truth | F-003 | features/stream-lines.md |
+| F-110 | Stream flecks: foam drifting at the local stream speed on rules-5 head races | shipped | P3 | Truth | F-109 | 162-stream-fx.js; drawing only, drift ×6 so it reads |

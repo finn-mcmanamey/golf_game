@@ -29,6 +29,7 @@ function drawFx(mb, dt, time, course) {
   if (['regatta', 'head', 'knockout', 'bumps', 'boatrace'].includes(course.kind)) drawSwans(mb, dt, time, course);
   drawCrowd(mb, time, course);
   drawBankParty(mb, dt, time, course);
+  if (R.quality > 0) drawStreamFlecks(mb, dt, course);
   drawBirds(mb, time, course);
   if (R.wet > 0.05 && R.quality > 0) drawRain(mb, time, R.wet);
 }

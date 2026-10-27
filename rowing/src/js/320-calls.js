@@ -51,7 +51,7 @@ function updateCalls(race) {
     say(race.course.current < 0 ? 'Stream against us: slacker water by the bank. Mind the edge!' : 'Stream with us: stay mid-river, it runs fastest there!', 'stream');
   // Head races: a crew that started behind and is now on your stern.
   if (race.course.bends) {
-    const hunter = race.boats.find(b => b !== p && b.startAt > 0 && b.finishTime == null && p.x - b.x > 0 && p.x - b.x < 18);
+    const hunter = race.boats.find(b => b !== p && b.startAt > 0 && race.t > b.startAt && b.finishTime == null && p.x - b.x > 0 && p.x - b.x < 18);   // a crew still waiting to start isn't hunting
     if (hunter) say(`${hunter.crewName} on our stern! Hold them off!`, 'hunt-' + hunter.lane, 3);
   }
   if (calls.place && p.strokes > 15 && !race.order) {
