@@ -24,7 +24,7 @@ function readInput() {
   if (keys.has('Space') || keys.has('Mouse') || touchState.drive) bits |= IN.DRIVE;
   if (keys.has('KeyA') || (!duel && keys.has('ArrowLeft')) || touchState.left) bits |= IN.LEFT;
   if (keys.has('KeyD') || (!duel && keys.has('ArrowRight')) || touchState.right) bits |= IN.RIGHT;
-  if (settings.assist && !(bits & (IN.LEFT | IN.RIGHT)) && race) bits |= assistSteer(race.player);
+  if (assistOn() && !(bits & (IN.LEFT | IN.RIGHT)) && race) bits |= assistSteer(race.player);
   if (keys.has('ShiftLeft') || (!duel && keys.has('ShiftRight')) || touchState.push) bits |= IN.PUSH;
   return packInput(bits, targetRate);
 }
@@ -35,7 +35,7 @@ function readInput2() {
   if (keys.has('Enter') || keys.has('NumpadEnter')) bits |= IN.DRIVE;
   if (keys.has('ArrowLeft')) bits |= IN.LEFT;
   if (keys.has('ArrowRight')) bits |= IN.RIGHT;
-  if (settings.assist && !(bits & (IN.LEFT | IN.RIGHT))) bits |= assistSteer(race.player2);
+  if (assistOn() && !(bits & (IN.LEFT | IN.RIGHT))) bits |= assistSteer(race.player2);
   if (keys.has('ShiftRight')) bits |= IN.PUSH;
   return packInput(bits, targetRate2);
 }
@@ -46,11 +46,14 @@ addEventListener('keydown', e => {
   if (!e.repeat) onKey(e.code);
   keys.add(e.code);
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  // In a race Enter is a game key (player 2's drive), never a press of whichever button last had focus.
+  if ((e.code === 'Enter' || e.code === 'NumpadEnter') && game.state === 'race') e.preventDefault();
 });
 addEventListener('keyup', e => keys.delete(e.code));
 addEventListener('blur', () => { keys.clear(); Object.keys(touchState).forEach(k => touchState[k] = false) });
 
 function onKey(code) {
+  if ((code === 'Escape' || code === 'KeyP') && (game.state === 'race' || game.state === 'paused')) return togglePause();
   if (game.state !== 'race') return;
   const duel = !!race.player2;
   if (code === 'KeyW' || (!duel && code === 'ArrowUp')) changeRate(2);
@@ -59,9 +62,11 @@ function onKey(code) {
   if (duel && code === 'ArrowDown') targetRate2 = clamp(targetRate2 - 2, RATE_MIN + 2, RATE_MAX - 2);
   if (code === 'KeyC') cycleCamera();
   if (code === 'KeyG') cycleQuality();
-  if (code === 'Escape' || code === 'KeyP') togglePause();
   if (code === 'Enter' && race.player.finishTime != null && !race.player2) game.fastForward = true;
 }
+
+// Learn to row teaches steering, so the assist is off there whatever the setting says.
+const assistOn = () => settings.assist && game.mode !== 'learn';
 
 // Steering assist nudges the boat back to the lane centre when the player isn't steering.
 // It only produces ordinary steering inputs, so recorded races replay exactly.
@@ -74,12 +79,17 @@ function assistSteer(b) {
 const isTouch = matchMedia('(pointer: coarse)').matches;
 if (isTouch) document.body.classList.add('touchy');
 
+// Only the finger that started the drive ends it, so tapping a button with the other thumb mid-stroke is safe.
+let driveFinger = null;
 const driveDown = e => {
   if (game.state !== 'race' || e.target.closest('button')) return;
   AU.init();
-  if (e.pointerType === 'mouse') keys.add('Mouse'); else touchState.drive = true;
+  if (e.pointerType === 'mouse') keys.add('Mouse'); else { touchState.drive = true; driveFinger = e.pointerId }
 };
-const driveUp = e => { if (e.pointerType === 'mouse') keys.delete('Mouse'); else touchState.drive = false };
+const driveUp = e => {
+  if (e.pointerType === 'mouse') keys.delete('Mouse');
+  else if (e.pointerId === driveFinger) { touchState.drive = false; driveFinger = null }
+};
 canvas.addEventListener('pointerdown', driveDown);
 $('hud').addEventListener('pointerdown', driveDown);
 addEventListener('pointerup', driveUp);

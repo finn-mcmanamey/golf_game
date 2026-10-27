@@ -23,6 +23,7 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   game.finishShown = false;
   game.cue = null;
   game.replay = null;
+  game.tuned = false;
   game.lastAtHalf = false;
   game.halfSeen = false;
   resetCalls();
@@ -158,6 +159,7 @@ function simulate(dt, inputFor, quiet = false, input2For = () => 0) {
     game.acc -= TUNE.dt;
     rememberPoses([...race.boats, race.ghost]);
     stepRace(race, inputFor(), input2For());
+    if (!quiet && tuneEdited()) game.tuned = true;   // tuned at any moment means this race isn't a record
     recordSplits(race);
     if (!quiet) sampleForce(race.player);
     if (quiet) { for (const b of race.boats) b.events.length = 0; if (race.ghost) race.ghost.events.length = 0 }
@@ -181,7 +183,7 @@ function photoFinishSlowdown(race) {
 
 function watchReplay() {
   const { opts, inputs } = decodeRace(game.lastCode);
-  if (game.mode !== 'replay') game.modeBeforeReplay = game.mode;
+  if (game.mode !== 'replay') game.beforeReplay = { mode: game.mode, opts: game.opts, ghostInputs: game.ghostInputs };
   startRace(opts, null, 'replay');
   game.replay = inputs;
   cam.mode = 'tv';
@@ -190,7 +192,7 @@ function watchReplay() {
 
 function showReplayEnd() {
   game.replay = null;
-  game.mode = game.modeBeforeReplay || 'race';
+  Object.assign(game, game.beforeReplay || { mode: 'race' });
   $('hud').classList.add('hide');
   $('results').classList.remove('hide');
 }

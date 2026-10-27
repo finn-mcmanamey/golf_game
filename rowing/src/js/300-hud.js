@@ -2,7 +2,7 @@
 
 const GRADE_TEXT = {
   perfect: ['PERFECT', 'var(--good)'], good: ['GOOD', '#a3e635'], early: ['EARLY', 'var(--warn)'], late: ['LATE', 'var(--warn)'],
-  short: ['SHORT STROKE', 'var(--warn)'], crab: ['CAUGHT A CRAB!', 'var(--bad)'], buoy: ['ON THE BUOYS', 'var(--bad)'],
+  short: ['SHORT STROKE', 'var(--warn)'], crab: ['CAUGHT A CRAB!', 'var(--bad)'], buoy: ['ON THE BUOYS', 'var(--bad)'], bank: ['INTO THE BANK!', 'var(--bad)'],
 };
 
 let toastTimer = 0;

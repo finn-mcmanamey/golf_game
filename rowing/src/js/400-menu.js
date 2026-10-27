@@ -89,14 +89,16 @@ function showResults(race) {
   game.lastCode = code;
   const pb = getPB(opts.distance, opts.cls, opts.kind);
   let pbNote = '';
-  if (tuneEdited()) pbNote = ' · tuned physics, not recorded';
+  const finished = p.finishTime != null, counts = finished && !game.tuned && !tuneEdited() && !['duel', 'replay', 'learn'].includes(game.mode);
+  if (!finished) pbNote = ' · did not finish';
+  else if (game.tuned || tuneEdited()) pbNote = ' · tuned physics, not recorded';
   else if (game.mode === 'duel') pbNote = ' · duel';
   else if (game.mode === 'replay' || game.mode === 'learn') pbNote = game.mode === 'learn' ? ' · practice' : ' · replay';
   else if (!pb || p.finishTime < pb.time) {
     savePB(opts.distance, opts.cls, opts.kind, { time: p.finishTime, code, venue: race.course.name, date: Date.now() });
     pbNote = pb ? ` · new personal best (was ${fmtTime(pb.time)})` : ' · first personal best';
   }
-  if (game.mode === 'daily') {
+  if (counts && game.mode === 'daily') {
     const key = 'daily-' + opts.seed, best = STORE.get(key, null);
     if (!best || p.finishTime < best) STORE.set(key, p.finishTime);
   }
@@ -108,15 +110,16 @@ function showResults(race) {
   $('resChart').innerHTML = splitChart(race, order[0]) + timingChart();
   $('resStats').textContent = `${p.strokes} strokes · average rate ${(p.strokes / p.finishTime * 60).toFixed(1)} · ${Math.round(s.perfect / strokes * 100)}% perfect catches`
     + (s.crabs ? ` · ${s.crabs} crab${s.crabs > 1 ? 's' : ''}` : '') + (s.buoys ? ` · hit the buoys ${s.buoys}×` : '');
-  const careerNote = game.mode === 'career' ? careerResult(race, place) : '';
-  if (game.mode !== 'replay' && game.mode !== 'duel') recordHistory(race, place);
-  const badges = checkBadges(race, place);
+  const careerNote = game.mode === 'career' ? (counts ? careerResult(race, place) : 'Not counted for the season: tuned physics or unfinished.') : '';
+  if (counts) recordHistory(race, place);
+  const badges = counts ? checkBadges(race, place) : [];
   if (badges.length) setTimeout(() => toast('Badge earned: ' + badges.map(b => b.name).join(', '), 3200), 600);
   $('careerNote').textContent = careerNote;
   $('careerNote').classList.toggle('hide', !careerNote);
   $('btnAgain').textContent = game.mode === 'career' ? 'Next race' : 'Race again';
   // A duel's code only holds player 1's strokes, so it can't be replayed or shared.
-  for (const id of ['btnReplay', 'btnShare']) $(id).classList.toggle('hide', !!race.player2);
+  // Duel and practice codes can't be re-rowed (a code holds one crew in a full field), so no replay or link.
+  for (const id of ['btnReplay', 'btnShare']) $(id).classList.toggle('hide', !!race.player2 || game.mode === 'learn');
   $('results').classList.remove('hide');
   $('hud').classList.add('hide');
   AU.play(place === 1 ? 'win' : 'finish');
