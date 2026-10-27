@@ -14,11 +14,11 @@ function segmented(id, items, current, onPick) {
   }
 }
 
-const currentOpts = () => ({ seed: settings.seed, distance: settings.distance, cls: settings.cls, difficulty: settings.difficulty, lane: 2, kind: settings.kind });
+const currentOpts = () => ({ seed: settings.seed, distance: settings.distance, cls: settings.kind === 'erg' ? '1x' : settings.cls, difficulty: settings.difficulty, lane: 2, kind: settings.kind });
 
 function buildMenu() {
   if (!settings.seed) settings.seed = 1 + Math.floor(Math.random() * 99999);
-  segmented('segKind', [['regatta', 'Regatta'], ['head', 'Head race']], settings.kind, v => { settings.kind = v; menuChanged() });
+  segmented('segKind', [['regatta', 'Regatta'], ['head', 'Head race'], ['erg', 'Indoor erg']], settings.kind, v => { settings.kind = v; menuChanged() });
   segmented('segDist', DISTANCES.map(d => [d, d + ' m']), settings.distance, v => { settings.distance = v; menuChanged() });
   segmented('segCls', Object.entries(BOAT_CLASSES).map(([k, c]) => [k, k]), settings.cls, v => { settings.cls = v; menuChanged() });
   segmented('segDiff', Object.entries(DIFFICULTY).map(([k, d]) => [k, d.label]), settings.difficulty, v => { settings.difficulty = v; menuChanged() });
@@ -51,7 +51,7 @@ const soundLabel = () => { $('btnSound').textContent = settings.sound ? '🔊 So
 function menuChanged() {
   saveSettings();
   const c = makeCourse(settings.seed, settings.distance, settings.kind);
-  $('venue').textContent = `${c.name}${c.bends ? ' · winding river, crews start 8 s apart' : ''} · ${c.rain ? 'Rain · ' : ''}${windLabel(c.wind)}${c.current ? ` · ${c.current > 0 ? 'following' : 'opposing'} stream` : ''}`;
+  $('venue').textContent = c.kind === 'erg' ? `${c.name} · six rowing machines, one big screen` : `${c.name}${c.bends ? ' · winding river, crews start 8 s apart' : ''} · ${c.rain ? 'Rain · ' : ''}${windLabel(c.wind)}${c.current ? ` · ${c.current > 0 ? 'following' : 'opposing'} stream` : ''}`;
   const pb = getPB(settings.distance, settings.cls, settings.kind);
   $('pbLine').textContent = pb ? `Your best over ${settings.distance} m in the ${BOAT_CLASSES[settings.cls].name.toLowerCase()}${settings.kind === 'head' ? ' (head race)' : ''}: ${fmtTime(pb.time)} (${pb.venue})` : '';
   $('btnGhost').classList.toggle('hide', !pb);

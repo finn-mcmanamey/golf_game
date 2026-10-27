@@ -130,7 +130,7 @@ function stepBoat(b, input, course, race) {
   const grip = b.phase === 'drive' ? 1 : 0.25;
   b.steerOut = steer;
   b.yaw += (steer * TUNE.steerRate * grip * Math.min(1, b.v / 3) / Math.sqrt(n) + course.wind.cross * 0.0012 - b.yaw * TUNE.yawDamp * 0.05) * dt;
-  b.yaw = clamp(b.yaw, course.bends ? -0.7 : -0.25, course.bends ? 0.7 : 0.25);
+  b.yaw = course.kind === 'erg' ? 0 : clamp(b.yaw, course.bends ? -0.7 : -0.25, course.bends ? 0.7 : 0.25);   // ergs don't steer
   const prevX = b.x;
   b.x += (b.v + course.current) * dt;
   b.z += (b.v * b.yaw + course.wind.cross * TUNE.crossDrift) * dt;

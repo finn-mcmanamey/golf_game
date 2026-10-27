@@ -67,4 +67,11 @@ for (const kind of Object.keys(GOLDEN)) {
   assert.equal(JSON.stringify(r.boats.map(b => b.finishTime)), JSON.stringify(GOLDEN[kind]), `golden ${kind} times unchanged`);
 }
 console.log('golden times unchanged');
+
+// Indoor erg races: still air, no steering, and codes that re-row exactly.
+const erg = { ...opts, kind: 'erg', distance: 500 };
+const e1 = row(erg, 34), ecode = encodeRace(erg, e1.inputs), e2 = simulateRace(decodeRace(ecode).opts, decodeRace(ecode).inputs);
+assert.equal(e2.player.finishTime, e1.player.finishTime, 'erg codes re-row exactly');
+assert.ok(e1.boats.every(b => b.z === e1.boats[b.lane].z && b.yaw === 0), 'ergs never steer');
+console.log(`500m erg: player ${fmtTime(e1.player.finishTime)} place ${placeOf(e1, e1.player)}`);
 console.log('ok');

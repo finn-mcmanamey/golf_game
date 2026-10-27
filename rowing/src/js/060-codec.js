@@ -2,7 +2,7 @@
    A code holds the race settings and the player's inputs, run-length packed. Anyone can re-row it and get the
    same time, which is what makes ghosts and shared results trustworthy. */
 
-const CLASS_KEYS = Object.keys(BOAT_CLASSES), DIFF_KEYS = Object.keys(DIFFICULTY), KIND_KEYS = ['regatta', 'head'];
+const CLASS_KEYS = Object.keys(BOAT_CLASSES), DIFF_KEYS = Object.keys(DIFFICULTY), KIND_KEYS = ['regatta', 'head', 'erg'];
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
 function packVarints(nums) {

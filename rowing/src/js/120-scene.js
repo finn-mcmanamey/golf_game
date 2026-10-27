@@ -57,6 +57,7 @@ function voxelText(mb, text, x, y, z, s, col, facing = 1) {
 }
 
 function buildScene(course, cls) {
+  if (course.kind === 'erg') return buildHall(course);
   const mb = new ChunkedMesh();
   SC.bank = course.bends ? course.halfW + 1 : BANK_Z;
   SC.rz = x => riverZ(course, x);

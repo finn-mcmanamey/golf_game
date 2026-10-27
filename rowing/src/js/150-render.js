@@ -13,7 +13,7 @@ function setScene(course, cls) {
   const { mb, L } = buildScene(course, cls);
   R.sceneRanges = mb.upload(R.sceneBuf, gl.STATIC_DRAW);
   R.L = L;
-  R.fogK = 0.0019 + (course.timeOfDay < 0.15 ? 0.0025 : 0) + (course.rain ? 0.003 : 0);
+  R.fogK = course.kind === 'erg' ? 0.002 : 0.0019 + (course.timeOfDay < 0.15 ? 0.0025 : 0) + (course.rain ? 0.003 : 0);
   if (course.rain) {
     // Rain: a grey, flatter sky and light.
     const grey = (c, k) => c.map(v => lerp(v, 0.55, k));
@@ -77,20 +77,22 @@ function renderFrame(race, time, dtFrame) {
   gl.uniform1f(LIT.u.uMirror, 1);
   bindLitAttribs(R.sceneBuf);
   // Only slices of scenery within sight; beyond this the fog has swallowed them anyway.
-  const sight = R.quality === 0 ? 550 : 800, lo = Math.min(cam.eye[0], cam.at[0]) - sight, hi = Math.max(cam.eye[0], cam.at[0]) + sight;
+  const sight = race.course.kind === 'erg' ? 1e4 : R.quality === 0 ? 550 : 800, lo = Math.min(cam.eye[0], cam.at[0]) - sight, hi = Math.max(cam.eye[0], cam.at[0]) + sight;
   R.drawn = 0;
   for (const c of R.sceneRanges) if (c.x1 > lo && c.x0 < hi) { gl.drawArrays(gl.TRIANGLES, c.first, c.count); R.drawn += c.count }
 
   const mb = R.boatMb;
   mb.reset();
-  for (const b of race.boats) if (Math.abs(b.x - cam.at[0]) < 700) drawBoat(mb, b, dtFrame, time);
-  drawFx(mb, dtFrame, time, race.course);
+  const indoors = race.course.kind === 'erg';
+  if (indoors) { for (const b of race.boats) drawErg(mb, b, time); drawErgScreen(mb, race) }
+  else for (const b of race.boats) if (Math.abs(b.x - cam.at[0]) < 700) drawBoat(mb, b, dtFrame, time);
+  if (!indoors) drawFx(mb, dtFrame, time, race.course);
   const n = mb.upload(R.boatBuf, gl.DYNAMIC_DRAW);
   bindLitAttribs(R.boatBuf);
   gl.drawArrays(gl.TRIANGLES, 0, n);
 
   // Reflections: the boats and nearby banks again, upside down under the surface, seen through the water.
-  const reflect = R.quality > 0 && cam.eye[1] > 0.2;
+  const reflect = !indoors && R.quality > 0 && cam.eye[1] > 0.2;
   if (reflect) {
     gl.uniform1f(LIT.u.uMirror, -1);
     gl.uniform1f(LIT.u.uAlpha, 1);
@@ -103,11 +105,11 @@ function renderFrame(race, time, dtFrame) {
 
   // Water over the top hides the parts of blades below the surface and tints the reflections.
   if (reflect) { gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA) }
-  drawWater(race, vp, time, dtFrame, reflect);
+  if (!indoors) drawWater(race, vp, time, dtFrame, reflect);
   gl.disable(gl.BLEND);
 
   // The ghost is see-through, so it goes last.
-  if (race.ghost) {
+  if (race.ghost && !indoors) {
     R.ghostMb.reset();
     drawBoat(R.ghostMb, race.ghost, dtFrame, time);
     const gn = R.ghostMb.upload(R.ghostBuf, gl.DYNAMIC_DRAW);

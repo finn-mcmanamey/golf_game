@@ -33,6 +33,8 @@ function makeCourse(seed, distance, kind = 'regatta') {
     sceneSeed: hashSeed(seed, 0x5CE),
     rain: makeRng(hashSeed(seed, 0x2A1))() < 0.18,   // drawing only; its own stream so older values are unchanged
     kind, ...(kind === 'head' ? riverFor(seed, distance) : {}),
+    // Indoors on rowing machines: still air, no stream (the draws above still happen, so seeds line up).
+    ...(kind === 'erg' ? { wind: { speed: 0, along: 0, cross: 0 }, current: 0, rain: false, name: 'Indoor ' + VENUE_A[seed % VENUE_A.length] + ' Arena' } : {}),
   };
 }
 

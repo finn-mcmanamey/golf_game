@@ -5,6 +5,7 @@ const CAMERA_LABEL = { tv: 'TV', director: 'Director', chase: 'Chase', aerial: '
 const cam = { mode: 'tv', eye: [0, 10, 40], at: [0, 0, 0], fov: 0.9, shake: 0 };
 
 function cameraTarget(src, mode, raceT) {
+  if (race?.course.kind === 'erg') return ergCamera(src, mode === 'director' ? ['tv', 'chase', 'aerial'][Math.floor(Math.max(0, raceT) / 6) % 3] : mode);
   const q = pose(src), boat = { ...src, x: q.x, z: q.z, yaw: q.yaw, h: q.h };
   const L = BOAT_CLASSES[boat.cls].length, mid = boat.x - L / 2, lead = Math.min(8, boat.v * 1.2);
   if (raceT < 0 && mode !== 'rower') {
@@ -36,7 +37,7 @@ function cameraTarget(src, mode, raceT) {
 // As you cross the line, the TV director cuts to the finish camera for a moment.
 function finishShot(boat) {
   const D = race.course.distance, since = boat.finishTime != null ? race.t - boat.finishTime - boat.startAt : -1;
-  if (cam.mode !== 'tv' || since < 0 || since > 3 || race.player2) return null;
+  if (cam.mode !== 'tv' || race.course.kind === 'erg' || since < 0 || since > 3 || race.player2) return null;
   const z = riverZ(race.course, D);
   return { eye: [D - 0.5, 4, z + (race.course.bends ? race.course.halfW + 4 : BANK_Z - 6)], at: [D + 4, 0.5, boat.z], fov: 0.55 };
 }

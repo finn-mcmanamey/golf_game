@@ -205,7 +205,7 @@ function duelCameraBoat(race) {
 
 // On the menu the camera drifts slowly along the start, showing off the venue.
 function menuCamera(dt) {
-  if (race.started) {
+  if (race.started || race.course.kind === 'erg') {
     const lead = race.boats.reduce((a, b) => b.x > a.x ? b : a);
     updateCamera(lead, race.t, dt);
     return;
