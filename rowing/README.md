@@ -52,6 +52,7 @@ rowing/
   test/e2e.cjs       plays one race per mode in headless Chromium
   test/balance.mjs   races human-like rowers against each field
   test/leaderboard.cjs  checks forged or copied leaderboard runs are rejected
+  test/live.cjs      two pages race each other live through a fake room
   app/               the iPhone app wrapper (Expo + WebView)
 ```
 
