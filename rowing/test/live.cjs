@@ -1,5 +1,6 @@
 // Live race check: two pages share a fake room (BroadcastChannel), one makes a race code, the other joins,
 // both start together and each must see the other's boat moving. Needs Playwright.   node rowing/test/live.cjs
+const { chromium } = require('playwright');
 
 const fakeRoom = () => {
   const ch = new BroadcastChannel('fake-room'), me = Math.random().toString(36).slice(2, 10);
