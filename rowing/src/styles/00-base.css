@@ -117,3 +117,10 @@ input[type=number] { width: 110px; font: inherit; text-align: center; padding: 6
 .legend .me { color: var(--acc); font-weight: 700 } .legend .w { color: #fff }
 details#more { margin: 6px 0 } details#more summary { cursor: pointer; color: var(--dim); font-size: 13px; list-style: none }
 details#more summary::before { content: '⚙ ' } details#more[open] summary { color: var(--ink) }
+#tunedTag { position: absolute; top: 96px; left: 14px; color: var(--warn); font-size: 11px; font-weight: 800; letter-spacing: 1px }
+#lesson { position: absolute; top: 90px; left: 50%; transform: translateX(-50%); width: min(520px, 92vw); padding: 12px 16px; font-size: 16px; text-align: center }
+#lesson small { display: block; color: var(--acc); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px }
+#tune { position: fixed; right: 12px; top: 12px; bottom: 12px; width: 320px; overflow: auto; padding: 12px 14px; z-index: 5; font-size: 12px }
+#tune h3 { margin: 0 0 8px } #tune h3 small { color: var(--dim); font-weight: 400 }
+#tune label { display: grid; grid-template-columns: 110px 1fr 54px; gap: 6px; align-items: center; margin: 4px 0 }
+#tune label span { color: var(--dim); overflow: hidden; text-overflow: ellipsis } #tune b { text-align: right; font-weight: 600 }

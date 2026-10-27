@@ -54,9 +54,9 @@ function voxelText(mb, text, x, y, z, s, col, facing = 1) {
 }
 
 function buildScene(course, cls) {
-  const mb = new MeshBuilder(200000);
+  const mb = new ChunkedMesh();
   const L = lightingFor(course), rng = makeRng(course.sceneSeed), noise = makeNoise2(course.sceneSeed % 1000);
-  const x0 = -260, x1 = course.distance + 380, cell = 6, depth = 26;
+  const x0 = -260, x1 = course.distance + 380, bankDepth = 156;
 
   // Banks: voxel columns that rise gently away from the water into hills.
   const heightAt = (x, az) => {
@@ -65,28 +65,31 @@ function buildScene(course, cls) {
     const hills = noise(x * 0.012, az * 0.012) * 26 * smooth(10, 120, away);
     return Math.round((0.5 + away * 0.03 + hills) * 2) / 2;
   };
-  for (const side of [-1, 1]) {
-    for (let x = x0; x < x1; x += cell) for (let i = 0; i < depth; i++) {
-      const az = BANK_Z + i * cell, z = side * (az + cell / 2), hgt = heightAt(x, az);
+  // Fine 6 m blocks near the water where the camera looks closely; 12 m blocks further back.
+  const rows = [];
+  for (let az = BANK_Z; az < BANK_Z + bankDepth;) { const size = az < BANK_Z + 48 ? 6 : 12; rows.push({ az, size }); az += size }
+  for (const side of [-1, 1]) rows.forEach(({ az, size }, i) => {
+    for (let x = x0; x < x1; x += size) {
+      const z = side * (az + size / 2), hgt = heightAt(x, az);
       const g = noise(x * 0.05 + 7, az * 0.05);
-      const col = i === 0 ? shade(hex(0xc9b98a), 0.9 + g * 0.2) : shade(lerp(0, 1, g) > 0.5 ? L.grass[1] : L.grass[0], 0.85 + g * 0.3);
-      const xa = x, xb = x + cell, za = z - cell / 2, zb = z + cell / 2;
+      const col = i === 0 ? shade(hex(0xc9b98a), 0.9 + g * 0.2) : shade(g > 0.5 ? L.grass[1] : L.grass[0], 0.85 + g * 0.3);
+      const xa = x, xb = x + size, za = z - size / 2, zb = z + size / 2;
       mb.quad([xa, hgt, za], [xa, hgt, zb], [xb, hgt, zb], [xb, hgt, za], [0, 1, 0], col);
       const sideCol = i === 0 ? shade(hex(0x7a6448), 0.9 + g * 0.2) : shade(col, 0.72);
       // Sides only where the neighbour is lower, so hidden faces are never drawn.
-      const nx = heightAt(x + cell, az), px = heightAt(x - cell, az);
-      const inner = i === 0 ? -1.2 : heightAt(x, az - cell), outer = heightAt(x, az + cell);
+      const nx = heightAt(x + size, az), px = heightAt(x - size, az), outer = heightAt(x, az + size);
+      const inner = i === 0 ? -1.2 : Math.min(heightAt(x, rows[i - 1].az), heightAt(x + size / 2, rows[i - 1].az));
       if (nx < hgt) mb.quad([xb, nx, za], [xb, hgt, za], [xb, hgt, zb], [xb, nx, zb], [1, 0, 0], sideCol);
       if (px < hgt) mb.quad([xa, px, zb], [xa, hgt, zb], [xa, hgt, za], [xa, px, za], [-1, 0, 0], sideCol);
       const zi = side > 0 ? za : zb, zo = side > 0 ? zb : za;
       if (inner < hgt) mb.quad([xa, inner, zi], [xa, hgt, zi], [xb, hgt, zi], [xb, inner, zi], [0, 0, -side], sideCol);
       if (outer < hgt) mb.quad([xb, outer, zo], [xb, hgt, zo], [xa, hgt, zo], [xa, outer, zo], [0, 0, side], sideCol);
     }
-  }
+  });
 
   // Trees, in clumps where the noise says woodland.
   for (let x = x0; x < x1; x += 7) for (const side of [-1, 1]) for (let k = 0; k < 3; k++) {
-    const az = BANK_Z + 8 + rng() * (depth * cell - 14);
+    const az = BANK_Z + 8 + rng() * (bankDepth - 14);
     const wood = noise(x * 0.01 + 50, az * 0.01 + side * 9);
     if (rng() > wood * wood * 0.55) continue;
     const tx = x + rng() * 7, tz = side * az, ty = heightAt(tx, az);
@@ -96,7 +99,7 @@ function buildScene(course, cls) {
 
   // Far hills: stepped blocks that fade into the haze.
   for (let x = x0 - 400; x < x1 + 400; x += 48) for (const side of [-1, 1]) {
-    const peak = 8 + noise(x * 0.006, side * 3) * 34, z = side * (BANK_Z + depth * cell + 30 + rng() * 60);
+    const peak = 8 + noise(x * 0.006, side * 3) * 34, z = side * (BANK_Z + bankDepth + 30 + rng() * 60);
     for (let k = 0; k < 3; k++) {
       const hgt = peak * (1 - k * 0.3), w = 52 - k * 14;
       mb.box(x, hgt / 2 - 1, z + side * k * -6, w, hgt, 40 - k * 10, shade(L.grass[0], 0.62 + k * 0.08));

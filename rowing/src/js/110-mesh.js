@@ -59,6 +59,37 @@ class MeshBuilder {
   }
 }
 
+// Scenery split into slices along the course, so only the slices near the camera are drawn.
+// Each face goes to the slice holding its first corner.
+const CHUNK = 150;
+class ChunkedMesh extends MeshBuilder {
+  constructor() { super(16); this.chunks = new Map() }
+
+  quad(a, b, c, d, nrm, col) {
+    const key = Math.floor(a[0] / CHUNK);
+    let m = this.chunks.get(key);
+    if (!m) this.chunks.set(key, m = new MeshBuilder(8192));
+    m.quad(a, b, c, d, nrm, col);
+  }
+
+  // One buffer for all slices, with each slice's range so it can be drawn on its own.
+  upload(buffer, usage) {
+    const keys = [...this.chunks.keys()].sort((a, b) => a - b);
+    const total = keys.reduce((n, k) => n + this.chunks.get(k).n, 0), all = new Float32Array(total * 9);
+    const ranges = [];
+    let at = 0;
+    for (const k of keys) {
+      const m = this.chunks.get(k);
+      all.set(m.data.subarray(0, m.n * 9), at * 9);
+      ranges.push({ x0: k * CHUNK, x1: (k + 1) * CHUNK, first: at, count: m.n });
+      at += m.n;
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, all, usage);
+    return ranges;
+  }
+}
+
 function bindLitAttribs(buffer) {
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   const a = LIT.a;

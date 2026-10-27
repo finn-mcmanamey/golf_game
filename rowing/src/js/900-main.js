@@ -26,6 +26,8 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   resetCalls();
   resetSplits();
   $('replayTag').classList.toggle('hide', mode !== 'replay');
+  $('lesson').classList.add('hide');
+  tuneChanged();
   cam.mode = settings.camera;
   $('btnCam').textContent = CAMERA_LABEL[cam.mode];
   game.state = 'race';
@@ -33,7 +35,7 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   $('hud').classList.remove('hide');
 }
 
-const restartRace = () => game.mode === 'replay' ? watchReplay() : startRace(game.opts, game.ghostInputs, game.mode);
+const restartRace = () => game.mode === 'replay' ? watchReplay() : game.mode === 'learn' ? startLearning() : startRace(game.opts, game.ghostInputs, game.mode);
 
 function toMenu() {
   game.state = 'menu';
@@ -73,6 +75,7 @@ function handleEvents() {
   for (const b of race.boats) {
     if (b !== race.player) { b.events.length = 0; continue }
     for (const e of b.events) {
+      learnEvent(e);
       if (e.type === 'catch') {
         AU.play('catch');
         catchTimes.push(race.t);
@@ -124,7 +127,7 @@ function frame(now) {
     const p = race.player, d = race.course.distance;
     AU.ambient(p.v, smooth(d - 400, d, p.x) * (p.finishTime != null ? 0.6 : 1));
     if (race.done) { game.state = 'results'; game.replay ? showReplayEnd() : showResults(race) }
-    if (game.state === 'race') { updateHud(race); if (!game.replay) updateCalls(race) }
+    if (game.state === 'race') { updateHud(race); if (!game.replay && game.mode !== 'learn') updateCalls(race); updateLearning(race) }
   } else if ((game.state === 'menu' || game.state === 'results') && race) {
     // Behind the menu a demo race rows itself; after a race the field rows on past the line.
     simulate(dt, () => packInput(race.started ? autoRow(race.player) : 0, 35), true);

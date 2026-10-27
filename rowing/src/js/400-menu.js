@@ -33,6 +33,7 @@ function buildMenu() {
     if (pb) { const d = decodeRace(pb.code); startRace(d.opts, d.inputs) }
   };
   $('btnDaily').onclick = () => startRace(dailyOpts(), null, 'daily');
+  $('btnLearn').onclick = startLearning;
   $('btnSound').onclick = () => { settings.sound = !settings.sound; AU.init(); AU.setOn(settings.sound); saveSettings(); soundLabel() };
   soundLabel();
   checkFriendLink();
@@ -80,7 +81,7 @@ function showResults(race) {
   const pb = getPB(opts.distance, opts.cls);
   let pbNote = '';
   if (tuneEdited()) pbNote = ' · tuned physics, not recorded';
-  else if (game.mode === 'replay') pbNote = ' · replay';
+  else if (game.mode === 'replay' || game.mode === 'learn') pbNote = game.mode === 'learn' ? ' · practice' : ' · replay';
   else if (!pb || p.finishTime < pb.time) {
     savePB(opts.distance, opts.cls, { time: p.finishTime, code, venue: race.course.name, date: Date.now() });
     pbNote = pb ? ` · new personal best (was ${fmtTime(pb.time)})` : ' · first personal best';

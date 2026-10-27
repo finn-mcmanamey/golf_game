@@ -1,7 +1,7 @@
 /* ===== drawing a frame: sky, scenery, boats, then water over the submerged blades ===== */
 
 const R = {
-  sceneBuf: gl && gl.createBuffer(), sceneCount: 0,
+  sceneBuf: gl && gl.createBuffer(), sceneRanges: [],
   boatBuf: gl && gl.createBuffer(), boatMb: new MeshBuilder(30000),
   ghostBuf: gl && gl.createBuffer(), ghostMb: new MeshBuilder(4000),
   waterBuf: gl && gl.createBuffer(), skyBuf: gl && gl.createBuffer(),
@@ -11,7 +11,7 @@ const QUALITY_LABELS = ['Fast', 'Balanced', 'Sharp'];
 
 function setScene(course, cls) {
   const { mb, L } = buildScene(course, cls);
-  R.sceneCount = mb.upload(R.sceneBuf, gl.STATIC_DRAW);
+  R.sceneRanges = mb.upload(R.sceneBuf, gl.STATIC_DRAW);
   R.L = L;
   R.fogK = 0.0019 + (course.timeOfDay < 0.15 ? 0.0025 : 0);
   // Water: one big quad under everything; the banks cover its edges.
@@ -70,7 +70,10 @@ function renderFrame(race, time, dtFrame) {
   setLightUniforms(LIT.u, L);
   gl.uniform1f(LIT.u.uAlpha, 1);
   bindLitAttribs(R.sceneBuf);
-  gl.drawArrays(gl.TRIANGLES, 0, R.sceneCount);
+  // Only slices of scenery within sight; beyond this the fog has swallowed them anyway.
+  const sight = R.quality === 0 ? 550 : 800, lo = Math.min(cam.eye[0], cam.at[0]) - sight, hi = Math.max(cam.eye[0], cam.at[0]) + sight;
+  R.drawn = 0;
+  for (const c of R.sceneRanges) if (c.x1 > lo && c.x0 < hi) { gl.drawArrays(gl.TRIANGLES, c.first, c.count); R.drawn += c.count }
 
   const mb = R.boatMb;
   mb.reset();
