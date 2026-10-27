@@ -124,3 +124,10 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 #tune h3 { margin: 0 0 8px } #tune h3 small { color: var(--dim); font-weight: 400 }
 #tune label { display: grid; grid-template-columns: 110px 1fr 54px; gap: 6px; align-items: center; margin: 4px 0 }
 #tune label span { color: var(--dim); overflow: hidden; text-overflow: ellipsis } #tune b { text-align: right; font-weight: 600 }
+#careerBox { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; margin: 12px 0 4px; padding: 10px 12px;
+  border-radius: 12px; background: rgba(255, 210, 58, .08); border: 1px solid rgba(255, 210, 58, .25); font-size: 13px }
+#careerT { flex: 1 1 260px; text-align: left } #careerT b { color: var(--acc) }
+#medals { display: flex; gap: 4px }
+.medal { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 800 11px system-ui; font-style: normal; color: #3a2a00; box-shadow: inset 0 -2px 0 rgba(0,0,0,.2) }
+.medal.gold { background: #ffd23a } .medal.silver { background: #cfd8e3 } .medal.bronze { background: #d08a4a }
+#careerNote { margin: 6px 0 10px; font-size: 18px; font-weight: 800; color: var(--acc) }

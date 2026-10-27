@@ -35,7 +35,7 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   $('hud').classList.remove('hide');
 }
 
-const restartRace = () => game.mode === 'replay' ? watchReplay() : game.mode === 'learn' ? startLearning() : startRace(game.opts, game.ghostInputs, game.mode);
+const restartRace = () => game.mode === 'career' ? startCareerRace() : game.mode === 'replay' ? watchReplay() : game.mode === 'learn' ? startLearning() : startRace(game.opts, game.ghostInputs, game.mode);
 
 function toMenu() {
   game.state = 'menu';
@@ -174,6 +174,7 @@ function photoFinishSlowdown(race) {
 
 function watchReplay() {
   const { opts, inputs } = decodeRace(game.lastCode);
+  if (game.mode !== 'replay') game.modeBeforeReplay = game.mode;
   startRace(opts, null, 'replay');
   game.replay = inputs;
   cam.mode = 'tv';
@@ -182,6 +183,7 @@ function watchReplay() {
 
 function showReplayEnd() {
   game.replay = null;
+  game.mode = game.modeBeforeReplay || 'race';
   $('hud').classList.add('hide');
   $('results').classList.remove('hide');
 }
@@ -200,7 +202,7 @@ function menuCamera(dt) {
   cam.fov = 0.85;
 }
 
-$('btnAgain').onclick = () => { game.mode = game.mode === 'replay' ? 'race' : game.mode; restartRace() };
+$('btnAgain').onclick = () => restartRace();
 $('btnReplay').onclick = watchReplay;
 $('btnMenu').onclick = toMenu;
 $('btnShare').onclick = shareRace;

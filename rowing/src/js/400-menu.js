@@ -34,6 +34,7 @@ function buildMenu() {
   };
   $('btnDaily').onclick = () => startRace(dailyOpts(), null, 'daily');
   $('btnLearn').onclick = startLearning;
+  $('btnCareer').onclick = startCareerRace;
   $('btnSound').onclick = () => { settings.sound = !settings.sound; AU.init(); AU.setOn(settings.sound); saveSettings(); soundLabel() };
   soundLabel();
   checkFriendLink();
@@ -49,6 +50,7 @@ function menuChanged() {
   const pb = getPB(settings.distance, settings.cls);
   $('pbLine').textContent = pb ? `Your best over ${settings.distance} m in the ${BOAT_CLASSES[settings.cls].name.toLowerCase()}: ${fmtTime(pb.time)} (${pb.venue})` : '';
   $('btnGhost').classList.toggle('hide', !pb);
+  renderCareer();
   showPreview(currentOpts());
 }
 
@@ -98,6 +100,10 @@ function showResults(race) {
   $('resChart').innerHTML = splitChart(race, order[0]);
   $('resStats').textContent = `${p.strokes} strokes · average rate ${(p.strokes / p.finishTime * 60).toFixed(1)} · ${Math.round(s.perfect / strokes * 100)}% perfect catches`
     + (s.crabs ? ` · ${s.crabs} crab${s.crabs > 1 ? 's' : ''}` : '') + (s.buoys ? ` · hit the buoys ${s.buoys}×` : '');
+  const careerNote = game.mode === 'career' ? careerResult(race, place) : '';
+  $('careerNote').textContent = careerNote;
+  $('careerNote').classList.toggle('hide', !careerNote);
+  $('btnAgain').textContent = game.mode === 'career' ? 'Next race' : 'Race again';
   $('results').classList.remove('hide');
   $('hud').classList.add('hide');
   AU.play(place === 1 ? 'win' : 'finish');
