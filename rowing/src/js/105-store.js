@@ -25,7 +25,8 @@ const settings = Object.assign({ distance: 500, cls: '1x', difficulty: 'club', s
 const saveSettings = () => STORE.set('settings', settings);
 
 // Personal bests: one per distance and boat class, with the race code that rowed it (so it can be a ghost).
-const pbKey = (distance, cls, kind) => (kind === 'head' ? 'head-' : '') + `${distance}-${cls}`;
+// Each kind of race keeps its own records; regattas keep the original keys so older saves still count.
+const pbKey = (distance, cls, kind) => (kind && kind !== 'regatta' ? kind + '-' : '') + `${distance}-${cls}`;
 const getPB = (distance, cls, kind) => STORE.get('pbs', {})[pbKey(distance, cls, kind)] || null;
 function savePB(distance, cls, kind, record) {
   const all = STORE.get('pbs', {});

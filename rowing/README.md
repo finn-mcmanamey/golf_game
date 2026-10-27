@@ -9,6 +9,7 @@ no libraries, one self-contained `dist/index.html`.
 npm run build:rowing   # writes rowing/dist/index.html
 npm run dev:rowing     # serves http://localhost:5174 and rebuilds on save
 npm run test:rowing    # checks the race simulation in Node (no browser needed)
+node rowing/test/e2e.cjs   # plays one race per mode in headless Chromium (needs Playwright)
 ```
 
 ## How to play
@@ -26,7 +27,7 @@ and **press again** just as the slide reaches the front. That's a perfect catch.
 | C | TV button | camera: TV, chase, aerial, rower's eye |
 | G, F8, Esc | | graphics, tuning panel, pause |
 
-Modes: single races, **head races** on a winding river, a **season** of heats and finals, the **daily regatta**,
+Modes: single races, **head races** on a winding river, **indoor erg** races, the **Voxel Cup** knockout, a **season** of heats and finals, the **daily regatta**,
 **learn to row**, a two-player **duel**, ghosts of your best race, and shareable race links.
 
 ## Layout

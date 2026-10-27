@@ -16,6 +16,10 @@ function makeNoise2(seed) {
   return (x, y) => n(x, y) * 0.6 + n(x * 2.1, y * 2.1) * 0.3 + n(x * 4.3, y * 4.3) * 0.1;
 }
 
+// An evening regatta: moonlight, a deep blue sky with stars, and floodlights along the banks.
+const NIGHT = { sun: norm3([0.3, 0.6, 0.5]), sunCol: [0.6, 0.66, 0.85], sky: [0.08, 0.12, 0.26], horizon: [0.12, 0.16, 0.3],
+  ground: [0.2, 0.2, 0.24], deep: [0.03, 0.05, 0.1], cloud: 0.15, stars: 1 };
+
 // Light and colour for a time of day: 0 is dawn, 0.5 midday, 1 dusk.
 function lightingFor(course) {
   const t = course.timeOfDay, high = Math.sin(Math.PI * t);
@@ -34,6 +38,7 @@ function lightingFor(course) {
     bank: shade(hex(season[0]), 0.45),
     grass: season.map(hex),
     cloud: 0.25 + ((course.sceneSeed % 100) / 100) * 0.5,
+    ...(course.night && !course.rain ? NIGHT : {}),
   };
 }
 

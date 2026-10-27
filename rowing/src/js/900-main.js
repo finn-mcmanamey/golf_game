@@ -40,7 +40,7 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   $('hud').classList.remove('hide');
 }
 
-const restartRace = () => game.mode === 'career' ? startCareerRace() : game.mode === 'replay' ? watchReplay() : game.mode === 'learn' ? startLearning() : startRace(game.opts, game.ghostInputs, game.mode);
+const restartRace = () => game.mode === 'career' ? startCareerRace() : game.mode === 'cup' ? startCupRace() : game.mode === 'replay' ? watchReplay() : game.mode === 'learn' ? startLearning() : startRace(game.opts, game.ghostInputs, game.mode);
 
 function toMenu() {
   game.state = 'menu';
@@ -144,7 +144,7 @@ function frame(now) {
 
   if (gl && race) {
     if (game.state === 'menu') menuCamera(dt);
-    else updateCamera(race.player2 ? duelCameraBoat(race) : race.player, race.t, dt);
+    else updateCamera(race.player2 || race.course.kind === 'knockout' ? duelCameraBoat(race) : race.player, race.t, dt);
     renderFrame(race, game.time, dt);
     updateFps(dt);
   }
@@ -197,9 +197,10 @@ function showReplayEnd() {
   $('results').classList.remove('hide');
 }
 
-// In a duel the camera frames both human crews: it follows a point between them.
+// In a duel or a match race the camera frames both crews: it follows a point between them.
 function duelCameraBoat(race) {
-  const a = pose(race.player), b = pose(race.player2);
+  const other = race.player2 || race.boats.find(x => x !== race.player) || race.player;
+  const a = pose(race.player), b = pose(other);
   return { ...race.player, x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 - 3, yaw: 0 };
 }
 

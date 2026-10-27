@@ -43,6 +43,7 @@ function buildMenu() {
   $('bhClose').onclick = () => $('boathouse').classList.add('hide');
   $('btnDuel').onclick = () => startRace({ ...currentOpts(), duel: true }, null, 'duel');
   $('btnCareer').onclick = startCareerRace;
+  $('btnCup').onclick = startCupRace;
   $('btnSound').onclick = () => { settings.sound = !settings.sound; AU.init(); AU.setOn(settings.sound); saveSettings(); soundLabel() };
   soundLabel();
   checkFriendLink();
@@ -60,11 +61,12 @@ const soundLabel = () => { $('btnSound').textContent = settings.sound ? '🔊 So
 function menuChanged() {
   saveSettings();
   const c = makeCourse(settings.seed, settings.distance, settings.kind);
-  $('venue').textContent = c.kind === 'erg' ? `${c.name} · six rowing machines, one big screen` : `${c.name}${c.bends ? ' · winding river, crews start 8 s apart' : ''} · ${c.rain ? 'Rain · ' : ''}${windLabel(c.wind)}${c.current ? ` · ${c.current > 0 ? 'following' : 'opposing'} stream` : ''}`;
+  $('venue').textContent = c.kind === 'erg' ? `${c.name} · six rowing machines, one big screen` : `${c.name}${c.bends ? ' · winding river, crews start 8 s apart' : ''} · ${c.rain ? 'Rain · ' : c.night ? 'Evening, under lights · ' : ''}${windLabel(c.wind)}${c.current ? ` · ${c.current > 0 ? 'following' : 'opposing'} stream` : ''}`;
   const pb = getPB(settings.distance, settings.cls, settings.kind);
   $('pbLine').textContent = pb ? `Your best over ${settings.distance} m in the ${BOAT_CLASSES[settings.cls].name.toLowerCase()}${settings.kind === 'head' ? ' (head race)' : ''}: ${fmtTime(pb.time)} (${pb.venue})` : '';
   $('btnGhost').classList.toggle('hide', !pb);
   renderCareer();
+  renderCup();
   showPreview(currentOpts());
 }
 
@@ -119,13 +121,14 @@ function showResults(race) {
   $('resChart').innerHTML = splitChart(race, order[0]) + timingChart();
   $('resStats').textContent = `${p.strokes} strokes · average rate ${(p.strokes / p.finishTime * 60).toFixed(1)} · ${Math.round(s.perfect / strokes * 100)}% perfect catches`
     + (s.crabs ? ` · ${s.crabs} crab${s.crabs > 1 ? 's' : ''}` : '') + (s.buoys ? ` · hit the buoys ${s.buoys}×` : '');
-  const careerNote = game.mode === 'career' ? (counts ? careerResult(race, place) : 'Not counted for the season: tuned physics or unfinished.') : '';
+  const careerNote = game.mode === 'career' ? (counts ? careerResult(race, place) : 'Not counted for the season: tuned physics or unfinished.')
+    : game.mode === 'cup' ? (counts ? cupResult(race) : 'Not counted for the cup: tuned physics or unfinished.') : '';
   if (counts) recordHistory(race, place);
   const badges = counts ? checkBadges(race, place) : [];
   if (badges.length) setTimeout(() => toast('Badge earned: ' + badges.map(b => b.name).join(', '), 3200), 600);
   $('careerNote').textContent = careerNote;
   $('careerNote').classList.toggle('hide', !careerNote);
-  $('btnAgain').textContent = game.mode === 'career' ? 'Next race' : 'Race again';
+  $('btnAgain').textContent = game.mode === 'career' || game.mode === 'cup' && !cup.out && !cup.won ? 'Next race' : 'Race again';
   // A duel's code only holds player 1's strokes, so it can't be replayed or shared.
   // Duel and practice codes can't be re-rowed (a code holds one crew in a full field), so no replay or link.
   for (const id of ['btnReplay', 'btnShare']) $(id).classList.toggle('hide', !!race.player2 || game.mode === 'learn');

@@ -10,10 +10,11 @@ function makeRace(opts) {
   const boats = [], brains = [];
   for (let l = 0; l < LANES; l++) {
     if (solo && l !== lane) continue;   // practice: just you on the water
+    if (kind === 'knockout' && l !== lane && l !== lane + 1) continue;   // a match race: two crews side by side
     const name = l === lane ? (duel ? 'Player 1' : 'You') : names.splice((rng() * names.length) | 0, 1)[0];
     const human = l === lane || (duel && l === lane + 1);   // a duel puts a second human crew in the next lane
     boats.push(makeBoat(cls, l, duel && l === lane + 1 ? 'Player 2' : name, seed, human ? 0.035 : DIFFICULTY[difficulty].crewSd));
-    brains.push(human ? null : makeBrain(seed, l, difficulty));
+    brains[l] = human ? null : makeBrain(seed, l, difficulty);   // indexed by lane, since some lanes may be empty
   }
   if (course.bends) {
     // Head race: you go first; the other crews follow at 8-second intervals, each on its own line.

@@ -82,7 +82,7 @@ const WATER = gl && makeProgram(
 // Sky: a full-screen triangle; each pixel works out its view direction from the camera basis.
 const SKY = gl && makeProgram(
   `precision highp float;attribute vec2 aP;varying vec2 vS;void main(){vS=aP;gl_Position=vec4(aP,0.9999,1.0);}`,
-  `precision highp float;varying vec2 vS;uniform vec3 uR,uU,uF,uSun,uSunCol,uSky,uHorizon;uniform vec2 uTan;uniform float uT,uCloud;
+  `precision highp float;varying vec2 vS;uniform vec3 uR,uU,uF,uSun,uSunCol,uSky,uHorizon;uniform vec2 uTan;uniform float uT,uCloud,uStars;
    float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
    float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}
    void main(){vec3 d=normalize(uF+vS.x*uTan.x*uR+vS.y*uTan.y*uU);
@@ -90,6 +90,7 @@ const SKY = gl && makeProgram(
      float s=max(dot(d,uSun),0.0);col+=uSunCol*(pow(s,800.0)*3.0+pow(s,12.0)*0.25);
      if(d.y>0.01){vec2 cp=d.xz/d.y*0.004+vec2(uT*0.002,0.0);float c=n(cp*6.0)*0.6+n(cp*13.0)*0.3+n(cp*29.0)*0.1;
        c=smoothstep(1.0-uCloud,1.05-uCloud*0.5,c)*smoothstep(0.0,0.25,d.y);col=mix(col,mix(uHorizon,vec3(1.0),0.7)+uSunCol*0.08,c*0.85);}
+     if(uStars>0.0&&d.y>0.0){vec2 g=floor(d.xz/(d.y+0.3)*260.0);float st=step(0.9975,h(g));col+=vec3(st)*uStars*smoothstep(0.02,0.3,d.y)*(0.6+0.4*sin(uT*2.0+h(g+1.0)*40.0));}
      if(d.y<0.0)col=uHorizon;
      gl_FragColor=vec4(col,1.0);}`);
 

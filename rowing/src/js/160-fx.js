@@ -22,6 +22,7 @@ function drawFx(mb, dt, time, course) {
     mb.box(d.p[0], d.p[1], d.p[2], s, s, s, white);
   }
   drawFlags(mb, time, course);
+  if (course.night && !course.rain) drawLamps(mb, course);
   drawStartLights(mb, course);
   drawCrowd(mb, time, course);
   drawBirds(mb, time, course);
@@ -97,4 +98,16 @@ function drawCrowd(mb, time, course) {
     const y = 0.8 + row * 0.9 + 1.4, z = z0 - row * 1.4, wave = Math.sin(time * 8 + i * 0.9 + row) * 0.25 * rise;
     mb.beam([x, y, z], [x + wave, y + 0.55 * rise, z + 0.1], 0.08, 0.08, skin);
   }
+}
+
+// Night: floodlight towers along both banks near the camera, and a white light on each bow.
+function drawLamps(mb, course) {
+  const rz = x => riverZ(course, x), bank = course.bends ? course.halfW + 5 : BANK_Z + 5, glow = [4, 3.6, 2.6];
+  const x0 = Math.floor((cam.at[0] - 300) / 60) * 60;
+  for (let x = Math.max(-120, x0); x < cam.at[0] + 300 && x < course.distance + 120; x += 60) for (const side of [-1, 1]) {
+    const z = rz(x) + side * bank;
+    mb.box(x, 6, z, 0.3, 12, 0.3, [0.3, 0.3, 0.32]);
+    mb.box(x, 12.2, z - side * 0.4, 1.6, 0.6, 0.6, glow);
+  }
+  for (const b of race.boats) mb.box(b.x + 0.1, 0.32, b.z, 0.12, 0.12, 0.12, [6, 6, 5]);
 }

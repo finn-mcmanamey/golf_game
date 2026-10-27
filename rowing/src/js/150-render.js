@@ -64,7 +64,7 @@ function renderFrame(race, time, dtFrame) {
   gl.uniform2f(SKY.u.uTan, tanY * aspect, tanY);
   gl.uniform3fv(SKY.u.uSun, L.sun); gl.uniform3fv(SKY.u.uSunCol, L.sunCol);
   gl.uniform3fv(SKY.u.uSky, L.sky); gl.uniform3fv(SKY.u.uHorizon, L.horizon);
-  gl.uniform1f(SKY.u.uT, time); gl.uniform1f(SKY.u.uCloud, L.cloud);
+  gl.uniform1f(SKY.u.uT, time); gl.uniform1f(SKY.u.uCloud, L.cloud); gl.uniform1f(SKY.u.uStars, L.stars || 0);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   gl.disableVertexAttribArray(SKY.a.aP);
 
