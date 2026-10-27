@@ -21,3 +21,4 @@ Build order follows `Depends on`. Status: idea → spec'd → approved → build
 | F-109 | Stream lines: head-race streams fastest mid-river, slack by the banks (rules 5) | shipped | P2 | Truth | F-003 | features/stream-lines.md |
 | F-110 | Stream flecks: foam drifting at the local stream speed on rules-5 head races | shipped | P3 | Truth | F-109 | 162-stream-fx.js; drawing only, drift ×6 so it reads |
 | F-111 | Henley verdicts: match-race margins called in lengths (canvas, feet, ¾ length, easily) | shipped | P3 | Truth | F-003 | 415-cup.js byVerdict; lead: HRR glossary |
+| F-112 | Learn to Row names this device's controls (keys or on-screen buttons) | shipped | P1 | Feel | F-001 | Phone players were told to press W, A, D and Shift |

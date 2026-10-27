@@ -1,13 +1,16 @@
 /* ===== Learn to row: a coach on the bank walks a new player through one skill at a time ===== */
 
+// Each lesson names the control this device actually has: keys on a keyboard, the on-screen buttons on a phone.
+const ctl = (keysText, touchText) => isTouch ? touchText : keysText;
+
 const LESSONS = [
-  { say: 'Hold <kbd>Space</kbd> (or touch and hold) to drive the blades through the water.', done: s => s.drives >= 1 },
+  { say: ctl('Hold <kbd>Space</kbd> to drive the blades through the water.', 'Touch and hold the water to drive the blades through it.'), done: s => s.drives >= 1 },
   { say: 'Let go as the handle reaches the yellow <b>finish</b> zone. A clean release keeps the boat running.', done: s => s.clean >= 2 },
   { say: 'The slide comes forward on its own. Press again just as it reaches the green <b>catch</b> zone.', done: s => s.perfectRun >= 3 },
   { say: 'Three perfect strokes in a row build <b>swing</b>: the blue bar. Full swing makes the boat faster.', done: s => s.swing >= 0.95 },
-  { say: 'Raise the stroke rate with <kbd>W</kbd> (lower it with <kbd>S</kbd>). Faster rates go quicker but burn energy.', done: s => s.rateUps >= 2 },
-  { say: 'Steer with <kbd>A</kbd> and <kbd>D</kbd>. It works best while the blades are in the water.', done: s => s.steers >= 20 },
-  { say: 'Hold <kbd>Shift</kbd> for a <b>power ten</b>. It drains energy fast: save it for the finish.', done: s => s.pushes >= 30 },
+  { say: `Raise the stroke rate with ${ctl('<kbd>W</kbd> (lower it with <kbd>S</kbd>)', '<kbd>+</kbd> (lower it with <kbd>−</kbd>)')}. Faster rates go quicker but burn energy.`, done: s => s.rateUps >= 2 },
+  { say: `Steer with ${ctl('<kbd>A</kbd> and <kbd>D</kbd>', '<kbd>◀</kbd> and <kbd>▶</kbd>')}. It works best while the blades are in the water.`, done: s => s.steers >= 20 },
+  { say: `Hold ${ctl('<kbd>Shift</kbd>', '<kbd>PUSH</kbd>')} for a <b>power ten</b>. It drains energy fast: save it for the finish.`, done: s => s.pushes >= 30 },
   { say: "You're ready. Try a 500 m race against a club field!", done: () => false },
 ];
 
