@@ -159,3 +159,4 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 #bhBody { overflow-x: auto }
 #boathouse { background: rgba(8, 18, 34, .88) }
 #windT { display: flex; gap: 4px; align-items: center; color: var(--dim); font-size: 12px } #windT svg { width: 14px; height: 14px; color: #7dd3fc }
+#stats .force canvas { display: block; width: 90px; height: 26px; margin-top: 2px } @media (max-width: 640px) { #stats .force { display: none } }

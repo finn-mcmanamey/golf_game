@@ -122,6 +122,7 @@ function stepBoat(b, input, course, race) {
   const air = course.wind.along - b.v;
   const wind = TUNE.windDrag * Math.sqrt(n) * air * Math.abs(air) * 0.25;
   const mass = TUNE.mass * n + 15 * n;
+  b.force = force / n;   // per rower, for the force curve on screen
   b.v += (force - drag + wind) / mass * dt;
   if (b.v < 0) b.v *= 0.98;
 
