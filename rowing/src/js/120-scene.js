@@ -117,6 +117,7 @@ function buildScene(course, cls) {
     const tall = course.theme === 'alpine' ? 4 : 1, peak = (8 + noise(x * 0.006, side * 3) * 34) * tall;
     const z = side * (BANK + bankDepth + 30 + rng() * 60 + (tall > 1 ? 80 : 0)) + rz(x);
     if (course.theme === 'city') { skyline(mb, x, z, rng, course.night); continue }
+    if (tall > 1) { mountain(mb, x, z, peak, L); continue }
     for (let k = 0; k < 3; k++) {
       const hgt = peak * (1 - k * 0.3), w = (52 - k * 14) * (tall > 1 ? 1.6 : 1);
       // Alpine peaks get rock and snow on their upper steps.
@@ -139,6 +140,16 @@ function tree(mb, x, y, z, rng, L, alpine = false) {
     const w = 3.5 + rng() * 2.5;
     mb.box(x, y + h + w * 0.35, z, w, w * 0.8, w, leaf);
     mb.box(x + (rng() - 0.5) * 2, y + h + w * 0.8, z + (rng() - 0.5) * 2, w * 0.65, w * 0.6, w * 0.65, shade(leaf, 1.1));
+  }
+}
+
+// Alpine venues: stepped voxel peaks, green at the foot, grey rock above, snow on the top.
+function mountain(mb, x, z, peak, L) {
+  const tiers = 8, base = 90 + peak * 0.5, step = peak / tiers;
+  for (let k = 0; k < tiers; k++) {
+    const w = base * (1 - k / tiers), f = k / tiers;
+    const col = f > 0.7 ? [1.25, 1.25, 1.3] : f > 0.4 ? shade(hex(0x8a8f99), 0.85 + f * 0.2) : shade(L.grass[0], 0.6 + f * 0.3);
+    mb.box(x, step * (k + 0.5) - 1, z, w, step, w * 0.8, col);
   }
 }
 
