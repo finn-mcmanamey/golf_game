@@ -97,7 +97,7 @@ function menuChanged() {
 // After a race, one suggestion for what to try next.
 function nextChallenge(race, place) {
   const o = race.opts, i = FIELD_ORDER.indexOf(o.difficulty);
-  if (place === 1 && i < FIELD_ORDER.length - 1) return `Next: try a ${DIFFICULTY[FIELD_ORDER[i + 1]].label} field.`;
+  if (place === 1 && i < FIELD_ORDER.length - 1) { const next = DIFFICULTY[FIELD_ORDER[i + 1]].label; return `Next: try ${/^[AEIOU]/.test(next) ? 'an' : 'a'} ${next} field.` }
   if (place === 1) return o.kind === 'regatta' ? 'Next: take on a head race down a winding river.' : 'Next: chase your own ghost with "Race your best".';
   if (race.player.stats.off > race.player.strokes / 3) return 'Next: steadier catches. Try Learn to row, or turn on the catch beep.';
   return place <= 3 ? 'So close. Save a power ten for the last 250 m.' : 'Next: try the Classic rate plan, and keep energy for the finish.';
@@ -187,6 +187,7 @@ function showResults(race) {
   $('btnAgain').textContent = game.mode === 'live' ? 'Back to the lobby' : game.mode === 'career' || game.mode === 'cup' && !cup.out && !cup.won ? 'Next race' : game.mode === 'week' ? (weekOver() ? 'Start a new week' : `Row day ${week.day + 1}`) : game.mode === 'cup' ? 'Enter a new cup' : 'Race again';
   // A duel's code only holds player 1's strokes, so it can't be replayed or shared.
   // Duel and practice codes can't be re-rowed (a code holds one crew in a full field), so no replay or link.
+  $('btnCard').classList.toggle('hide', game.mode !== 'daily' || p.finishTime == null);
   for (const id of ['btnReplay', 'btnShare']) $(id).classList.toggle('hide', !!race.player2 || practiceMode() || game.mode === 'live');
   $('results').classList.remove('hide');
   $('hud').classList.add('hide');

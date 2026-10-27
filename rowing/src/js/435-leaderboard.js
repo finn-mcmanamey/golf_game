@@ -76,7 +76,7 @@ function renderBoard() {
     `<div class="${r.id === board.uid ? 'me' : ''}"><span>${i + 1}</span><span>${escapeHtml(r.name || 'Rower')}</span><span class="t">${fmtTime(r.dailyTime)}</span></div>`).join('')
     + (rows.length && rows[0].id !== board.uid ? `<button class="sec mini raceLeader">Race ${escapeHtml(rows[0].name || 'the leader')}'s ghost</button>` : '');
   const rb = $('resBoard');
-  if (rb && game.mode === 'daily') rb.innerHTML = el.innerHTML;
+  if (rb && game.mode === 'daily') rb.innerHTML = rows.length ? el.innerHTML : '';
   document.querySelectorAll('.raceLeader').forEach(b => b.onclick = raceLeader);
 }
 
