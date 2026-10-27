@@ -143,7 +143,7 @@ function drawWater(race, vp, time, dtFrame, reflect) {
   gl.uniform1f(u.uBankZ, race.course.bends ? 1e4 : BANK_Z);
   gl.uniform1f(u.uReflect, reflect ? 1 : 0);
   gl.uniform1f(u.uT, time);
-  gl.uniform1f(u.uWind, Math.min(1.5, race.course.wind.speed / 3));
+  gl.uniform1f(u.uWind, Math.min(1.5, race.course.wind.speed / 3 + (race.course.theme === 'coast' ? 0.5 : 0)));   // the sea is never quite flat
   const w = race.course.wind, wl = Math.hypot(w.along, w.cross) || 1;
   gl.uniform2f(u.uWindDir, w.along / wl, w.cross / wl);
   boatUniform.fill(0);

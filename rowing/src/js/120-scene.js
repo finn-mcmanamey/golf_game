@@ -75,21 +75,25 @@ function buildScene(course, cls) {
   const heightAt = (x, az) => {
     const away = az - BANK;
     if (away < 0) return -1;
+    if (coast) return away < 42 ? Math.round((0.3 + away * 0.03) * 2) / 2 : Math.round((5 + noise(x * 0.02, az * 0.02) * 9 + smooth(42, 140, away) * 10) * 2) / 2;   // beach, then low cliffs rising inland
     const hills = noise(x * 0.012, az * 0.012) * 26 * smooth(10, 120, away);
     return Math.round((0.5 + away * 0.03 + hills) * 2) / 2;
   };
   // Fine 6 m blocks near the water where the camera looks closely; 12 m blocks further back.
   const rows = [];
   for (let az = BANK; az < BANK + bankDepth;) { const size = az < BANK + 48 ? 6 : 12; rows.push({ az, size }); az += size }
-  for (const side of [-1, 1]) rows.forEach(({ az, size }, i) => {
+  // On the coast the near side (towards the TV camera) is open sea: no land there at all.
+  const coast = course.theme === 'coast', landSides = coast ? [-1] : [-1, 1];
+  for (const side of landSides) rows.forEach(({ az, size }, i) => {
     for (let x = x0; x < x1; x += size) {
       const hgt = heightAt(x, az), ra = rz(x), rb = rz(x + size);   // the strip follows the river's bends
       const g = noise(x * 0.05 + 7, az * 0.05);
-      const col = i === 0 ? shade(hex(0xc9b98a), 0.9 + g * 0.2) : shade(g > 0.5 ? L.grass[1] : L.grass[0], 0.85 + g * 0.3);
+      const sand = i === 0 || coast && az < BANK + 42, rock = false;
+      const col = sand ? shade(hex(0xd9c79a), 0.9 + g * 0.2) : rock ? shade(hex(0x8a8478), 0.85 + g * 0.3) : shade(g > 0.5 ? L.grass[1] : L.grass[0], 0.85 + g * 0.3);
       const xa = x, xb = x + size, near = side * az, far = side * (az + size);
       const za = Math.min(near, far), zb = Math.max(near, far);
       mb.quad([xa, hgt, za + ra], [xa, hgt, zb + ra], [xb, hgt, zb + rb], [xb, hgt, za + rb], [0, 1, 0], col);
-      const sideCol = i === 0 ? shade(hex(0x7a6448), 0.9 + g * 0.2) : shade(col, 0.72);
+      const sideCol = i === 0 ? shade(hex(0x7a6448), 0.9 + g * 0.2) : coast ? shade(hex(0xb0a690), 0.85 + g * 0.2) : shade(col, 0.72);   // pale chalk cliffs on the coast
       // Sides only where the neighbour is lower, so hidden faces are never drawn.
       const nx = heightAt(x + size, az), px = heightAt(x - size, az), outer = heightAt(x, az + size);
       const inner = i === 0 ? -1.2 : Math.min(heightAt(x, rows[i - 1].az), heightAt(x + size / 2, rows[i - 1].az));
@@ -102,7 +106,8 @@ function buildScene(course, cls) {
   });
 
   // Trees, in clumps where the noise says woodland.
-  for (let x = x0; x < x1; x += 7) for (const side of [-1, 1]) for (let k = 0; k < 3; k++) {
+  for (let x = x0; x < x1; x += 7) for (const side of landSides) for (let k = 0; k < 3; k++) {
+    if (coast && rng() < 0.6) continue;   // windswept: fewer trees on the clifftops
     const az = BANK + 8 + rng() * (bankDepth - 14);
     const wood = noise(x * 0.01 + 50, az * 0.01 + side * 9);
     if (rng() > wood * wood * 0.55) continue;
@@ -113,7 +118,7 @@ function buildScene(course, cls) {
   }
 
   // Far hills: stepped blocks that fade into the haze.
-  for (let x = x0 - 400; x < x1 + 400; x += 48) for (const side of [-1, 1]) {
+  for (let x = x0 - 400; x < x1 + 400; x += 48) for (const side of landSides) {
     const tall = course.theme === 'alpine' ? 4 : 1, peak = (8 + noise(x * 0.006, side * 3) * 34) * tall;
     const z = side * (BANK + bankDepth + 30 + rng() * 60 + (tall > 1 ? 80 : 0)) + rz(x);
     if (course.theme === 'city') { skyline(mb, x, z, rng, course.night); continue }
@@ -194,14 +199,24 @@ function buildCourseFurniture(mb, course, cls, L, rng) {
   gantry(mb, -BOAT_CLASSES[cls].length - 8, span, 'START', hex(0x2a5db0));
   gantry(mb, D, span, 'FINISH', red);
   // Distance boards on both banks every 250 m.
-  for (let x = 250; x < D; x += 250) for (const side of [-1, 1]) {
+  for (let x = 250; x < D; x += 250) for (const side of course.theme === 'coast' ? [-1] : [-1, 1]) {
     const z = side * (SC.bank + 2) + SC.rz(x);
     mb.box(x, 2.6, z, 0.4, 5.2, 0.4, hex(0x444444));
     mb.box(x, 5.2, z, 7.5, 3, 0.4, D - x <= 500 ? red : hex(0x1f3d72));
     voxelText(mb, String(D - x), x, 4.25, z - side * 0.3, 0.35, white, -side);
   }
   grandstand(mb, D, rng);
-  boathouses(mb, rng);
+  if (course.theme === 'coast') lighthouse(mb, D + 140, -(SC.bank + 40));
+  else boathouses(mb, rng);
+}
+
+// A striped lighthouse on the headland beyond the finish.
+function lighthouse(mb, x, z) {
+  const red = hex(0xd8352a), white = [1.15, 1.15, 1.1];
+  mb.box(x, 14, z, 7, 2, 7, hex(0x8a8478));
+  for (let i = 0; i < 6; i++) mb.box(x, 16 + i * 2.5 + 1.25, z, 4.6 - i * 0.3, 2.5, 4.6 - i * 0.3, i % 2 ? red : white);
+  mb.box(x, 32.5, z, 3.2, 2, 3.2, [3, 2.8, 1.8]);
+  mb.box(x, 34, z, 3.8, 1, 3.8, red);
 }
 
 function gantry(mb, x, span, label, col, zc = 0) {
