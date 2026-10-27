@@ -10,11 +10,11 @@ function makeRace(opts) {
   const boats = [], brains = [];
   for (let l = 0; l < LANES; l++) {
     const name = l === lane ? 'You' : names.splice((rng() * names.length) | 0, 1)[0];
-    boats.push(makeBoat(cls, l, name));
+    boats.push(makeBoat(cls, l, name, seed, l === lane ? 0.035 : DIFFICULTY[difficulty].crewSd));
     brains.push(l === lane ? null : makeBrain(seed, l, difficulty));
   }
   let ghost = null;
-  if (ghostInputs) { ghost = makeBoat(cls, lane, 'Ghost'); ghost.isGhost = true }
+  if (ghostInputs) { ghost = makeBoat(cls, lane, 'Ghost', seed, 0.035); ghost.isGhost = true }
   return {
     opts, course, boats, brains, ghost, ghostInputs,
     player: boats[lane],

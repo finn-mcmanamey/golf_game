@@ -101,3 +101,9 @@ input[type=number] { width: 110px; font: inherit; text-align: center; padding: 6
   #topL b { font-size: 20px }
 }
 #fps { font: 11px ui-monospace, Menlo, monospace; color: var(--dim); text-align: center }
+#call { position: absolute; left: 16px; bottom: 150px; max-width: min(340px, 60vw); padding: 8px 14px; border-radius: 14px 14px 14px 4px;
+  background: #fff; color: #10223a; font-weight: 800; font-size: 16px; opacity: 0; box-shadow: 0 8px 24px rgba(0, 0, 0, .3) }
+#call small { display: block; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #5a6b80 }
+#call.pop { animation: callpop 3.2s ease-out }
+@keyframes callpop { 0% { opacity: 0; transform: translateY(8px) } 6% { opacity: 1; transform: none } 85% { opacity: 1 } 100% { opacity: 0 } }
+.touchy #call { bottom: 230px }

@@ -2,9 +2,9 @@
    Each bot draws its timing errors from its own seeded stream, so a race replays identically. */
 
 const DIFFICULTY = {
-  club:     { label: 'Club',     sd: 0.10, cruise: 28, start: 38, sprint: 34, push: 0.4, slack: 0.05 },
-  national: { label: 'National', sd: 0.065, cruise: 31, start: 41, sprint: 37, push: 0.6, slack: 0.03 },
-  olympic:  { label: 'Olympic',  sd: 0.04, cruise: 33, start: 43, sprint: 40, push: 0.85, slack: 0.015 },
+  club:     { label: 'Club',     sd: 0.10, cruise: 28, start: 38, sprint: 34, push: 0.4, slack: 0.05, crewSd: 0.05 },
+  national: { label: 'National', sd: 0.065, cruise: 31, start: 41, sprint: 37, push: 0.6, slack: 0.03, crewSd: 0.035 },
+  olympic:  { label: 'Olympic',  sd: 0.04, cruise: 33, start: 43, sprint: 40, push: 0.85, slack: 0.015, crewSd: 0.022 },
 };
 
 // Race plans give each crew a personality: flyers go out hard, sprinters save it for the end.

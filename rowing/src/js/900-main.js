@@ -1,6 +1,6 @@
 /* ===== main loop: fixed 60 Hz simulation, drawing at whatever rate the screen runs ===== */
 
-const game = { state: 'menu', mode: 'race', acc: 0, last: 0, time: 0, fastForward: false, lastCode: '', finishShown: false };
+const game = { autopilot: location.hash.includes('autopilot'), state: 'menu', mode: 'race', acc: 0, last: 0, time: 0, fastForward: false, lastCode: '', finishShown: false };
 let race = null;
 
 function showPreview(opts) {
@@ -22,6 +22,7 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   game.fastForward = false;
   game.finishShown = false;
   game.cue = null;
+  resetCalls();
   cam.mode = settings.camera;
   $('btnCam').textContent = CAMERA_LABEL[cam.mode];
   game.state = 'race';
@@ -132,7 +133,7 @@ function frame(now) {
     const p = race.player, d = race.course.distance;
     AU.ambient(p.v, smooth(d - 400, d, p.x) * (p.finishTime != null ? 0.6 : 1));
     if (race.done) { game.state = 'results'; showResults(race) }
-    if (game.state === 'race') updateHud(race);
+    if (game.state === 'race') { updateHud(race); updateCalls(race) }
   }
 
   if (gl && race) {

@@ -63,12 +63,14 @@ function drawBoat(mb, boat, dtFrame, time) {
   vs.phase = boat.phase;
 
   const sculls = c.sculls, Li = sculls ? 0.88 : 1.15, Lo = sculls ? 2.0 : 2.55, pinW = sculls ? 0.8 : 0.86, pinY = 0.42;
-  const theta = lerp(1.0, -0.72, q.h) + (boat.phase === 'crab' ? -0.3 : 0);
-  const legT = smooth(0, 0.62, q.h), backT = smooth(0.25, 0.85, q.h);
   const shirt = hex(col.shirt), skin = hex(vs.skin), shorts = hex(0x1d2330);
   const bladeCols = col.blade.map(hex);
 
+  // Stations run stern to bow; the stroke (seat 0) sets the time and the others follow with their lag.
   for (const [si, st] of stationsFor(boat).entries()) {
+    const seatH = clamp(q.h - (boat.lag[si] || 0) * (boat.phase === 'drive' ? TUNE.driveSpeed : boat.recSpeed || 1), 0, 1);
+    const theta = lerp(1.0, -0.72, seatH) + (boat.phase === 'crab' ? -0.3 : 0);
+    const legT = smooth(0, 0.62, seatH), backT = smooth(0.25, 0.85, seatH);
     const handles = [];
     for (const side of st.sides) {
       const pin = [st.u, pinY, side * pinW];

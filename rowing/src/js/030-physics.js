@@ -9,9 +9,10 @@ const RATE_MIN = 16, RATE_MAX = 46;
 const packInput = (bits, rate) => bits | (clamp(rate, RATE_MIN, RATE_MAX) - RATE_MIN) << 4;
 const inputRate = v => (v >> 4) + RATE_MIN;
 
-function makeBoat(cls, lane, crewName) {
+function makeBoat(cls, lane, crewName, seed = 0, crewSd = 0.035) {
   const c = BOAT_CLASSES[cls];
   return {
+    rng: makeRng(hashSeed(seed, lane, 0xC2E)), crewSd, lag: new Array(c.crew).fill(0), sync: 1,
     cls, lane, crewName, crew: c.crew,
     x: 0, z: laneZ(lane), yaw: 0, v: 0,
     h: 0, phase: 'front', phaseT: 0, held: false,
@@ -27,9 +28,20 @@ const recoveryTime = rate => Math.max(0.45, 60 / rate - 1 / TUNE.driveSpeed);
 function gradeCatch(b, timingError) {
   const e = Math.abs(timingError);
   const grade = e <= TUNE.perfectWindow ? 'perfect' : e <= TUNE.goodWindow ? 'good' : timingError < 0 ? 'early' : 'late';
-  b.catchEff = grade === 'perfect' ? 1 : grade === 'good' ? 0.96 : 0.86;
+  b.catchEff = (grade === 'perfect' ? 1 : grade === 'good' ? 0.96 : 0.86) * crewSync(b);
   b.catchGrade = grade;
   b.events.push({ type: 'catch', grade, error: timingError });
+}
+
+// In a crew boat the others follow the stroke seat, each a little early or late. A crew with swing
+// settles into time; pushing hard makes it ragged. Ragged crews waste effort.
+function crewSync(b) {
+  if (b.crew === 1) return 1;
+  const sd = b.crewSd * (1.3 - 0.6 * b.swing) * (b.lastBits & IN.PUSH ? 1.4 : 1);
+  let sum = 0;
+  for (let i = 1; i < b.crew; i++) { b.lag[i] = gauss(b.rng, sd); sum += Math.abs(b.lag[i]) }
+  b.sync = clamp(1 - 1.6 * sum / (b.crew - 1), 0.8, 1);
+  return b.sync;
 }
 
 function endStroke(b, releaseGrade) {

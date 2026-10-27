@@ -9,8 +9,16 @@ function changeRate(d) {
   AU.play('tick');
 }
 
-function readInput() {
+// Autopilot rows clean strokes on its own: used by the demo behind the menu and by automated checks.
+function autoRow(b) {
   let bits = 0;
+  if (b.phase === 'drive') bits = b.h < 0.95 ? IN.DRIVE : 0;
+  else if (!(b.lastBits & IN.DRIVE) && (b.phase === 'front' || b.h / b.recSpeed < 0.03)) bits = IN.DRIVE;
+  return bits | assistSteer(b);
+}
+
+function readInput() {
+  let bits = game.autopilot && race.started ? autoRow(race.player) : 0;
   if (keys.has('Space') || keys.has('Mouse') || touchState.drive) bits |= IN.DRIVE;
   if (keys.has('KeyA') || keys.has('ArrowLeft') || touchState.left) bits |= IN.LEFT;
   if (keys.has('KeyD') || keys.has('ArrowRight') || touchState.right) bits |= IN.RIGHT;
