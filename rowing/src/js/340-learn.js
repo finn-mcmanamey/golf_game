@@ -14,6 +14,7 @@ const LESSONS = [
 const learn = { step: 0, s: null };
 
 function startLearning() {
+  STORE.set('learned', true);
   learn.step = 0;
   learn.s = { drives: 0, clean: 0, perfectRun: 0, swing: 0, rateUps: 0, steers: 0, pushes: 0, rate: 0 };
   startRace({ seed: settings.seed, distance: 2000, cls: '1x', difficulty: 'club', lane: 2, solo: true }, null, 'learn');

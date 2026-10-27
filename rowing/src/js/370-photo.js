@@ -8,6 +8,7 @@ function togglePhoto() {
   game.state = photo.on ? 'photo' : 'race';
   document.body.classList.toggle('photo', photo.on);
   if (!photo.on) game.last = performance.now();
+  else AU.ambient(0, 0, 0, 0);   // the frozen moment is silent
   toast(photo.on ? 'Photo mode: drag to look around, scroll to zoom, F to carry on' : 'Back to the race', 1600);
 }
 

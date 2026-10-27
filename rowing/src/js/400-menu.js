@@ -73,10 +73,10 @@ function menuChanged() {
   $('btnGhost').classList.toggle('hide', !pb);
   renderCareer();
   renderCup();
-  const streak = STORE.get('dailyStreak', { n: 0, day: 0 }), today = Math.floor(Date.now() / 864e5);
+  const streak = STORE.get('dailyStreak', { n: 0, day: 0 }), today = localDay();
   const best = STORE.get('daily-' + dailyOpts().seed, null);
   $('dailySub').textContent = best ? `Today's best ${fmtTime(best)}` + (streak.n > 1 && streak.day >= today - 1 ? ` · ${streak.n}-day streak` : '') : 'Same race for everyone today';
-  $('welcome').classList.toggle('hide', STORE.get('history', []).length > 0);
+  $('welcome').classList.toggle('hide', STORE.get('history', []).length > 0 || STORE.get('learned', false));
   showPreview(currentOpts());
 }
 
@@ -90,8 +90,11 @@ function nextChallenge(race, place) {
 }
 
 // The daily regatta: same course, boat and field for everyone today.
+// Today's date as a day number, in the player's own time zone (the daily race and the streak both use it).
+const localDay = () => { const d = new Date(); return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5) };
+
 function dailyOpts() {
-  const d = new Date(), day = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5);
+  const day = localDay();
   return { seed: hashSeed(day, 0xDA1) % 999999 + 1, distance: 1000, cls: CLASS_KEYS[day % 4], difficulty: 'national', lane: 2 };
 }
 
@@ -132,7 +135,7 @@ function showResults(race) {
     const key = 'daily-' + opts.seed, best = STORE.get(key, null);
     if (!best || p.finishTime < best) STORE.set(key, p.finishTime);
     // A streak counts days in a row with a daily regatta finished.
-    const today = Math.floor(Date.now() / 864e5), s = STORE.get('dailyStreak', { n: 0, day: 0 });
+    const today = localDay(), s = STORE.get('dailyStreak', { n: 0, day: 0 });
     if (s.day !== today) STORE.set('dailyStreak', { n: s.day === today - 1 ? s.n + 1 : 1, day: today });
   }
   $('resSub').textContent = `${fmtTime(p.finishTime)} · ${race.course.name}, ${opts.distance} m ${BOAT_CLASSES[opts.cls].name.toLowerCase()}${pbNote}`;

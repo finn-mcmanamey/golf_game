@@ -5,7 +5,7 @@ let race = null;
 
 function showPreview(opts) {
   race = makeRace(opts);
-  if (gl) setScene(race.course, opts.cls);
+  if (gl && !showroom.on) setScene(race.course, opts.cls);   // the showroom restores this scene when it closes
 }
 
 function startRace(opts, ghostInputs = null, mode = 'race') {
@@ -32,7 +32,7 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   resetCommentary();
   resetCox();
   resetPlan();
-  if (coxing()) toast('You are the cox: steer, set the rate, and press Space (or tap) for a power ten. Three to call.', 4200);
+  if (mode !== 'replay' && coxing()) toast('You are the cox: steer, set the rate, and press Space (or tap) for a power ten. Three to call.', 4200);
   $('replayTag').classList.toggle('hide', mode !== 'replay');
   $('lesson').classList.add('hide');
   tuneChanged();
@@ -75,9 +75,10 @@ function cycleQuality() {
 
 // If the device can't keep up early in a race, step the graphics down once (it remembers, like choosing it yourself).
 function autoQuality() {
-  if (game.state !== 'race' || game.autoQualityDone || game.autopilot || R.quality === 0 || race.t < 4 || race.t > 12) return;
+  if (game.state !== 'race' || game.autoQualityDone || STORE.get('autoQualityDone', false) || game.autopilot || R.quality === 0 || race.t < 4 || race.t > 12) return;
   if (fpsMeter.avg < 32) {
     game.autoQualityDone = true;
+    STORE.set('autoQualityDone', true);   // once per device: if the first step didn't help, more steps won't either
     settings.quality = R.quality = R.quality - 1;
     saveSettings();
     toast(`Graphics set to ${QUALITY_LABELS[R.quality]} to keep it smooth (change it in Settings)`, 3000);

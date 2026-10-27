@@ -7,7 +7,7 @@ const MUSIC = {
   chords: [[146.8, 185, 220, 293.7], [123.5, 146.8, 185, 246.9], [98, 146.8, 196, 246.9], [110, 138.6, 164.8, 220]],
 
   start() {
-    if (this.timer || !settings.music || !AU.ready()) return;
+    if (this.timer || !settings.music || !AU.ready() || game.state !== 'menu') return;   // menus only
     if (!this.bus) {
       this.bus = AU.ctx.createBiquadFilter();
       this.bus.type = 'lowpass'; this.bus.frequency.value = 1400;

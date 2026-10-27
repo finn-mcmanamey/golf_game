@@ -96,7 +96,7 @@ function raceHistoryGhost(code) {
 // Lifetime totals from the history (the last 50 races).
 function totalsLine(h) {
   const km = h.reduce((n, r) => n + r.distance, 0) / 1000, wins = h.filter(r => r.place === 1).length;
-  const streak = STORE.get('dailyStreak', { n: 0 }).n;
+  const s = STORE.get('dailyStreak', { n: 0, day: 0 }), streak = s.day >= localDay() - 1 ? s.n : 0;   // a lapsed streak shows nothing
   return `<p class="totals"><b>${h.length}</b> races · <b>${wins}</b> wins · <b>${km.toFixed(1)}</b> km rowed${streak ? ` · daily streak <b>${streak}</b>` : ''}</p>`;
 }
 

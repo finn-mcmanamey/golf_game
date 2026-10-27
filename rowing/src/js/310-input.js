@@ -58,6 +58,7 @@ addEventListener('blur', () => { keys.clear(); Object.keys(touchState).forEach(k
 
 function onKey(code) {
   if (code === 'Space' && game.state === 'race' && coxing()) return callPowerTen();
+  if (code === 'Escape' && photo.on) return togglePhoto();
   if ((code === 'Escape' || code === 'KeyP') && (game.state === 'race' || game.state === 'paused')) return togglePause();
   if (game.state !== 'race') return;
   const duel = !!race.player2;
