@@ -67,6 +67,7 @@ for (const kind of Object.keys(GOLDEN)) {
   assert.equal(JSON.stringify(r.boats.map(b => b.finishTime)), JSON.stringify(GOLDEN[kind]), `golden ${kind} times unchanged`);
 }
 console.log('golden times unchanged');
+for (const difficulty of ['novice', 'elite']) assert.equal(decodeRace(encodeRace({ ...opts, difficulty }, [1, 2])).opts.difficulty, difficulty, `${difficulty} survives a race code`);
 
 // Indoor erg races: still air, no steering, and codes that re-row exactly.
 const erg = { ...opts, kind: 'erg', distance: 500 };

@@ -22,7 +22,7 @@ function buildMenu() {
   segmented('segKind', [['regatta', 'Regatta'], ['head', 'Head race'], ['erg', 'Indoor erg']], settings.kind, v => { settings.kind = v; menuChanged() });
   segmented('segDist', DISTANCES.map(d => [d, d + ' m']), settings.distance, v => { settings.distance = v; menuChanged() });
   segmented('segCls', Object.entries(BOAT_CLASSES).map(([k, c]) => [k, k]), settings.cls, v => { settings.cls = v; menuChanged() });
-  segmented('segDiff', Object.entries(DIFFICULTY).map(([k, d]) => [k, d.label]), settings.difficulty, v => { settings.difficulty = v; menuChanged() });
+  segmented('segDiff', FIELD_ORDER.map(k => [k, DIFFICULTY[k].label]), settings.difficulty, v => { settings.difficulty = v; menuChanged() });
   segmented('segQuality', QUALITY_LABELS.map((l, i) => [i, l]), settings.quality, v => { settings.quality = v; R.quality = v; saveSettings() });
   segmented('segAssist', [[true, 'Assisted'], [false, 'Manual']], settings.assist, v => { settings.assist = v; saveSettings() });
   segmented('segCue', [[true, 'On'], [false, 'Off']], settings.cue, v => { settings.cue = v; saveSettings() });

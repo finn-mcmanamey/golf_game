@@ -4,7 +4,7 @@
 const CUP_ROUNDS = [
   { name: 'Quarter-final', difficulty: 'club' },
   { name: 'Semi-final', difficulty: 'national' },
-  { name: 'Final', difficulty: 'olympic' },
+  { name: 'Final', difficulty: 'elite' },
 ];
 let cup = STORE.get('cup', null);
 

@@ -5,7 +5,11 @@ const DIFFICULTY = {
   club:     { label: 'Club',     sd: 0.10, cruise: 28, start: 38, sprint: 34, push: 0.4, slack: 0.05, crewSd: 0.05 },
   national: { label: 'National', sd: 0.065, cruise: 31, start: 41, sprint: 37, push: 0.6, slack: 0.03, crewSd: 0.035 },
   olympic:  { label: 'Olympic',  sd: 0.04, cruise: 33, start: 43, sprint: 40, push: 0.85, slack: 0.015, crewSd: 0.022 },
+  // Added later, so they come after the first three: race codes store a field by its position in this list.
+  novice:   { label: 'Novice',   sd: 0.14, cruise: 25, start: 32, sprint: 29, push: 0.2, slack: 0.08, crewSd: 0.07 },
+  elite:    { label: 'Elite',    sd: 0.052, cruise: 32, start: 42, sprint: 38, push: 0.7, slack: 0.022, crewSd: 0.028 },
 };
+const FIELD_ORDER = ['novice', 'club', 'national', 'elite', 'olympic'];   // easiest to hardest, for menus
 
 // Race plans give each crew a personality: flyers go out hard, sprinters save it for the end.
 const PLANS = [
