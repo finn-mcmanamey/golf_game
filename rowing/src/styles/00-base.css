@@ -107,3 +107,13 @@ input[type=number] { width: 110px; font: inherit; text-align: center; padding: 6
 #call.pop { animation: callpop 3.2s ease-out }
 @keyframes callpop { 0% { opacity: 0; transform: translateY(8px) } 6% { opacity: 1; transform: none } 85% { opacity: 1 } 100% { opacity: 0 } }
 .touchy #call { bottom: 230px }
+#replayTag { position: absolute; top: 70px; left: 14px; color: #ff5a4a; font-weight: 900; letter-spacing: 2px; animation: blink 1s steps(2) infinite }
+@keyframes blink { 50% { opacity: .3 } }
+.chart { width: 100%; height: auto; margin: 4px 0 0 }
+.chart polyline { fill: none; stroke-width: 2.5 } .chart polyline.me { stroke: var(--acc) } .chart polyline.w { stroke: #fff; opacity: .6 }
+.chart circle.me { fill: var(--acc) } .chart circle.w { fill: #fff; opacity: .6 }
+.chart text { fill: var(--dim); font-size: 10px; text-anchor: middle } .chart text.ax { text-anchor: start }
+.legend { display: flex; gap: 14px; justify-content: center; font-size: 12px; color: var(--dim); margin-bottom: 6px }
+.legend .me { color: var(--acc); font-weight: 700 } .legend .w { color: #fff }
+details#more { margin: 6px 0 } details#more summary { cursor: pointer; color: var(--dim); font-size: 13px; list-style: none }
+details#more summary::before { content: '⚙ ' } details#more[open] summary { color: var(--ink) }

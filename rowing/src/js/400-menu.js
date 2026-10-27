@@ -80,6 +80,7 @@ function showResults(race) {
   const pb = getPB(opts.distance, opts.cls);
   let pbNote = '';
   if (tuneEdited()) pbNote = ' · tuned physics, not recorded';
+  else if (game.mode === 'replay') pbNote = ' · replay';
   else if (!pb || p.finishTime < pb.time) {
     savePB(opts.distance, opts.cls, { time: p.finishTime, code, venue: race.course.name, date: Date.now() });
     pbNote = pb ? ` · new personal best (was ${fmtTime(pb.time)})` : ' · first personal best';
@@ -93,6 +94,7 @@ function showResults(race) {
     <td class="t">${b.finishTime != null ? fmtTime(b.finishTime) : '–'}</td><td class="t">${i && b.finishTime != null ? '+' + (b.finishTime - win).toFixed(2) : ''}</td></tr>`).join('')
     + (race.ghost?.finishTime ? `<tr><td></td><td></td><td>Ghost</td><td class="t">${fmtTime(race.ghost.finishTime)}</td><td class="t">${(race.ghost.finishTime - p.finishTime >= 0 ? '+' : '') + (race.ghost.finishTime - p.finishTime).toFixed(2)}</td></tr>` : '');
   const s = p.stats, strokes = Math.max(1, s.perfect + s.good + s.off);
+  $('resChart').innerHTML = splitChart(race, order[0]);
   $('resStats').textContent = `${p.strokes} strokes · average rate ${(p.strokes / p.finishTime * 60).toFixed(1)} · ${Math.round(s.perfect / strokes * 100)}% perfect catches`
     + (s.crabs ? ` · ${s.crabs} crab${s.crabs > 1 ? 's' : ''}` : '') + (s.buoys ? ` · hit the buoys ${s.buoys}×` : '');
   $('results').classList.remove('hide');

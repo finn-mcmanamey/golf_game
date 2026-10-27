@@ -98,3 +98,36 @@ function updateCourseStrip(race) {
     d.className = b === race.player ? 'me' : '';
   });
 }
+
+/* ----- splits: the time each boat passes every marker, for the results chart ----- */
+const splits = { every: 100, times: new Map() };
+
+function resetSplits() { splits.times.clear() }
+
+function recordSplits(race) {
+  const D = race.course.distance;
+  splits.every = D <= 500 ? 50 * Math.max(1, D / 250) : 250;
+  for (const b of race.boats) {
+    let list = splits.times.get(b);
+    if (!list) splits.times.set(b, list = []);
+    const next = (list.length + 1) * splits.every;
+    if (next <= D && b.x >= next) list.push(race.t);
+  }
+}
+
+// Pace per segment (time per 500 m) for you and the winner, drawn as two lines.
+function splitChart(race, winner) {
+  const me = race.player, seg = splits.every, n = Math.round(race.course.distance / seg);
+  const pace = b => (splits.times.get(b) || []).map((t, i, a) => (t - (i ? a[i - 1] : 0)) * 500 / seg);
+  const mine = pace(me), theirs = winner === me ? [] : pace(winner);
+  const all = [...mine, ...theirs].filter(v => v < 600);
+  if (all.length < 2) return '';
+  const lo = Math.min(...all) - 2, hi = Math.max(...all) + 2, W = 520, H = 120, pad = 30;
+  const X = i => pad + i * (W - pad * 2) / Math.max(1, n - 1), Y = v => 10 + (v - lo) / (hi - lo) * (H - 30);
+  const line = (vals, cls) => `<polyline class="${cls}" points="${vals.map((v, i) => X(i) + ',' + Y(v)).join(' ')}"/>`
+    + vals.map((v, i) => `<circle class="${cls}" cx="${X(i)}" cy="${Y(v)}" r="3"/>`).join('');
+  const labels = Array.from({ length: n }, (_, i) => `<text x="${X(i)}" y="${H - 4}">${(i + 1) * seg}</text>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" class="chart"><text x="2" y="${Y(lo + 2) + 4}" class="ax">${fmtSplit(lo + 2)}</text>
+    <text x="2" y="${Y(hi - 2) + 4}" class="ax">${fmtSplit(hi - 2)}</text>${labels}${theirs.length ? line(theirs, 'w') : ''}${line(mine, 'me')}</svg>
+    <div class="legend"><span class="me">You</span>${theirs.length ? `<span class="w">${winner.crewName}</span>` : ''}<span>pace per 500 m at each marker · higher is faster</span></div>`;
+}

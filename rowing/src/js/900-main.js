@@ -22,7 +22,10 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   game.fastForward = false;
   game.finishShown = false;
   game.cue = null;
+  game.replay = null;
   resetCalls();
+  resetSplits();
+  $('replayTag').classList.toggle('hide', mode !== 'replay');
   cam.mode = settings.camera;
   $('btnCam').textContent = CAMERA_LABEL[cam.mode];
   game.state = 'race';
@@ -30,7 +33,7 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   $('hud').classList.remove('hide');
 }
 
-const restartRace = () => startRace(game.opts, game.ghostInputs, game.mode);
+const restartRace = () => game.mode === 'replay' ? watchReplay() : startRace(game.opts, game.ghostInputs, game.mode);
 
 function toMenu() {
   game.state = 'menu';
@@ -114,26 +117,19 @@ function frame(now) {
   game.time += dt;
 
   if (game.state === 'race' && race) {
-    game.acc += dt * (game.fastForward ? 8 : 1);
-    let steps = 0;
-    while (game.acc >= TUNE.dt && steps++ < 400) {
-      game.acc -= TUNE.dt;
-      rememberPoses([...race.boats, race.ghost]);
-      stepRace(race, readInput());
-      handleEvents();
-      if (race.falseStart) {
-        toast('False start! Wait for the horn.', 2200);
-        restartRace();
-        break;
-      }
-      if (race.done) break;
-    }
+    const slow = game.replay && photoFinishSlowdown(race);
+    simulate(dt * (game.fastForward ? 8 : slow || 1), () => game.replay ? (game.replay[race.tick] ?? packInput(0, 18)) : readInput());
     frameBlend.alpha = clamp(game.acc / TUNE.dt, 0, 1);
     startSequence();
     const p = race.player, d = race.course.distance;
     AU.ambient(p.v, smooth(d - 400, d, p.x) * (p.finishTime != null ? 0.6 : 1));
-    if (race.done) { game.state = 'results'; showResults(race) }
-    if (game.state === 'race') { updateHud(race); updateCalls(race) }
+    if (race.done) { game.state = 'results'; game.replay ? showReplayEnd() : showResults(race) }
+    if (game.state === 'race') { updateHud(race); if (!game.replay) updateCalls(race) }
+  } else if ((game.state === 'menu' || game.state === 'results') && race) {
+    // Behind the menu a demo race rows itself; after a race the field rows on past the line.
+    simulate(dt, () => packInput(race.started ? autoRow(race.player) : 0, 35), true);
+    frameBlend.alpha = clamp(game.acc / TUNE.dt, 0, 1);
+    if (game.state === 'menu' && race.done) showPreview(currentOpts());
   }
 
   if (gl && race) {
@@ -145,8 +141,55 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+// Steps the race at 60 Hz for the time that has passed. `quiet` skips sound and on-screen feedback.
+function simulate(dt, inputFor, quiet = false) {
+  game.acc += dt;
+  let steps = 0;
+  while (game.acc >= TUNE.dt && steps++ < 400) {
+    game.acc -= TUNE.dt;
+    rememberPoses([...race.boats, race.ghost]);
+    stepRace(race, inputFor());
+    recordSplits(race);
+    if (quiet) { for (const b of race.boats) b.events.length = 0; if (race.ghost) race.ghost.events.length = 0 }
+    else handleEvents();
+    if (race.falseStart && !quiet) {
+      toast('False start! Wait for the horn.', 2200);
+      restartRace();
+      break;
+    }
+    if (race.done && !quiet) break;
+  }
+}
+
+// In a replay, the last metres of a close finish play in slow motion.
+function photoFinishSlowdown(race) {
+  const p = race.player, left = race.course.distance - p.x;
+  if (left > 25 || left < -3) return 0;
+  const close = race.boats.some(b => b !== p && Math.abs(b.x - p.x) < Math.max(1.5, p.v * 0.6));
+  return close ? 0.25 : 0;
+}
+
+function watchReplay() {
+  const { opts, inputs } = decodeRace(game.lastCode);
+  startRace(opts, null, 'replay');
+  game.replay = inputs;
+  cam.mode = 'tv';
+  toast('Replay', 1200);
+}
+
+function showReplayEnd() {
+  game.replay = null;
+  $('hud').classList.add('hide');
+  $('results').classList.remove('hide');
+}
+
 // On the menu the camera drifts slowly along the start, showing off the venue.
 function menuCamera(dt) {
+  if (race.started) {
+    const lead = race.boats.reduce((a, b) => b.x > a.x ? b : a);
+    updateCamera(lead, race.t, dt);
+    return;
+  }
   const t = game.time * 0.05;
   const eye = [-60 + Math.sin(t) * 40, 12 + Math.sin(t * 0.7) * 3, 70], at = [20 + Math.sin(t) * 30, 0, -10];
   const k = 1 - Math.exp(-dt * 2);
@@ -154,7 +197,8 @@ function menuCamera(dt) {
   cam.fov = 0.85;
 }
 
-$('btnAgain').onclick = () => restartRace();
+$('btnAgain').onclick = () => { game.mode = game.mode === 'replay' ? 'race' : game.mode; restartRace() };
+$('btnReplay').onclick = watchReplay;
 $('btnMenu').onclick = toMenu;
 $('btnShare').onclick = shareRace;
 $('btnResume').onclick = togglePause;
