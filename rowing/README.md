@@ -34,7 +34,7 @@ Gamepads work too: A drives, the stick or d-pad steers, bumpers set the rate, RT
 The **rate plan** (menu) sets your stroke rate down the course for you: Classic (fast start, settle, sprint), Even,
 or Manual. Pressing W/S takes over. Five fields, from Novice to Olympic; `test/balance.mjs` checks the steps between them.
 
-Modes: single races, **head races** on a winding river, **bumps** (single file: catch the crew ahead, bank-party whistles and all), **indoor erg** races, the **Voxel Cup** knockout, a **season** of heats and finals, the **daily regatta**,
+Modes: single races, **head races** on a winding river, **bumps** (single file: catch the crew ahead, bank-party whistles and all) and a four-day **bumps week**, **indoor erg** races, the **Voxel Cup** knockout, a **season** of heats and finals, the **daily regatta**,
 **learn to row**, a two-player **duel**, **cox mode** for crew boats (the crew rows; you steer, set the rate and call
 three power tens), ghosts of your best race (or any race in your history),
 shareable race links, and a Boathouse with a 3D showroom of your boat, colours, badges and history.
