@@ -40,9 +40,11 @@ function encodeRace(opts, inputs) {
     let j = i; while (j < inputs.length && inputs[j] === inputs[i]) j++;
     runs.push(inputs[i], j - i); i = j;
   }
-  // Version 2 adds the kind of race; regatta races keep writing version 1 so older builds can read them.
-  const kind = KIND_KEYS.indexOf(opts.kind || 'regatta');
-  const head = kind ? [2, opts.seed, opts.distance, CLASS_KEYS.indexOf(opts.cls), DIFF_KEYS.indexOf(opts.difficulty), opts.lane, kind]
+  // Version 2 adds the kind of race; version 3 adds the rules version. Older races keep writing the version
+  // they always wrote, so their codes never change.
+  const kind = KIND_KEYS.indexOf(opts.kind || 'regatta'), rules = opts.rules || 1;
+  const head = rules > 1 ? [3, opts.seed, opts.distance, CLASS_KEYS.indexOf(opts.cls), DIFF_KEYS.indexOf(opts.difficulty), opts.lane, kind, rules]
+    : kind ? [2, opts.seed, opts.distance, CLASS_KEYS.indexOf(opts.cls), DIFF_KEYS.indexOf(opts.difficulty), opts.lane, kind]
     : [1, opts.seed, opts.distance, CLASS_KEYS.indexOf(opts.cls), DIFF_KEYS.indexOf(opts.difficulty), opts.lane];
   return 'VR' + packVarints(head.concat(runs));
 }
@@ -51,10 +53,11 @@ function decodeRace(code) {
   code = String(code).trim().replace(/^.*[#?]r=/, '');
   if (!code.startsWith('VR')) throw new Error('not a regatta code');
   const n = unpackVarints(code.slice(2));
-  if (n[0] !== 1 && n[0] !== 2) throw new Error('code from a newer version');
-  const opts = { seed: n[1], distance: n[2], cls: CLASS_KEYS[n[3]], difficulty: DIFF_KEYS[n[4]], lane: n[5], kind: n[0] === 2 ? KIND_KEYS[n[6]] : 'regatta' };
-  if (!opts.cls || !opts.difficulty || !opts.kind) throw new Error('bad code');
+  if (n[0] < 1 || n[0] > 3) throw new Error('code from a newer version');
+  const opts = { seed: n[1], distance: n[2], cls: CLASS_KEYS[n[3]], difficulty: DIFF_KEYS[n[4]], lane: n[5],
+    kind: n[0] >= 2 ? KIND_KEYS[n[6]] : 'regatta', rules: n[0] === 3 ? n[7] : 1 };
+  if (!opts.cls || !opts.difficulty || !opts.kind || opts.rules > RULES_LATEST) throw new Error('bad code');
   const inputs = [];
-  for (let i = n[0] === 2 ? 7 : 6; i + 1 < n.length; i += 2) for (let k = 0; k < n[i + 1]; k++) inputs.push(n[i]);
+  for (let i = [0, 6, 7, 8][n[0]]; i + 1 < n.length; i += 2) for (let k = 0; k < n[i + 1]; k++) inputs.push(n[i]);
   return { opts, inputs };
 }

@@ -2,7 +2,7 @@
 
 const GRADE_TEXT = {
   perfect: ['PERFECT', 'var(--good)'], good: ['GOOD', '#a3e635'], early: ['EARLY', 'var(--warn)'], late: ['LATE', 'var(--warn)'],
-  short: ['SHORT STROKE', 'var(--warn)'], crab: ['CAUGHT A CRAB!', 'var(--bad)'], buoy: ['ON THE BUOYS', 'var(--bad)'], bank: ['INTO THE BANK!', 'var(--bad)'],
+  short: ['SHORT STROKE', 'var(--warn)'], crab: ['CAUGHT A CRAB!', 'var(--bad)'], buoy: ['ON THE BUOYS', 'var(--bad)'], bank: ['INTO THE BANK!', 'var(--bad)'], wash: ['IN THEIR WASH: MOVE OVER', 'var(--warn)'],
 };
 
 let toastTimer = 0;
@@ -60,6 +60,8 @@ function updateHud(race) {
   $('catchZone').classList.toggle('ready', race.started && toFront < 0.25);
 
   catchCue(p);
+  if (p.inWash > 0.3 && !hudWash) showGrade('wash');
+  hudWash = p.inWash > 0.3;
   updateStandings(race);
   updateCourseStrip(race);
   updateWind(race.course.wind);
@@ -139,7 +141,7 @@ function splitChart(race, winner) {
 }
 
 // A soft tick the moment the slide reaches the front: rowing by ear, the way a cox box beeps the rhythm.
-let cuePhase = '';
+let cuePhase = '', hudWash = false;
 function catchCue(p) {
   if (settings.cue && cuePhase === 'recover' && p.phase === 'front') AU.play('cue');
   cuePhase = p.phase;

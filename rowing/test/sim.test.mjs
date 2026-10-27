@@ -67,6 +67,12 @@ for (const kind of Object.keys(GOLDEN)) {
   assert.equal(JSON.stringify(r.boats.map(b => b.finishTime)), JSON.stringify(GOLDEN[kind]), `golden ${kind} times unchanged`);
 }
 console.log('golden times unchanged');
+// Rules 2 (wash): codes record the rules and re-row exactly; rules 1 races are untouched (golden times above).
+const r2 = { ...opts, rules: 2 }, w = row(r2, 32), wcode = encodeRace(r2, w.inputs), wd = decodeRace(wcode);
+assert.equal(wd.opts.rules, 2, 'rules survive a race code');
+assert.equal(simulateRace(wd.opts, wd.inputs).player.finishTime, w.player.finishTime, 'rules-2 codes re-row exactly');
+assert.equal(decodeRace(code).opts.rules, 1, 'old codes are rules 1');
+console.log(`rules 2: 500m ${fmtTime(w.player.finishTime)} (rules 1: ${fmtTime(a.player.finishTime)})`);
 for (const difficulty of ['novice', 'elite']) assert.equal(decodeRace(encodeRace({ ...opts, difficulty }, [1, 2])).opts.difficulty, difficulty, `${difficulty} survives a race code`);
 
 // Indoor erg races: still air, no steering, and codes that re-row exactly.

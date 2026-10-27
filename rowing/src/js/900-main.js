@@ -10,6 +10,7 @@ function showPreview(opts) {
 
 function startRace(opts, ghostInputs = null, mode = 'race') {
   AU.init();
+  opts = { rules: RULES_LATEST, ...opts };   // new races use the latest rules; codes and ghosts bring their own
   game.mode = mode;
   game.opts = opts;
   game.ghostInputs = ghostInputs;

@@ -21,8 +21,9 @@ one feature per branch. This file adds what is specific to the rowing game. See 
   No `Math.random`, no trigonometry, no `Math.pow`. Precompute constants instead (see `dragK`).
 - New random draws get their own stream (`makeRng(hashSeed(seed, NEW_TAG))`) so existing values don't shift.
 - Drawing may read race state, never write it. Per-boat drawing memory lives in `visualState`.
-- The golden times in `test/sim.test.mjs` must not change. New physics goes behind a new race `kind` or a new
-  code version in `060-codec.js`.
+- The golden times in `test/sim.test.mjs` must not change. New physics goes behind a new **rules version**
+  (`RULES_LATEST` in `050-race.js`): check `race.opts.rules` before applying it. New races get the latest rules;
+  codes and ghosts carry the rules they were rowed under (code version 3 stores it). A new race `kind` works too.
 
 ## Writing new code
 

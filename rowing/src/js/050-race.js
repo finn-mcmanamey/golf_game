@@ -34,6 +34,22 @@ function makeRace(opts) {
   };
 }
 
+// Rules versions: each one changes the physics, so a race keeps the rules it was rowed under forever.
+//  1: the original physics.  2: wash from crews in the next lane.
+const RULES_LATEST = 2;
+
+// Wash: a faster crew just ahead in the next lane leaves rough water. Only felt when both boats drift towards
+// each other, so it rewards holding the middle of your lane. Computed for every boat before any moves.
+function washFor(race, b) {
+  let wash = 0;
+  for (const o of race.boats) {
+    if (o === b || Math.abs(o.lane - b.lane) !== 1 || o.v <= b.v) continue;
+    const behind = o.x - BOAT_CLASSES[o.cls].length - b.x, side = Math.abs(o.z - b.z);
+    if (behind > -2 && behind < 25 && side < 9.5) wash = Math.max(wash, clamp((9.5 - side) / 2.5, 0, 1) * (1 - behind / 25));
+  }
+  return wash;
+}
+
 function stepRace(race, playerInput, player2Input = 0) {
   const dt = TUNE.dt;
   race.t += dt;
@@ -47,8 +63,10 @@ function stepRace(race, playerInput, player2Input = 0) {
     player2Input &= ~(IN.DRIVE | IN.PUSH);
   }
   race.inputs.push(playerInput);
+  const wash = (race.opts.rules || 1) >= 2 && race.course.kind === 'regatta' ? race.boats.map(b => washFor(race, b)) : null;
   for (let i = 0; i < race.boats.length; i++) {
     const b = race.boats[i];
+    if (wash && wash[i] > 0) { b.v *= 1 - TUNE.washDrag * wash[i] * TUNE.dt; b.inWash = wash[i] } else b.inWash = 0;
     if (b.finishTime != null && b.x > race.course.distance + 40) { b.v *= 0.99; b.x += b.v * dt; continue }
     const input = b === race.player ? playerInput : b === race.player2 ? player2Input : botInput(race.brains[b.lane], b, race);
     stepBoat(b, b.finishTime != null ? packInput(0, 18) : input, race.course, race);
