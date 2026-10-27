@@ -13,12 +13,10 @@ function setScene(course, cls) {
   const { mb, L } = buildScene(course, cls);
   R.sceneRanges = mb.upload(R.sceneBuf, gl.STATIC_DRAW);
   R.L = L;
-  R.fogK = course.kind === 'erg' ? 0.002 : 0.0019 + (course.timeOfDay < 0.15 ? 0.0025 : 0) + (course.rain ? 0.003 : 0);
-  if (course.rain) {
-    // Rain: a grey, flatter sky and light.
-    const grey = (c, k) => c.map(v => lerp(v, 0.55, k));
-    Object.assign(L, { sky: grey(L.sky, 0.6), horizon: grey(L.horizon, 0.5), sunCol: grey(L.sunCol, 0.55), cloud: 0.95 });
-  }
+  R.fogBase = course.kind === 'erg' ? 0.002 : 0.0019 + (course.timeOfDay < 0.15 ? 0.0025 : 0);
+  R.Ldry = { ...L };
+  R.wet = -1;
+  setWetness(course.rain && course.kind !== 'erg' && course.kind !== 'showroom' ? 1 : 0);
   // Water: one big quad under everything; the banks cover its edges.
   const x0 = -2000, x1 = course.distance + 2000, z = 2000;
   gl.bindBuffer(gl.ARRAY_BUFFER, R.waterBuf);
@@ -26,6 +24,24 @@ function setScene(course, cls) {
   gl.bindBuffer(gl.ARRAY_BUFFER, R.skyBuf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   puddles.length = 0;
+}
+
+// How rainy it looks, 0 to 1: a grey, flatter sky and light, thicker haze. Blended so a shower can roll in.
+function setWetness(k) {
+  if (Math.abs(k - R.wet) < 0.01) return;
+  R.wet = k;
+  const D = R.Ldry, grey = (c, f) => c.map(v => lerp(v, 0.55, f * k));
+  R.L = { ...D, sky: grey(D.sky, 0.6), horizon: grey(D.horizon, 0.5), sunCol: grey(D.sunCol, 0.55), cloud: lerp(D.cloud, 0.95, k) };
+  R.fogK = R.fogBase + 0.003 * k;
+}
+
+// Wetness for this moment of the race: steady rain, or a shower following the leading crew down the course.
+function wetnessNow(race) {
+  const c = race.course;
+  if (c.rain) return 1;
+  if (!c.shower || c.kind !== 'regatta' && c.kind !== 'head') return 0;
+  const f = Math.max(...race.boats.map(b => b.x)) / c.distance;
+  return smooth(c.shower.from - 0.05, c.shower.from + 0.05, f) * (1 - smooth(c.shower.to - 0.05, c.shower.to + 0.05, f));
 }
 
 function resize() {
@@ -46,6 +62,7 @@ function setLightUniforms(u, L) {
 
 function renderFrame(race, time, dtFrame) {
   resize();
+  if (race.course.kind !== 'showroom') { const w = wetnessNow(race); setWetness(w); race.wet = w }
   const L = R.L, aspect = canvas.width / canvas.height;
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.clearColor(...L.horizon, 1);

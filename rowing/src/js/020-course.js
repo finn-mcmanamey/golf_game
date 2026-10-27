@@ -37,6 +37,7 @@ function makeCourse(seed, distance, kind = 'regatta') {
     sceneSeed: hashSeed(seed, 0x5CE),
     rain: makeRng(hashSeed(seed, 0x2A1))() < 0.18,   // drawing only; its own stream so older values are unchanged
     night: makeRng(hashSeed(seed, 0x416))() < 0.12,  // drawing only: an evening regatta under lights
+    shower: showerFor(seed),                          // drawing only: rain that sweeps in partway down the course
     theme: ['parkland', 'parkland', 'alpine', 'city', 'coast'][(makeRng(hashSeed(seed, 0x7E3))() * 5) | 0],   // drawing only
     kind, ...(kind === 'head' ? riverFor(seed, distance) : {}),
     // Indoors on rowing machines: still air, no stream (the draws above still happen, so seeds line up).
@@ -84,6 +85,14 @@ const targetZ = (course, b, ahead = 0) => course.bends ? riverZ(course, b.x + ah
 // How far a boat is off its line, looking a little ahead: positive means steer left.
 function steerError(course, b) {
   return course.bends ? (b.z - targetZ(course, b, 12)) + (b.yaw - riverSlope(course, b.x + 10)) * 10 : (b.z - laneZ(b.lane)) + b.yaw * 10;
+}
+
+// A passing shower on some dry courses: where along the course it starts and where (if anywhere) it clears.
+function showerFor(seed) {
+  const rng = makeRng(hashSeed(seed, 0x5E0));
+  if (rng() > 0.15) return null;
+  const from = 0.25 + rng() * 0.35;
+  return { from, to: rng() < 0.5 ? from + 0.25 + rng() * 0.2 : 2 };
 }
 
 function windLabel(w) {

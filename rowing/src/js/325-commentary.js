@@ -58,5 +58,6 @@ function updateCommentary(race) {
   comm.leader = lead;
   const gap = (lead.x - second.x) / Math.max(1, lead.v);
   if (D - lead.x < 150 && gap < 0.4 && !comm.said.has('close')) { comm.said.add('close'); comment(`It's neck and neck between ${displayName(lead)} and ${displayName(second)}!`, true) }
+  if (R.wet > 0.5 && !race.course.rain && !comm.said.has('shower')) { comm.said.add('shower'); comment('And here comes the rain! A squall sweeping down the course.') }
   if (lead.x > D / 2 && !comm.said.has('half')) { comm.said.add('half'); comment(`Halfway: ${who(lead)} lead by ${gap.toFixed(1)} seconds.`) }
 }

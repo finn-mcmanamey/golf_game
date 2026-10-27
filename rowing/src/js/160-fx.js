@@ -29,7 +29,7 @@ function drawFx(mb, dt, time, course) {
   if (course.kind === 'regatta' || course.kind === 'head' || course.kind === 'knockout') drawSwans(mb, dt, time, course);
   drawCrowd(mb, time, course);
   drawBirds(mb, time, course);
-  if (course.rain && R.quality > 0) drawRain(mb, time);
+  if (R.wet > 0.05 && R.quality > 0) drawRain(mb, time, R.wet);
 }
 
 // A small flock wheeling over the course: each bird two flapping wings and a body.
@@ -46,9 +46,9 @@ function drawBirds(mb, time, course) {
 }
 
 // Rain: thin falling streaks in a box around the camera.
-function drawRain(mb, time) {
+function drawRain(mb, time, amount = 1) {
   const col = [1.5, 1.55, 1.65];
-  for (let i = 0; i < 300; i++) {
+  for (let i = 0; i < 300 * amount; i++) {
     const rx = ((i * 7.31) % 1), rz = ((i * 3.77) % 1), fall = ((time * 1.4 + i * 0.137) % 1);
     const x = cam.eye[0] + (rx - 0.5) * 50 + (cam.at[0] - cam.eye[0]) * 0.4;
     const z = cam.eye[2] + (rz - 0.5) * 50 + (cam.at[2] - cam.eye[2]) * 0.4;
