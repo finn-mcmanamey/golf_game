@@ -206,3 +206,10 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 .board { grid-column: 1 / -1; font-size: 12.5px; text-align: left; background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px }
 .board:empty { display: none } .board b { display: block; margin-bottom: 4px; color: var(--acc) }
 .board div { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; padding: 1px 0 } .board div.me { color: var(--acc); font-weight: 700 } .board .t { font-variant-numeric: tabular-nums }
+/* The stroke cycle, animated: 1 s drive to the right, 1.4 s recovery back to the catch. */
+.stroke-demo { width: 100%; max-width: 420px; margin: 8px auto 0; display: block }
+.stroke-demo .track { fill: rgba(255,255,255,.1) } .stroke-demo .zone.catch { fill: rgba(74,222,128,.6) } .stroke-demo .zone.finish { fill: rgba(255,210,58,.5) }
+.stroke-demo .handle { fill: #fff; animation: stroke 2.4s ease-in-out infinite }
+.stroke-demo text { fill: var(--dim); font-size: 11px } .stroke-demo .mid { text-anchor: middle } .stroke-demo .end { text-anchor: end } .stroke-demo .dim { opacity: .7 }
+@keyframes stroke { 0% { transform: translateX(0); fill: #4ade80 } 6% { fill: #ffd23a } 42% { transform: translateX(300px); fill: #ffd23a } 48% { fill: #fff } 100% { transform: translateX(0); fill: #fff } }
+.calm .stroke-demo .handle { animation-duration: 5s }
