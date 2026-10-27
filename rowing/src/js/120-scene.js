@@ -236,6 +236,25 @@ function riverFurniture(mb, course, cls, L, rng) {
     mb.box(x, 5.2, z, 7.5, 3, 0.4, hex(0x1f3d72));
     voxelText(mb, String(D - x), x, 4.25, z - side * 0.3, 0.35, white, -side);
   }
+  for (const f of [0.32, 0.68]) bridge(mb, D * f, course, rng);
   grandstand(mb, D, rng);
   boathouses(mb, rng);
+}
+
+// A stone footbridge across the river: arches over the water, railings, and a few people watching from it.
+function bridge(mb, x, course, rng) {
+  const z0 = riverZ(course, x), half = course.halfW + 8, stone = hex(0xa89f8c), dark = shade(stone, 0.75);
+  mb.box(x, 7.4, z0, 5, 0.8, half * 2, stone);                                    // deck
+  for (const s of [-1, 1]) mb.box(x + s * 2.3, 8.3, z0, 0.3, 1, half * 2, dark);  // railings
+  // Arches: stepped blocks hanging under the deck, leaving the water clear below 4.5 m.
+  for (let z = -half; z <= half; z += 2) {
+    const t = Math.abs(z) / half, drop = 0.6 + t * t * 2.4;
+    mb.box(x, 7 - drop / 2, z0 + z, 4.8, drop, 2.05, stone);
+  }
+  for (const s of [-1, 1]) mb.box(x, 3.5, z0 + s * (course.halfW + 6), 5, 7, 4, dark);   // abutments on the banks
+  for (let i = 0; i < 8; i++) {
+    const z = z0 + (rng() * 2 - 1) * course.halfW * 0.9, side = rng() < 0.5 ? -1.6 : 1.6;
+    mb.box(x + side, 8.3, z, 0.5, 0.9, 0.4, hex([0xd8352a, 0x2a5db0, 0xf2c230, 0x3aa35a][i % 4]));
+    mb.box(x + side, 9, z, 0.32, 0.32, 0.32, hex(0xe0b590));
+  }
 }
