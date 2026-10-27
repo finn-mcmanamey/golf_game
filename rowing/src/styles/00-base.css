@@ -173,3 +173,16 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 #cupBox { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; margin: 8px 0 4px; padding: 10px 12px;
   border-radius: 12px; background: rgba(96, 165, 250, .08); border: 1px solid rgba(96, 165, 250, .3); font-size: 13px }
 #cupT { flex: 1 1 260px; text-align: left } #cupT b { color: #93c5fd }
+/* ----- front page: quick race on the left, the ways to play on the right ----- */
+.box.wide { width: min(940px, 100%) }
+.menuGrid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 14px; text-align: left; margin-top: 6px }
+.card { background: rgba(255, 255, 255, .04); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; min-width: 0 }
+.card h3 { margin: 0 0 4px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim) }
+.quick .row { justify-content: flex-start } .quick .row label { min-width: 64px }
+.modes { display: flex; flex-direction: column; gap: 10px; min-width: 0 }
+#careerBox, #cupBox { margin: 0 }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px }
+.tile { text-align: left; background: rgba(255, 255, 255, .06); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px }
+.tile:hover { background: rgba(255, 255, 255, .12) } .tile b { font-size: 14px } .tile span { font-size: 11.5px; color: var(--dim) }
+#howto, #more { margin: 8px 0 0 } #howto summary { cursor: pointer; color: var(--dim); font-size: 13px; list-style: none } #howto summary::before { content: '? ' }
+@media (max-width: 760px) { .menuGrid { grid-template-columns: 1fr } }

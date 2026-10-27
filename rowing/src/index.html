@@ -44,32 +44,43 @@
 </div>
 
 <div id="menu" class="ov">
-  <div class="box">
+  <div class="box wide">
     <h1>Voxel <span>Regatta</span></h1>
     <p class="sub">Six lanes. One rhythm. Time the catch, hold the drive, let the boat run.</p>
-    <div class="row"><label>Event</label><div class="seg" id="segKind"></div></div>
-    <div class="row"><label>Distance</label><div class="seg" id="segDist"></div></div>
-    <div class="row"><label>Boat</label><div class="seg" id="segCls"></div></div>
-    <div class="row"><label>Field</label><div class="seg" id="segDiff"></div></div>
-    <div class="row"><label>Course #</label><input id="seedIn" type="number" min="1" max="999999"><button id="btnRnd" class="sec">Random</button></div>
-    <div id="venue" class="sub small"></div>
+    <div class="menuGrid">
+      <section class="card quick">
+        <h3>Quick race</h3>
+        <div class="row"><label>Event</label><div class="seg" id="segKind"></div></div>
+        <div class="row"><label>Distance</label><div class="seg" id="segDist"></div></div>
+        <div class="row"><label>Boat</label><div class="seg" id="segCls"></div></div>
+        <div class="row"><label>Field</label><div class="seg" id="segDiff"></div></div>
+        <div class="row"><label>Course #</label><input id="seedIn" type="number" min="1" max="999999"><button id="btnRnd" class="sec">Random</button></div>
+        <div id="venue" class="sub small"></div>
+        <div class="row"><button id="btnRace" class="big">Race</button><button id="btnGhost" class="sec hide">Race your best</button></div>
+        <div id="pbLine" class="sub small"></div>
+        <div id="friend" class="row hide"><span id="friendT"></span><button id="btnFriend" class="sec">Race their ghost</button></div>
+      </section>
+      <section class="modes">
+        <div id="careerBox" class="card"><div id="careerT"></div><div id="medals"></div><button id="btnCareer" class="sec"></button></div>
+        <div id="cupBox" class="card"><div id="cupT"></div><button id="btnCup" class="sec"></button></div>
+        <div class="tiles">
+          <button id="btnDaily" class="tile"><b>Daily regatta</b><span>Same race for everyone today</span></button>
+          <button id="btnLearn" class="tile"><b>Learn to row</b><span>A coach, one skill at a time</span></button>
+          <button id="btnDuel" class="tile keysOnly" title="Two players on one keyboard"><b>Duel</b><span>Two players, one keyboard</span></button>
+          <button id="btnBoathouse" class="tile"><b>Boathouse</b><span>Colours, history, badges</span></button>
+        </div>
+      </section>
+    </div>
     <details id="more"><summary>Settings</summary>
-      <div class="row"><label>Steering</label><div class="seg" id="segAssist"></div></div>
-      <div class="row"><label>Graphics</label><div class="seg" id="segQuality"></div></div>
-      <div class="row"><label>Catch beep</label><div class="seg" id="segCue"></div></div>
-      <div class="row"><label>Motion</label><div class="seg" id="segCalm"></div></div>
-      <div class="row"><label>Text</label><div class="seg" id="segText"></div></div>
-      <div class="row"><label>Cox voice</label><div class="seg" id="segVoice"></div></div>
+      <div class="row"><label>Steering</label><div class="seg" id="segAssist"></div><label>Graphics</label><div class="seg" id="segQuality"></div></div>
+      <div class="row"><label>Catch beep</label><div class="seg" id="segCue"></div><label>Cox voice</label><div class="seg" id="segVoice"></div></div>
+      <div class="row"><label>Motion</label><div class="seg" id="segCalm"></div><label>Text</label><div class="seg" id="segText"></div></div>
     </details>
-
-    <div class="row"><button id="btnRace" class="big">Race</button><button id="btnGhost" class="sec hide">Race your best</button><button id="btnDaily" class="sec">Daily regatta</button><button id="btnLearn" class="sec">Learn to row</button><button id="btnBoathouse" class="sec">Boathouse</button><button id="btnDuel" class="sec keysOnly" title="Two players on one keyboard">Duel</button></div>
-    <div id="pbLine" class="sub small"></div>
-    <div id="cupBox" class="careerLike"><div id="cupT"></div><button id="btnCup" class="sec"></button></div>
-    <div id="careerBox"><div id="careerT"></div><div id="medals"></div><button id="btnCareer" class="sec"></button></div>
-    <div id="friend" class="row hide"><span id="friendT"></span><button id="btnFriend" class="sec">Race their ghost</button></div>
+    <details id="howto"><summary>How to row</summary>
     <div class="help keys"><kbd>Space</kbd> hold to drive, release to recover · catch again as the slide reaches the front<br>
       <kbd>W</kbd>/<kbd>S</kbd> stroke rate · <kbd>A</kbd>/<kbd>D</kbd> steer · <kbd>Shift</kbd> push · <kbd>C</kbd> camera · <kbd>G</kbd> graphics · <kbd>Esc</kbd> pause<br>Duel: player 2 drives with <kbd>Enter</kbd>, steers with the arrows, rate with ↑ ↓, pushes with right <kbd>Shift</kbd></div>
     <div class="help tap">Touch and hold anywhere on the water to drive, let go to recover. ◀ ▶ steer, − + set the stroke rate, PUSH for a power ten.</div>
+    </details>
     <button id="btnSound" class="ghost"></button>
   </div>
 </div>
