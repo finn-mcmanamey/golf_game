@@ -1,9 +1,9 @@
 /* ===== the Boat Race: two eights, side by side, all the way down a winding river =====
    A match race on the head-race river. You take the Surrey station; your rivals, the Dark Blues, take Middlesex. */
 
-function startBoatRace() {
+function startBoatRace(distance = 2000) {   // shorter only for tests
   const seed = 1 + Math.floor(Math.random() * 99999);   // a new stretch of river each year
-  startRace({ seed, distance: 2000, cls: '8+', difficulty: settings.difficulty, lane: 2, kind: 'boatrace' }, null, 'boatrace');
+  startRace({ seed, distance, cls: '8+', difficulty: settings.difficulty, lane: 2, kind: 'boatrace' }, null, 'boatrace');
   const rival = race.boats.find(b => b !== race.player);
   if (rival) Object.assign(rival, { crewName: 'Dark Blues', colours: { hull: 0xf4f1e8, shirt: 0x1b2f6b, blade: [0x1b2f6b, 0x1b2f6b] } });   // name and kit: drawing only
 }
