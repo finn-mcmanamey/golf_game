@@ -87,4 +87,9 @@ $('calGo').onclick = startCalibration;
 $('calClose').onclick = closeCalibration;
 $('btnCalCard').onclick = openCalibration;
 $('pCal').onclick = openCalibration;
-if (!STORE.get('calibrated', false)) $('calCard').classList.remove('hide');
+// Offered once the player has rowed: before that the catch beep means nothing, and Learn to Row comes first.
+function showCalCard() {
+  const rowed = STORE.get('history', []).length > 0 || STORE.get('learned', false);
+  $('calCard').classList.toggle('hide', STORE.get('calibrated', false) || !rowed);
+}
+showCalCard();

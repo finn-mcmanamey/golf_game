@@ -88,6 +88,7 @@ function menuChanged() {
   renderCup();
   renderWeek();
   renderBoatRace();
+  showCalCard();
   const streak = streakNow(), best = STORE.get('daily-' + dailyOpts().seed, null);
   const shields = streak.shields ? ` · ${'🛡'.repeat(streak.shields)}` : '';
   // Before today's row: the streak at stake is the reason to row; after it, today's best.

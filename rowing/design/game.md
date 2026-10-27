@@ -46,7 +46,7 @@ Loops:
 
 ## Session and psychology
 - **Motivation:** primary *mastery* (timing, rate strategy); secondary *social/status* (board, codes).
-- **First 60 s:** the calibration prompt (10 taps, about 8 s) then straight into Learn to Row. The first decision comes at the first stroke: rate up or settle.
+- **First 60 s:** "New here?" leads into Learn to Row. The first decision comes at the first stroke: rate up or settle. The timing card (10 taps, about 7 s) appears only after the first race or lesson, when the catch beep means something. Before that it competed with Learn to Row for a newcomer's first tap.
 - **Stopping points:** the end of a race, a bumps day, a season regatta.
 - **Reason to return:** tomorrow's daily, with the streak at stake, and the next bumps day.
 - **Mastery:**

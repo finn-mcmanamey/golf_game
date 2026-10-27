@@ -241,3 +241,4 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 #calMsg { min-height: 2.6em }
 #codeIn { flex: 1 1 180px; min-width: 0; font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.07); color: var(--ink) }
 .board div.gap { opacity: .5 }
+#calCard { margin: 4px 0 10px; text-align: left; font-size: 13.5px } #calCard b { color: #93c5fd }
