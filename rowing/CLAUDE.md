@@ -25,6 +25,15 @@ one feature per branch. This file adds what is specific to the rowing game. See 
   (`RULES_LATEST` in `050-race.js`): check `race.opts.rules` before applying it. New races get the latest rules;
   codes and ghosts carry the rules they were rowed under (code version 3 stores it). A new race `kind` works too.
   The daily regatta pins its rules in `dailyOpts()`, so a new rules version never splits today's leaderboard.
+  Rules so far: 1 original, 2–3 wash, 4 bumps pushes, 5 head-race stream lines, 6 Elite/Olympic crews read the river.
+  `test/sim.test.mjs` also fails on any engine-dependent `Math` call (sin, pow, exp…) or `**` in the simulation.
+
+## Input timing
+
+- Drive presses are timestamped (`driveChanged` in `310-input.js`); each simulation step reads the drive as of its own
+  real time (`inputClock`, set in `simulate`). Recorded inputs are still one per tick, so this never affects codes.
+- Device latency (`settings.latencyMs`, from the calibration test) only moves cues and drawing earlier. The simulation
+  must never read it, nor `settings.speed` (75% speed is applied by the frame loop, in real time).
 
 ## Bumps
 
