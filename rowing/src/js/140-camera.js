@@ -8,6 +8,12 @@ function cameraTarget(src, mode, raceT) {
   if (race?.course.kind === 'erg') return ergCamera(src, mode === 'director' ? ['tv', 'chase', 'aerial'][Math.floor(Math.max(0, raceT) / 6) % 3] : mode);
   const q = pose(src), boat = { ...src, x: q.x, z: q.z, yaw: q.yaw, h: q.h };
   const L = BOAT_CLASSES[boat.cls].length, mid = boat.x - L / 2, lead = Math.min(8, boat.v * 1.2);
+  const intro = race && mode !== 'rower' && race.boats.length > 2 && !race.course.bends && race.course.kind === 'regatta' && raceT < race.attentionAt - 0.4;
+  if (intro) {
+    // Crews introduced lane by lane, sweeping from lane 1 across the start, as the TV coverage does.
+    const span = race.attentionAt - 0.4 - race.t0, f = clamp((raceT - race.t0) / span, 0, 1), z = lerp(laneZ(0), laneZ(LANES - 1), f);
+    return { eye: [mid - 4, 3, z + 13], at: [mid - 2, 0.8, z], fov: 0.7 };
+  }
   if (raceT < 0 && mode !== 'rower') {
     // Before the start: a slow pan along the start line.
     const k = clamp(-raceT / 6, 0, 1);

@@ -3,7 +3,7 @@
 
 const comm = { leader: null, lastT: -99, lastLine: '', said: new Set(), excite: 0 };
 
-function resetCommentary() { Object.assign(comm, { leader: null, lastT: -99, lastLine: '', excite: 0 }); comm.said.clear() }
+function resetCommentary() { Object.assign(comm, { leader: null, lastT: -99, lastLine: '', excite: 0, introLane: -1 }); comm.said.clear() }
 
 const who = b => `${displayName(b)}${race.course.bends ? '' : ` in lane ${b.lane + 1}`}`;
 
@@ -21,6 +21,18 @@ function comment(text, urgent = false) {
 // Other crews' moments: called with each bot event before it is cleared.
 function commentEvent(b, e) {
   if (e.type === 'release' && e.grade === 'crab') comment(`Oh no, a crab for ${who(b)}! That will cost them.`, true);
+}
+
+// Before the start: introduce the crew in the lane the camera is passing.
+function introduceCrews(race) {
+  if (race.started || race.boats.length < 3 || race.course.kind !== 'regatta' || race.t >= race.attentionAt - 0.4) return;
+  const f = clamp((race.t - race.t0) / (race.attentionAt - 0.4 - race.t0), 0, 0.999), lane = Math.floor(f * LANES);
+  const b = race.boats.find(x => x.lane === lane);
+  if (!b || comm.introLane === lane) return;
+  comm.introLane = lane;
+  const el = $('ticker');
+  el.textContent = `Lane ${lane + 1} · ${displayName(b)}${b === race.player && displayName(b) !== 'You' ? ' (you)' : b.isRival ? ' · your rival' : ''}`;
+  el.classList.remove('roll'); void el.offsetWidth; el.classList.add('roll');
 }
 
 function updateCommentary(race) {

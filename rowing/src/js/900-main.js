@@ -173,6 +173,7 @@ function frame(now) {
     simulate(dt * (game.fastForward ? 8 : slow || 1), () => game.replay ? (game.replay[race.tick] ?? packInput(0, 18)) : readInput(), false, readInput2);
     frameBlend.alpha = clamp(game.acc / TUNE.dt, 0, 1);
     if (game.mode === 'live') updateLiveBoats(dt);
+    if (cam.mode !== 'rower') introduceCrews(race);
     startSequence();
     const p = race.player, d = race.course.distance;
     AU.ambient(p.v, Math.min(1, smooth(d - 400, d, p.x) * (p.finishTime != null ? 0.6 : 1) + comm.excite * 0.5), race.course.rain ? 1 : 0, p.phase === 'recover' && race.started ? 1 : 0);

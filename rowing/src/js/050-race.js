@@ -29,15 +29,17 @@ function makeRace(opts) {
     ghost.crewName = 'Ghost';
     ghost.isGhost = true;
   }
-  return {
+  const race = {
     opts, course, boats, brains, ghost, ghostInputs, ghostRace,
     player: boats.find(b => b.lane === lane),
     player2: duel ? boats.find(b => b.lane === lane + 1) : null,
     tick: 0,
-    t: -(4 + rng() * 2.5),        // seconds until the start
+    t: -(4 + rng() * 2.5),        // seconds until the start (t0 remembers it, for the start-line camera)
     attentionAt: -(1.2 + rng() * 1.6),  // "Attention!" comes a varying time before the horn, so nobody can anticipate it
     started: false, inputs: [], done: false, falseStart: false, finishOrder: [],
   };
+  race.t0 = race.t;
+  return race;
 }
 
 // Rules versions: each one changes the physics, so a race keeps the rules it was rowed under forever.
