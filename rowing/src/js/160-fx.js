@@ -23,6 +23,7 @@ function drawFx(mb, dt, time, course) {
   }
   drawFlags(mb, time, course);
   drawStartLights(mb, course);
+  drawCrowd(mb, time, course);
   drawBirds(mb, time, course);
   if (course.rain && R.quality > 0) drawRain(mb, time);
 }
@@ -82,5 +83,18 @@ function drawStartLights(mb, course) {
   for (const dz of [-2.5, 2.5]) {
     mb.box(x + 0.1, 6.6, z0 + dz, 0.4, 1.0, 1.0, [0.08, 0.08, 0.1]);
     mb.box(x - 0.15, 6.6, z0 + dz, 0.2, 0.7, 0.7, red ? [3, 0.3, 0.2] : green ? [0.3, 3, 0.5] : [0.25, 0.25, 0.25]);
+  }
+}
+
+// The front rows of the grandstand stand and wave as the leaders come into the last 300 m.
+function drawCrowd(mb, time, course) {
+  const D = course.distance;
+  if (!race || Math.abs(cam.at[0] - D) > 320) return;
+  const lead = Math.max(...race.boats.map(b => b.x)), rise = smooth(D - 300, D - 60, lead) * (lead > D + 60 ? 0.4 : 1);
+  if (rise <= 0) return;
+  const z0 = -(SC.bank + 6) + SC.rz(D), skin = hex(0xe0b590);
+  for (let x = D - 160, i = 0; x < D - 20; x += 2.4, i++) for (let row = 0; row < 2; row++) {
+    const y = 0.8 + row * 0.9 + 1.4, z = z0 - row * 1.4, wave = Math.sin(time * 8 + i * 0.9 + row) * 0.25 * rise;
+    mb.beam([x, y, z], [x + wave, y + 0.55 * rise, z + 0.1], 0.08, 0.08, skin);
   }
 }

@@ -1,7 +1,7 @@
 /* ===== cameras: TV side view, chase, aerial and the rower's own view (facing backwards, as rowers do) ===== */
 
-const CAMERAS = ['tv', 'chase', 'aerial', 'rower'];
-const CAMERA_LABEL = { tv: 'TV', chase: 'Chase', aerial: 'Aerial', rower: "Rower's eye" };
+const CAMERAS = ['tv', 'director', 'chase', 'aerial', 'rower'];
+const CAMERA_LABEL = { tv: 'TV', director: 'Director', chase: 'Chase', aerial: 'Aerial', rower: "Rower's eye" };
 const cam = { mode: 'tv', eye: [0, 10, 40], at: [0, 0, 0], fov: 0.9, shake: 0 };
 
 function cameraTarget(src, mode, raceT) {
@@ -12,6 +12,7 @@ function cameraTarget(src, mode, raceT) {
     const k = clamp(-raceT / 6, 0, 1);
     return { eye: [mid - 30 - k * 20, 6 + k * 6, boat.z + 26 + k * 14], at: [mid + 4, 0.5, boat.z - 4], fov: 0.8 };
   }
+  if (mode === 'director') return directorShot(boat, raceT, L, mid, lead);
   switch (mode) {
     case 'chase': {
       // Behind the stern along the boat's heading, so bends swing into view.
@@ -40,9 +41,25 @@ function finishShot(boat) {
   return { eye: [D - 0.5, 4, z + (race.course.bends ? race.course.halfW + 4 : BANK_Z - 6)], at: [D + 4, 0.5, boat.z], fov: 0.55 };
 }
 
+// Director: cuts between angles every few seconds, like a broadcast. Bank cameras stay put while the boats pass.
+const SHOTS = ['tv', 'aerial', 'bank', 'chase', 'tv', 'bow'];
+function directorShot(boat, raceT, L, mid, lead) {
+  const D = race.course.distance, left = D - boat.x;
+  const shot = left < 60 && left > -5 ? 'bank' : SHOTS[Math.floor(Math.max(0, raceT) / 7) % SHOTS.length];
+  if (shot === 'bank') {
+    // A fixed camera on the bank ahead; the boats row past it.
+    const at = Math.min(D, Math.floor((boat.x + 40) / 80) * 80 + 30), z = riverZ(race.course, at);
+    return { eye: [at, 2.5, z + (race.course.bends ? race.course.halfW + 2 : BANK_Z - 2)], at: [mid, 0.6, boat.z], fov: 0.6, cut: true };
+  }
+  if (shot === 'bow') return { eye: [boat.x + 9, 1.6, boat.z + 4], at: [mid, 0.8, boat.z], fov: 0.8, cut: true };
+  return { ...cameraTarget(boat, shot, raceT), cut: true };
+}
+
 function updateCamera(boat, raceT, dt) {
   const t = (race && boat === race.player && finishShot(boat)) || cameraTarget(boat, cam.mode, raceT);
-  const k = cam.mode === 'rower' ? 1 : 1 - Math.exp(-dt * 4);
+  // A director's cut jumps straight to the new angle; other cameras glide.
+  const cutNow = t.cut && Math.hypot(t.eye[0] - cam.eye[0], t.eye[1] - cam.eye[1], t.eye[2] - cam.eye[2]) > 15;
+  const k = cam.mode === 'rower' || cutNow ? 1 : 1 - Math.exp(-dt * 4);
   for (let i = 0; i < 3; i++) { cam.eye[i] += (t.eye[i] - cam.eye[i]) * k; cam.at[i] += (t.at[i] - cam.at[i]) * k }
   cam.fov += (t.fov - cam.fov) * k;
   if (cam.shake > 0) {
