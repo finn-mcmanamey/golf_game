@@ -132,7 +132,7 @@ function showResults(race) {
   game.lastCode = code;
   const pb = getPB(opts.distance, opts.cls, opts.kind);
   let pbNote = '';
-  const finished = p.finishTime != null, counts = finished && !game.tuned && !tuneEdited() && !['duel', 'replay', 'learn', 'training'].includes(game.mode);
+  const finished = p.finishTime != null, counts = finished && !game.tuned && !tuneEdited() && !['duel', 'replay', 'learn', 'training', 'live'].includes(game.mode);
   if (!finished) pbNote = ' · did not finish';
   else if (game.tuned || tuneEdited()) pbNote = ' · tuned physics, not recorded';
   else if (game.mode === 'duel') pbNote = ' · duel';
@@ -155,7 +155,7 @@ function showResults(race) {
     + (race.ghost?.finishTime ? `<tr><td></td><td></td><td>Ghost</td><td class="t">${fmtTime(race.ghost.finishTime)}</td><td class="t">${(race.ghost.finishTime - p.finishTime >= 0 ? '+' : '') + (race.ghost.finishTime - p.finishTime).toFixed(2)}</td></tr>` : '');
   const s = p.stats, strokes = Math.max(1, s.perfect + s.good + s.off);
   $('resChart').innerHTML = splitChart(race, order[0]) + timingChart();
-  $('resBoard').innerHTML = '';
+  $('resBoard').innerHTML = game.mode === 'live' ? $('liveStand').innerHTML : '';
   renderBoard();   // fills the results board for a daily, with working buttons
   $('nextUp').textContent = game.mode === 'training' ? trainingSummary() : counts ? nextChallenge(race, place) : '';
   $('resStats').textContent = `${p.strokes} strokes · average rate ${(p.strokes / p.finishTime * 60).toFixed(1)} · ${Math.round(s.perfect / strokes * 100)}% perfect catches`
@@ -168,10 +168,10 @@ function showResults(race) {
   if (badges.length) setTimeout(() => toast('Badge earned: ' + badges.map(b => b.name).join(', '), 3200), 600);
   $('careerNote').textContent = careerNote;
   $('careerNote').classList.toggle('hide', !careerNote);
-  $('btnAgain').textContent = game.mode === 'career' || game.mode === 'cup' && !cup.out && !cup.won ? 'Next race' : game.mode === 'cup' ? 'Enter a new cup' : 'Race again';
+  $('btnAgain').textContent = game.mode === 'live' ? 'Back to the lobby' : game.mode === 'career' || game.mode === 'cup' && !cup.out && !cup.won ? 'Next race' : game.mode === 'cup' ? 'Enter a new cup' : 'Race again';
   // A duel's code only holds player 1's strokes, so it can't be replayed or shared.
   // Duel and practice codes can't be re-rowed (a code holds one crew in a full field), so no replay or link.
-  for (const id of ['btnReplay', 'btnShare']) $(id).classList.toggle('hide', !!race.player2 || practiceMode());
+  for (const id of ['btnReplay', 'btnShare']) $(id).classList.toggle('hide', !!race.player2 || practiceMode() || game.mode === 'live');
   $('results').classList.remove('hide');
   $('hud').classList.add('hide');
   AU.play(place === 1 ? 'win' : 'finish');

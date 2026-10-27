@@ -20,6 +20,7 @@ const puddles = [];                  // swirls left on the water where blades ca
 function coloursFor(boat) {
   if (boat === race?.player || boat.isGhost || boat.isShowroom) return PLAYER_COLOURS;
   if (boat === race?.player2) return PLAYER2_COLOURS;
+  if (boat.isRemote) return { hull: 0xf4f1e8, shirt: boat.shirt ?? 0xffffff, blade: [boat.shirt ?? 0xffffff, 0xffffff] };
   let h = 0; for (const ch of boat.crewName) h = (h * 31 + ch.charCodeAt(0)) | 0;
   return CLUB_COLOURS[Math.abs(h) % CLUB_COLOURS.length];
 }

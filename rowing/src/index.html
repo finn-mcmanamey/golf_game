@@ -20,6 +20,7 @@
   <div id="startMsg"></div>
   <div id="replayTag" class="hide">● REPLAY</div>
   <div id="p2" class="panel hide"><small>Player 2 · <kbd>Enter</kbd> drive · arrows · right Shift</small><div id="p2slide"><div id="p2handle"></div></div><div id="p2stats"></div></div>
+  <div id="liveStand" class="panel board hide"></div>
   <div id="tunedTag" class="hide">TUNED · not recorded</div>
   <div id="lesson" class="panel hide"></div>
   <div id="grade"></div>
@@ -72,6 +73,7 @@
           <div id="dailyBoard" class="board hide"></div>
           <button id="btnTraining" class="tile"><b>Training pieces</b><span>Three pieces at set rates, scored</span></button>
           <button id="btnDuel" class="tile keysOnly" title="Two players on one keyboard"><b>Duel</b><span>Two players, one keyboard</span></button>
+          <button id="btnLive" class="tile hide"><b>Race live</b><span>Row against friends, right now</span></button>
           <button id="btnBoathouse" class="tile"><b>Boathouse</b><span>Colours, history, badges</span></button>
         </div>
       </section>
@@ -117,6 +119,15 @@
 
 <div id="boathouse" class="ov hide"><div class="box"><h2>Boathouse</h2><div id="bhTabs" class="seg"></div><div id="bhBody"></div>
   <div class="row"><button id="bhClose" class="big">Done</button></div></div></div>
+<div id="live" class="ov hide"><div class="box"><h2>Race live</h2>
+  <p class="sub">Row against friends who have the game open. One of you makes a race and shares its code; everyone starts together.</p>
+  <div id="liveJoin"><div class="row"><button id="liveCreate" class="big">Make a race</button></div>
+    <div class="row"><input id="liveCodeIn" maxlength="6" placeholder="Code" autocomplete="off"><button id="liveJoinBtn" class="sec">Join</button></div></div>
+  <div id="liveRoom" class="hide"><p>Race code <b id="liveCode" class="code"></b> · share it with your crew</p>
+    <div id="liveCrews" class="board"></div><p id="liveRace" class="sub small"></p>
+    <div class="row"><button id="liveStart" class="big">Start for everyone</button><button id="liveLeave" class="sec">Leave</button></div>
+    <p class="sub small">The course, distance and boat are the ones picked on the main menu by whoever presses Start.</p></div>
+  <div class="row"><button id="liveClose" class="sec">Close</button></div></div></div>
 <div id="tune" class="panel hide"></div>
 <div id="toast"></div>
 <script>{{script}}</script>

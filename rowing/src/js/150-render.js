@@ -85,7 +85,10 @@ function renderFrame(race, time, dtFrame) {
   mb.reset();
   const indoors = race.course.kind === 'erg';
   if (indoors) { for (const b of race.boats) drawErg(mb, b, time); drawErgScreen(mb, race) }
-  else for (const b of race.boats) if (Math.abs(b.x - cam.at[0]) < 700) drawBoat(mb, b, dtFrame, time);
+  else {
+    for (const b of race.boats) if (Math.abs(b.x - cam.at[0]) < 700) drawBoat(mb, b, dtFrame, time);
+    if (!showroom.on) for (const b of live.remote.values()) drawBoat(mb, b, dtFrame, time);   // friends in a live race
+  }
   if (race.course.kind === 'showroom') drawMedalWall(mb, time);
   else if (!indoors) drawFx(mb, dtFrame, time, race.course);
   const n = mb.upload(R.boatBuf, gl.DYNAMIC_DRAW);

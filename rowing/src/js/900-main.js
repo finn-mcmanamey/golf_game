@@ -36,6 +36,8 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   if (mode !== 'replay' && coxing()) toast('You are the cox: steer, set the rate, and press Space (or tap) for a power ten. Three to call.', 4200);
   $('replayTag').classList.toggle('hide', mode !== 'replay');
   $('lesson').classList.add('hide');
+  $('liveStand').classList.toggle('hide', mode !== 'live');
+  $('standings').classList.toggle('hide', mode === 'live');   // the live panel replaces it
   tuneChanged();
   cam.mode = settings.camera;
   $('btnCam').textContent = CAMERA_LABEL[cam.mode];
@@ -45,7 +47,9 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   $('hud').classList.remove('hide');
 }
 
-const restartRace = () => game.mode === 'career' ? startCareerRace() : game.mode === 'cup' ? startCupRace() : game.mode === 'replay' ? watchReplay() : game.mode === 'learn' ? startLearning() : game.mode === 'training' ? startTraining() : startRace(game.opts, game.ghostInputs, game.mode);
+// A live race goes back to its lobby; everything else restarts its own way.
+const backToLiveLobby = () => { live.state = 'lobby'; sendPresence(true); toMenu(); $('live').classList.remove('hide'); renderLiveLobby() };
+const restartRace = () => game.mode === 'live' ? backToLiveLobby() : game.mode === 'career' ? startCareerRace() : game.mode === 'cup' ? startCupRace() : game.mode === 'replay' ? watchReplay() : game.mode === 'learn' ? startLearning() : game.mode === 'training' ? startTraining() : startRace(game.opts, game.ghostInputs, game.mode);
 
 function toMenu() {
   game.state = 'menu';
@@ -167,10 +171,11 @@ function frame(now) {
     const slow = game.replay && photoFinishSlowdown(race);
     simulate(dt * (game.fastForward ? 8 : slow || 1), () => game.replay ? (game.replay[race.tick] ?? packInput(0, 18)) : readInput(), false, readInput2);
     frameBlend.alpha = clamp(game.acc / TUNE.dt, 0, 1);
+    if (game.mode === 'live') updateLiveBoats(dt);
     startSequence();
     const p = race.player, d = race.course.distance;
     AU.ambient(p.v, Math.min(1, smooth(d - 400, d, p.x) * (p.finishTime != null ? 0.6 : 1) + comm.excite * 0.5), race.course.rain ? 1 : 0, p.phase === 'recover' && race.started ? 1 : 0);
-    if (race.done) { game.state = 'results'; game.resultsAt = game.time; game.replay ? showReplayEnd() : showResults(race) }
+    if (race.done) { if (game.mode === 'live') endLiveRace(); game.state = 'results'; game.resultsAt = game.time; game.replay ? showReplayEnd() : showResults(race) }
     if (!game.halfSeen && race.player.x > race.course.distance / 2) { game.halfSeen = true; game.lastAtHalf = placeOf(race, race.player) === race.boats.length && race.boats.length > 1 }
     if (game.state === 'race') { updateHud(race); updateHud2(race); drawForceCurve(); updateCommentary(race); if (!game.replay && !practiceMode()) updateCalls(race); updateLearning(race); updateTraining(race) }
   } else if ((game.state === 'menu' || game.state === 'results') && race) {
