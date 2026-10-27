@@ -1,5 +1,5 @@
 # Latency calibration
-id: F-101 · status: spec'd · priority: P0 hook · pillars: Feel, Fair · depends on: F-001 · depended on by: F-106 · version: 1
+id: F-101 · status: shipped · priority: P0 hook · pillars: Feel, Fair · depends on: F-001 · depended on by: F-106 · version: 2
 
 ## Summary
 A 10-tap test measures how late this device's sound and screen reach you, plus your thumb. The catch cue (tone, catch-zone light) then arrives that much *earlier*, so it lands on the beat you actually feel. Bluetooth earbuds stop costing perfects.
@@ -11,7 +11,7 @@ Timing is the whole game: perfect is ±`perfectWindow` (75 ms). Output latency v
 Like a rhythm game's audio offset, except **the judge never moves**. Most rhythm games shift the hit window. Here the simulation and race codes stay identical on every device, and only the *cues* (sound, light, the drawn rower) are pulled earlier. Calibration can never make a code re-row differently. It is not a difficulty setting and not an auto-assist.
 
 ## Rules
-- **Test:** 10 clicks at `CAL_BEAT` intervals, scheduled on the AudioContext clock. The player taps (any key, touch or pad A) on each click. A tap within ±`CAL_ACCEPT` of a click pairs with it. Taps 1–2 are discarded as warm-up.
+- **Test:** 10 clicks at `CAL_BEAT` intervals, scheduled on the AudioContext clock. The player taps (any key, touch or pad A) on each click. A tap within ±`CAL_ACCEPT` of a click pairs with it. Taps 1–2 are discarded as warm-up. Taps are timed by their event timestamps against the clicks mapped once onto the page clock. The audio clock moves in blocks (coarse in some browsers), which biased an early build by +60 ms.
 - **Result:** offset = median of the paired (tap − click) values, clamped to [0, `CAL_MAX`]. Fewer than `CAL_MIN_TAPS` paired taps: "Didn't catch that, try again", and the offset is unchanged.
 - **Use:**
   - The cue tone plays when the slide's time-to-front ≤ offset (instead of = 0).
@@ -61,4 +61,4 @@ Tuning lever: if players report the cue feels early after calibrating, scale the
 ## Open questions
 - Separate audio and visual offsets? Recommendation: one number now; split only if players report the light and the tone disagreeing.
 
-Changelog: v1 initial.
+Changelog: v1 initial. v2 taps timed by event timestamp, not the audio clock (a 120 ms tapper measured 180 ms before, 120 ms after).

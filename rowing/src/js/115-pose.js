@@ -13,6 +13,8 @@ function rememberPoses(boats) {
 function pose(b) {
   const p = lastTick.get(b), a = frameBlend.alpha;
   // Blending the handle across a catch or release would show it sliding the wrong way, so phases snap.
-  if (!p) return { x: b.x, z: b.z, yaw: b.yaw, h: b.h };
-  return { x: lerp(p.x, b.x, a), z: lerp(p.z, b.z, a), yaw: lerp(p.yaw, b.yaw, a), h: p.phase === b.phase ? lerp(p.h, b.h, a) : b.h };
+  const q = !p ? { x: b.x, z: b.z, yaw: b.yaw, h: b.h } : { x: lerp(p.x, b.x, a), z: lerp(p.z, b.z, a), yaw: lerp(p.yaw, b.yaw, a), h: p.phase === b.phase ? lerp(p.h, b.h, a) : b.h };
+  // Your own slide is drawn ahead by the device's measured delay (F-101), so you see it reach the front on time.
+  if (b === race?.player && b.phase === 'recover' && settings.latencyMs) q.h = Math.max(0, q.h - b.recSpeed * settings.latencyMs / 1000);
+  return q;
 }

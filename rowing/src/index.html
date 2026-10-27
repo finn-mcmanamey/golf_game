@@ -51,6 +51,7 @@
   <div class="box wide">
     <h1>Voxel <span>Regatta</span></h1>
     <p class="sub">Six lanes. One rhythm. Time the catch, hold the drive, let the boat run.</p>
+    <div id="calCard" class="card hide"><b>Playing on a phone or headphones?</b> Tune the timing to this device so the catch beep lands on the beat. <button id="btnCalCard" class="sec mini">Tune timing · 7 s</button></div>
     <div id="welcome" class="card hide"><b>New here?</b> Rowing is a rhythm: hold to drive, let go to recover, catch again as the slide comes forward. <button id="btnWelcome" class="sec mini">Learn to row (2 minutes)</button></div>
     <div class="menuGrid">
       <section class="card quick">
@@ -121,7 +122,7 @@
 
 <div id="pause" class="ov hide"><div class="box"><h2>Paused</h2>
   <div class="row"><label>Sound</label><div class="seg" id="pSound"></div><label>Graphics</label><div class="seg" id="pQuality"></div></div>
-  <div class="row"><label>Catch beep</label><div class="seg" id="pCue"></div><label>Steering</label><div class="seg" id="pAssist"></div></div>
+  <div class="row"><label>Catch beep</label><div class="seg" id="pCue"></div><label>Timing</label><button id="pCal" class="sec mini">Tune to this device</button><label>Steering</label><div class="seg" id="pAssist"></div></div>
   <div class="row"><button id="btnResume" class="big">Resume</button><button id="btnRestart" class="sec">Restart</button><button id="btnQuit" class="sec">Menu</button></div></div></div>
 
 <div id="boathouse" class="ov hide"><div class="box"><h2>Boathouse</h2><div id="bhTabs" class="seg"></div><div id="bhBody"></div>
@@ -137,6 +138,10 @@
   <div class="row"><button id="liveClose" class="sec">Close</button></div></div></div>
 <div id="tune" class="panel hide"></div>
 <div id="toast"></div>
+<div id="calib" class="ov hide"><div class="box calPanel">
+  <h2>Tune timing</h2><div id="calRing"></div><div id="calTaps"></div><p id="calMsg"></p>
+  <div class="row"><button id="calGo" class="big">Start</button><button id="calClose" class="sec">Done</button></div>
+</div></div>
 <script>{{script}}</script>
 </body>
 </html>

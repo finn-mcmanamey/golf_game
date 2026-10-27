@@ -59,7 +59,7 @@ function updateHud(race) {
   h.style.left = (4 + p.h * 92) + '%';
   h.classList.toggle('drive', p.phase === 'drive');
   const toFront = p.phase === 'recover' ? p.h / p.recSpeed : p.phase === 'front' ? 0 : 9;
-  $('catchZone').classList.toggle('ready', race.started && toFront < 0.25);
+  $('catchZone').classList.toggle('ready', race.started && toFront < 0.25 + latencyLead());
 
   catchCue(p);
   if (p.inWash > 0.3 && !hudWash) showGrade('wash');
@@ -143,10 +143,13 @@ function splitChart(race, winner) {
 }
 
 // A soft tick the moment the slide reaches the front: rowing by ear, the way a cox box beeps the rhythm.
-let cuePhase = '', hudWash = false;
+// The tick fires early by this device's measured delay (F-101), so it is heard as the slide arrives.
+let cueArmed = false, hudWash = false;
 function catchCue(p) {
-  if (settings.cue && cuePhase === 'recover' && p.phase === 'front') AU.play('cue');
-  cuePhase = p.phase;
+  if (p.phase === 'recover') cueArmed = true;
+  if (p.phase === 'drive') cueArmed = false;
+  const toFront = p.phase === 'recover' ? p.h / p.recSpeed : p.phase === 'front' ? 0 : 9;
+  if (cueArmed && toFront <= latencyLead()) { cueArmed = false; if (settings.cue) AU.play('cue') }
 }
 
 // Player 2's own small stroke meter in a duel.

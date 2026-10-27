@@ -232,3 +232,10 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 #weekT, #boatRaceT { flex: 1 1 260px; text-align: left }
 #weekT b { color: #86efac } #boatRaceT b { color: #a5b4fc }
 #weekChart { flex: 1 1 100%; order: 2 } #weekChart:empty { display: none }
+/* Timing calibration (F-101): a ring that pulses on each click, and one dot per click coloured by the tap. */
+#calib { z-index: 30 }
+#calRing { width: 72px; height: 72px; margin: 10px auto; border-radius: 50%; border: 4px solid var(--acc, #ffd23f); transition: transform .05s }
+#calTaps { display: flex; gap: 6px; justify-content: center; margin: 6px 0 }
+#calTaps i { width: 12px; height: 12px; border-radius: 50%; background: rgba(255, 255, 255, .15) }
+#calTaps i.good { background: #4ade80 } #calTaps i.off { background: #fbbf24 } #calTaps i.warm { background: rgba(255, 255, 255, .45) }
+#calMsg { min-height: 2.6em }
