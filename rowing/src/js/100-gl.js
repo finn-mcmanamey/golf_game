@@ -47,12 +47,17 @@ const LIT = gl && makeProgram(
 // Water: rippled normals, sky reflection, sun glitter, and wakes trailing each boat.
 const WATER = gl && makeProgram(
   `precision highp float;attribute vec3 aP;uniform mat4 uVP;varying vec3 vW;void main(){vW=aP;gl_Position=uVP*vec4(aP,1.0);}`,
-  `precision highp float;varying vec3 vW;uniform vec3 uEye,uSun,uSunCol,uSky,uHorizon,uDeep,uBank;uniform float uT,uFogK,uWind,uBankZ,uReflect;
+  `precision highp float;varying vec3 vW;uniform vec3 uEye,uSun,uSunCol,uSky,uHorizon,uDeep,uBank;uniform float uT,uFogK,uWind,uBankZ,uReflect;uniform vec2 uWindDir;
+   float gh(vec2 q){return fract(sin(dot(q,vec2(127.1,311.7)))*43758.5453);}
+   float gn(vec2 q){vec2 i=floor(q),f=fract(q);f=f*f*(3.0-2.0*f);return mix(mix(gh(i),gh(i+vec2(1,0)),f.x),mix(gh(i+vec2(0,1)),gh(i+vec2(1,1)),f.x),f.y);}
    uniform vec4 uBoats[8];uniform vec4 uPuddles[24];
    ${FOG_GLSL}
    float wave(vec2 p,vec2 d,float f,float s){return sin(dot(p,d)*f+uT*s);}
    void main(){
-     vec2 p=vW.xz;float a=0.035+0.03*uWind;
+     vec2 p=vW.xz;
+     // Cat's paws: patches of rougher water drifting downwind, more of them in a stronger breeze.
+     vec2 drift=p*0.018-uWindDir*uT*0.09;float paw=smoothstep(0.55-0.12*uWind,0.85,gn(drift)*0.65+gn(drift*2.3)*0.35)*min(uWind,1.0);
+     float a=0.035+0.03*uWind+paw*0.09;
      vec2 g=vec2(0.0);
      g+=vec2(0.8,0.6)*cos(dot(p,vec2(0.8,0.6))*0.9+uT*1.6)*0.9;
      g+=vec2(-0.3,0.95)*cos(dot(p,vec2(-0.3,0.95))*1.7+uT*2.3)*0.55;
@@ -73,7 +78,7 @@ const WATER = gl && makeProgram(
      vec3 sky=mix(uHorizon,uSky,clamp(r.y*1.6,0.0,1.0));
      float bank=smoothstep(uBankZ-28.0,uBankZ+4.0,abs(vW.z+r.z*8.0));
      sky=mix(sky,uBank,bank*0.75);
-     vec3 col=mix(uDeep,sky,clamp(fres*1.3+0.12,0.0,1.0));
+     vec3 col=mix(uDeep,sky,clamp(fres*1.3+0.12-paw*0.18,0.0,1.0));
      col+=uSunCol*pow(max(dot(r,uSun),0.0),220.0)*2.2;
      col=mix(col,vec3(0.93,0.97,1.0),clamp(foam,0.0,0.8));
      float alpha=uReflect>0.5?clamp(0.5+0.5*(1.0-fres)-foam*0.3,0.55,0.92):1.0;alpha=max(alpha,clamp(foam,0.0,1.0));

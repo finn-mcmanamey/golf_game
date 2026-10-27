@@ -140,6 +140,8 @@ function drawWater(race, vp, time, dtFrame, reflect) {
   gl.uniform1f(u.uReflect, reflect ? 1 : 0);
   gl.uniform1f(u.uT, time);
   gl.uniform1f(u.uWind, Math.min(1.5, race.course.wind.speed / 3));
+  const w = race.course.wind, wl = Math.hypot(w.along, w.cross) || 1;
+  gl.uniform2f(u.uWindDir, w.along / wl, w.cross / wl);
   boatUniform.fill(0);
   race.boats.slice(0, 8).forEach((b, i) => {
     const q = pose(b);
