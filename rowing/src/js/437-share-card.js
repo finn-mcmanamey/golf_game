@@ -17,7 +17,7 @@ function dailyCard(race, place) {
 }
 
 async function shareCard() {
-  const text = game.mode === 'week' ? weekCard() : dailyCard(race, placeOf(race, race.player));
+  const text = game.mode === 'week' ? weekCard() : game.mode === 'cup' ? cupCard() : dailyCard(race, placeOf(race, race.player));
   try {
     if (navigator.share && matchMedia('(pointer: coarse)').matches) await navigator.share({ text });   // the phone's share sheet
     else { await navigator.clipboard.writeText(text); toast('Result copied: paste it anywhere') }

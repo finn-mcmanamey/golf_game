@@ -74,3 +74,9 @@ function renderCup() {
   $('cupT').innerHTML = `<b>The Voxel Cup</b> · ${CUP_ROUNDS[cup.round].name} against <b>${cupOpponent(cup.round)}</b>${done ? `<br>${done}` : ''}`;
   $('btnCup').textContent = 'Row the ' + CUP_ROUNDS[cup.round].name.toLowerCase();
 }
+
+// A finished cup run as one line to share: who you beat, and where it ended.
+function cupCard() {
+  const runs = cup.history.map(h => `${h.won ? '✓' : '✗'} ${h.opp}`).join(' '), last = cup.history[cup.history.length - 1];
+  return `Voxel Cup · ${runs} · ${cup.won ? '🏆 won the cup!' : `out in the ${last.round.toLowerCase()}`}`;
+}
