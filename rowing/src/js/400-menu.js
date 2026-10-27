@@ -74,7 +74,7 @@ const soundLabel = () => { $('btnSound').textContent = settings.sound ? '🔊 So
 function menuChanged() {
   saveSettings();
   const c = makeCourse(settings.seed, settings.distance, settings.kind);
-  $('venue').textContent = c.kind === 'erg' ? `${c.name} · six rowing machines, one big screen` : `${c.name}${c.bends ? ' · winding river, crews start 8 s apart' : ''} · ${c.rain ? 'Rain · ' : c.night ? 'Evening, under lights · ' : ''}${windLabel(c.wind)}${c.current ? ` · ${c.current > 0 ? 'following' : 'opposing'} stream` : ''}`;
+  $('venue').textContent = c.kind === 'erg' ? `${c.name} · six rowing machines, one big screen` : `${c.name}${c.bends ? ' · winding river, crews start 8 s apart' : ''} · ${{ alpine: 'Mountains · ', city: 'City · ' }[c.theme] || ''}${c.rain ? 'Rain · ' : c.night ? 'Evening, under lights · ' : ''}${windLabel(c.wind)}${c.current ? ` · ${c.current > 0 ? 'following' : 'opposing'} stream` : ''}`;
   // Erg races are always singles, so look records up with the options a race would really use.
   const o = currentOpts(), pb = getPB(o.distance, o.cls, o.kind);
   $('pbLine').textContent = pb ? `Your best over ${o.distance} m in the ${BOAT_CLASSES[o.cls].name.toLowerCase()}${KIND_LABEL[o.kind] || ''}: ${fmtTime(pb.time)} (${pb.venue})` : '';

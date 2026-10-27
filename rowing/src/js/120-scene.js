@@ -108,15 +108,20 @@ function buildScene(course, cls) {
     if (rng() > wood * wood * 0.55) continue;
     const tx = x + rng() * 7, tz = side * az + rz(tx), ty = heightAt(tx, az);
     if (course.distance - 220 < tx && tx < course.distance + 40 && side < 0 && az < BANK + 40) continue; // grandstand space
-    tree(mb, tx, ty, tz, rng, L);
+    if (course.theme === 'city' && az > BANK + 20 && rng() < 0.6) building(mb, tx, ty, tz, rng, course.night);
+    else tree(mb, tx, ty, tz, rng, L, course.theme === 'alpine');
   }
 
   // Far hills: stepped blocks that fade into the haze.
   for (let x = x0 - 400; x < x1 + 400; x += 48) for (const side of [-1, 1]) {
-    const peak = 8 + noise(x * 0.006, side * 3) * 34, z = side * (BANK + bankDepth + 30 + rng() * 60) + rz(x);
+    const tall = course.theme === 'alpine' ? 4 : 1, peak = (8 + noise(x * 0.006, side * 3) * 34) * tall;
+    const z = side * (BANK + bankDepth + 30 + rng() * 60 + (tall > 1 ? 80 : 0)) + rz(x);
+    if (course.theme === 'city') { skyline(mb, x, z, rng, course.night); continue }
     for (let k = 0; k < 3; k++) {
-      const hgt = peak * (1 - k * 0.3), w = 52 - k * 14;
-      mb.box(x, hgt / 2 - 1, z + side * k * -6, w, hgt, 40 - k * 10, shade(L.grass[0], 0.62 + k * 0.08));
+      const hgt = peak * (1 - k * 0.3), w = (52 - k * 14) * (tall > 1 ? 1.6 : 1);
+      // Alpine peaks get rock and snow on their upper steps.
+      const col = tall > 1 && k === 2 ? [1.25, 1.25, 1.3] : tall > 1 && k === 1 ? shade(hex(0x8a8f99), 0.9) : shade(L.grass[0], 0.62 + k * 0.08);
+      mb.box(x, hgt / 2 - 1, z + side * k * -6, w, hgt, 40 - k * 10, col);
     }
   }
 
@@ -124,8 +129,8 @@ function buildScene(course, cls) {
   return { mb, L };
 }
 
-function tree(mb, x, y, z, rng, L) {
-  const trunk = hex(0x6b4a2b), pine = rng() < 0.35;
+function tree(mb, x, y, z, rng, L, alpine = false) {
+  const trunk = hex(0x6b4a2b), pine = rng() < (alpine ? 0.85 : 0.35);
   const leaf = shade(pine ? hex(0x2f6a3a) : L.grass[(rng() * 2) | 0], 0.75 + rng() * 0.25);
   const h = 3 + rng() * 4;
   mb.box(x, y + h / 2, z, 0.7, h, 0.7, trunk);
@@ -134,6 +139,23 @@ function tree(mb, x, y, z, rng, L) {
     const w = 3.5 + rng() * 2.5;
     mb.box(x, y + h + w * 0.35, z, w, w * 0.8, w, leaf);
     mb.box(x + (rng() - 0.5) * 2, y + h + w * 0.8, z + (rng() - 0.5) * 2, w * 0.65, w * 0.6, w * 0.65, shade(leaf, 1.1));
+  }
+}
+
+// City venues: blocks of flats and offices beyond the banks, windows lit in the evening.
+const BUILDING_COLOURS = [0xc9b8a0, 0xa8b0bb, 0xd9cdb8, 0x8f8a84, 0xb86a4a, 0xe6e2d8];
+function building(mb, x, y, z, rng, night) {
+  const w = 6 + rng() * 6, d = 6 + rng() * 6, h = 8 + rng() * rng() * 30, col = hex(BUILDING_COLOURS[(rng() * BUILDING_COLOURS.length) | 0]);
+  mb.box(x, y + h / 2, z, w, h, d, col);
+  mb.box(x, y + h + 0.3, z, w + 0.4, 0.6, d + 0.4, shade(col, 0.7));
+  const lit = night ? [3, 2.6, 1.6] : [0.35, 0.45, 0.55];
+  for (let fy = y + 2; fy < y + h - 1; fy += 3) for (const s of [-1, 1]) mb.box(x, fy, z + s * (d / 2 + 0.02), w * 0.8, 0.9, 0.05, lit);
+}
+
+function skyline(mb, x, z, rng, night) {
+  for (let i = 0; i < 3; i++) {
+    const h = 25 + rng() * 70, w = 10 + rng() * 14;
+    mb.box(x + (i - 1) * 16, h / 2 - 1, z + (rng() - 0.5) * 30, w, h, w, shade(hex(0x8f9aa8), night ? 0.5 : 0.8 + rng() * 0.2));
   }
 }
 
