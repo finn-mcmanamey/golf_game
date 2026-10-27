@@ -51,6 +51,7 @@ rowing/
   test/sim.test.mjs  runs the simulation slices headless (determinism, codes, golden times)
   test/e2e.cjs       plays one race per mode in headless Chromium
   test/balance.mjs   races human-like rowers against each field
+  test/leaderboard.cjs  checks forged or copied leaderboard runs are rejected
   app/               the iPhone app wrapper (Expo + WebView)
 ```
 

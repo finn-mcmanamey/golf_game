@@ -22,8 +22,11 @@ function watchDailyBoard() {
 }
 
 // Re-row each new code (one per frame, so the page stays smooth) and keep only rows that check out.
+// A row is checked as the pair (code, claimed time): reusing someone's honest code with a better time fails.
+const rowKey = r => r.dailyCode + '|' + r.dailyTime;
+
 function verifyRows(seed) {
-  const todo = board.rows.filter(r => !board.verified.has(r.dailyCode));
+  const todo = board.rows.filter(r => !board.verified.has(rowKey(r)));
   const step = () => {
     const r = todo.shift();
     if (!r) return renderBoard();
@@ -32,22 +35,40 @@ function verifyRows(seed) {
       const { opts, inputs } = decodeRace(r.dailyCode), race = simulateRace(opts, inputs);
       ok = opts.seed === seed && race.player.finishTime != null && Math.abs(race.player.finishTime - r.dailyTime) < 0.005;
     } catch (e) { ok = false }
-    board.verified.set(r.dailyCode, ok);
+    board.verified.set(rowKey(r), ok);
     requestAnimationFrame(step);
   };
   step();
 }
 
-function verifiedRows() { return board.rows.filter(r => board.verified.get(r.dailyCode)) }
+// Today's daily with the fastest verified run as a ghost. Still counts as a daily for your own time.
+function raceLeader(e) {
+  e?.stopPropagation();
+  const top = verifiedRows()[0];
+  if (!top) return;
+  const { opts, inputs } = decodeRace(top.dailyCode);
+  $('results').classList.add('hide');
+  startRace(opts, inputs, 'daily');
+}
+
+// Verified rows, each race code shown once (a copied code earns nothing): the earliest poster keeps it.
+function verifiedRows() {
+  const seen = new Set();
+  return board.rows.filter(r => board.verified.get(rowKey(r)))
+    .sort((a, b) => a.dailyTime - b.dailyTime || (a.at || 0) - (b.at || 0))
+    .filter(r => !seen.has(r.dailyCode) && seen.add(r.dailyCode));
+}
 
 function renderBoard() {
   const rows = verifiedRows(), el = $('dailyBoard');
   if (!el) return;
   el.classList.toggle('hide', !rows.length);
   el.innerHTML = `<b>Today's leaderboard</b>` + rows.slice(0, 10).map((r, i) =>
-    `<div class="${r.id === board.uid ? 'me' : ''}"><span>${i + 1}</span><span>${escapeHtml(r.name || 'Rower')}</span><span class="t">${fmtTime(r.dailyTime)}</span></div>`).join('');
+    `<div class="${r.id === board.uid ? 'me' : ''}"><span>${i + 1}</span><span>${escapeHtml(r.name || 'Rower')}</span><span class="t">${fmtTime(r.dailyTime)}</span></div>`).join('')
+    + (rows.length && rows[0].id !== board.uid ? `<button class="sec mini raceLeader">Race ${escapeHtml(rows[0].name || 'the leader')}'s ghost</button>` : '');
   const rb = $('resBoard');
   if (rb && game.mode === 'daily') rb.innerHTML = el.innerHTML;
+  document.querySelectorAll('.raceLeader').forEach(b => b.onclick = raceLeader);
 }
 
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

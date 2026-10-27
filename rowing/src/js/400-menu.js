@@ -153,7 +153,8 @@ function showResults(race) {
     + (race.ghost?.finishTime ? `<tr><td></td><td></td><td>Ghost</td><td class="t">${fmtTime(race.ghost.finishTime)}</td><td class="t">${(race.ghost.finishTime - p.finishTime >= 0 ? '+' : '') + (race.ghost.finishTime - p.finishTime).toFixed(2)}</td></tr>` : '');
   const s = p.stats, strokes = Math.max(1, s.perfect + s.good + s.off);
   $('resChart').innerHTML = splitChart(race, order[0]) + timingChart();
-  $('resBoard').innerHTML = game.mode === 'daily' && verifiedRows().length ? $('dailyBoard').innerHTML : '';
+  $('resBoard').innerHTML = '';
+  renderBoard();   // fills the results board for a daily, with working buttons
   $('nextUp').textContent = game.mode === 'training' ? trainingSummary() : counts ? nextChallenge(race, place) : '';
   $('resStats').textContent = `${p.strokes} strokes · average rate ${(p.strokes / p.finishTime * 60).toFixed(1)} · ${Math.round(s.perfect / strokes * 100)}% perfect catches`
     + (s.crabs ? ` · ${s.crabs} crab${s.crabs > 1 ? 's' : ''}` : '') + (s.buoys ? ` · hit the buoys ${s.buoys}×` : '');
