@@ -14,6 +14,7 @@ function readInput() {
   if (keys.has('Space') || keys.has('Mouse') || touchState.drive) bits |= IN.DRIVE;
   if (keys.has('KeyA') || keys.has('ArrowLeft') || touchState.left) bits |= IN.LEFT;
   if (keys.has('KeyD') || keys.has('ArrowRight') || touchState.right) bits |= IN.RIGHT;
+  if (settings.assist && !(bits & (IN.LEFT | IN.RIGHT)) && race) bits |= assistSteer(race.player);
   if (keys.has('ShiftLeft') || keys.has('ShiftRight') || touchState.push) bits |= IN.PUSH;
   return packInput(bits, targetRate);
 }
@@ -33,8 +34,16 @@ function onKey(code) {
   if (code === 'KeyW' || code === 'ArrowUp') changeRate(2);
   if (code === 'KeyS' || code === 'ArrowDown') changeRate(-2);
   if (code === 'KeyC') cycleCamera();
+  if (code === 'KeyG') cycleQuality();
   if (code === 'Escape' || code === 'KeyP') togglePause();
   if (code === 'Enter' && race.player.finishTime != null) game.fastForward = true;
+}
+
+// Steering assist nudges the boat back to the lane centre when the player isn't steering.
+// It only produces ordinary steering inputs, so recorded races replay exactly.
+function assistSteer(b) {
+  const err = (b.z - laneZ(b.lane)) + b.yaw * 10;
+  return err > 0.8 ? IN.LEFT : err < -0.8 ? IN.RIGHT : 0;
 }
 
 // Touch and mouse: holding anywhere on the water drives; the buttons steer, set the rate and push.

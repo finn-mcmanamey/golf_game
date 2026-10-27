@@ -20,7 +20,7 @@ const TUNE_DEFAULTS = Object.freeze({
   steerCost: 0.9,          // propulsion kept while steering hard
   yawDamp: 0.9,            // how quickly the boat straightens on its own
   windDrag: 1.6,           // push from wind on the crew (N per (m/s)²)
-  crossDrift: 0.045,       // sideways drift per m/s of crosswind
+  crossDrift: 0.02,        // sideways drift per m/s of crosswind
   buoyLimit: 3.3,          // lateral distance from lane centre where the oars hit the buoys (m)
 });
 const TUNE = { ...TUNE_DEFAULTS };

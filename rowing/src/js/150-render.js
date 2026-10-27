@@ -5,8 +5,9 @@ const R = {
   boatBuf: gl && gl.createBuffer(), boatMb: new MeshBuilder(30000),
   ghostBuf: gl && gl.createBuffer(), ghostMb: new MeshBuilder(4000),
   waterBuf: gl && gl.createBuffer(), skyBuf: gl && gl.createBuffer(),
-  L: null, dpr: 1, quality: 1,
+  L: null, dpr: 1, quality: settings.quality,
 };
+const QUALITY_LABELS = ['Fast', 'Balanced', 'Sharp'];
 
 function setScene(course, cls) {
   const { mb, L } = buildScene(course, cls);
@@ -113,13 +114,14 @@ function drawWater(race, vp, time, dtFrame) {
   gl.uniform1f(u.uWind, Math.min(1.5, race.course.wind.speed / 3));
   boatUniform.fill(0);
   race.boats.slice(0, 8).forEach((b, i) => {
-    boatUniform.set([b.x, b.z, Math.min(1, b.v / 5.5), BOAT_CLASSES[b.cls].length], i * 4);
+    const q = pose(b);
+    boatUniform.set([q.x, q.z, Math.min(1, b.v / 5.5), BOAT_CLASSES[b.cls].length], i * 4);
   });
   gl.uniform4fv(u.uBoats, boatUniform);
   for (const p of puddles) p.age += dtFrame;
   while (puddles.length && puddles[0].age > 7) puddles.shift();
   puddleUniform.fill(0);
-  const near = puddles.filter(p => Math.abs(p.x - cam.at[0]) < 120).slice(-24);
+  const near = R.quality === 0 ? [] : puddles.filter(p => Math.abs(p.x - cam.at[0]) < 120).slice(-24);
   near.forEach((p, i) => puddleUniform.set([p.x, p.z, p.age, Math.max(0, 1 - p.age / 7)], i * 4));
   gl.uniform4fv(u.uPuddles, puddleUniform);
   gl.bindBuffer(gl.ARRAY_BUFFER, R.waterBuf);

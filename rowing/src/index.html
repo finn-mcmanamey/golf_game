@@ -35,7 +35,7 @@
     <div id="tRate"><button id="tUp" aria-label="Rate up">＋</button><button id="tDn" aria-label="Rate down">－</button></div>
     <button id="tPush">PUSH</button>
   </div>
-  <div id="tools"><button id="btnCam" title="Camera (C)">TV</button><button id="btnPause" title="Pause (Esc)">II</button></div>
+  <div id="tools"><span id="fps"></span><button id="btnCam" title="Camera (C)">TV</button><button id="btnPause" title="Pause (Esc)">II</button></div>
 </div>
 
 <div id="menu" class="ov">
@@ -45,13 +45,14 @@
     <div class="row"><label>Distance</label><div class="seg" id="segDist"></div></div>
     <div class="row"><label>Boat</label><div class="seg" id="segCls"></div></div>
     <div class="row"><label>Field</label><div class="seg" id="segDiff"></div></div>
+    <div class="row"><label>Steering</label><div class="seg" id="segAssist"></div><label>Graphics</label><div class="seg" id="segQuality"></div></div>
     <div class="row"><label>Course #</label><input id="seedIn" type="number" min="1" max="999999"><button id="btnRnd" class="sec">Random</button></div>
     <div id="venue" class="sub small"></div>
     <div class="row"><button id="btnRace" class="big">Race</button><button id="btnGhost" class="sec hide">Race your best</button><button id="btnDaily" class="sec">Daily regatta</button></div>
     <div id="pbLine" class="sub small"></div>
     <div id="friend" class="row hide"><span id="friendT"></span><button id="btnFriend" class="sec">Race their ghost</button></div>
     <div class="help"><kbd>Space</kbd> hold to drive, release to recover · catch again as the slide reaches the front<br>
-      <kbd>W</kbd>/<kbd>S</kbd> stroke rate · <kbd>A</kbd>/<kbd>D</kbd> steer · <kbd>Shift</kbd> push · <kbd>C</kbd> camera · <kbd>Esc</kbd> pause<br>
+      <kbd>W</kbd>/<kbd>S</kbd> stroke rate · <kbd>A</kbd>/<kbd>D</kbd> steer · <kbd>Shift</kbd> push · <kbd>C</kbd> camera · <kbd>G</kbd> graphics · <kbd>Esc</kbd> pause<br>
       On a phone: hold anywhere to drive, buttons to steer, set the rate and push.</div>
     <button id="btnSound" class="ghost"></button>
   </div>

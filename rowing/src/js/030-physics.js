@@ -125,8 +125,10 @@ function stepBoat(b, input, course, race) {
   // Oars clipping the lane buoys slow the boat and nudge it back.
   const off = b.z - laneZ(b.lane);
   if (Math.abs(off) > TUNE.buoyLimit) {
-    b.v *= 1 - 1.4 * dt;
-    b.yaw -= Math.sign(off) * 0.25 * dt;
+    // The blades bounce off the buoy line: some speed lost, and the boat is pushed back into its lane.
+    b.v *= 1 - 0.9 * dt;
+    b.yaw -= Math.sign(off) * 0.4 * dt;
+    b.z -= Math.sign(off) * 0.8 * dt;
     b.z = laneZ(b.lane) + Math.sign(off) * Math.min(Math.abs(off), TUNE.buoyLimit + 0.6);
     if (!b.onBuoys) { b.stats.buoys++; b.events.push({ type: 'buoy' }) }
     b.onBuoys = true;

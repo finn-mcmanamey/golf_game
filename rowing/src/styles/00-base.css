@@ -100,3 +100,4 @@ input[type=number] { width: 110px; font: inherit; text-align: center; padding: 6
   #course { top: auto; bottom: 128px; width: 92vw }
   #topL b { font-size: 20px }
 }
+#fps { font: 11px ui-monospace, Menlo, monospace; color: var(--dim); text-align: center }

@@ -4,7 +4,8 @@ const CAMERAS = ['tv', 'chase', 'aerial', 'rower'];
 const CAMERA_LABEL = { tv: 'TV', chase: 'Chase', aerial: 'Aerial', rower: "Rower's eye" };
 const cam = { mode: 'tv', eye: [0, 10, 40], at: [0, 0, 0], fov: 0.9, shake: 0 };
 
-function cameraTarget(boat, mode, raceT) {
+function cameraTarget(src, mode, raceT) {
+  const q = pose(src), boat = { ...src, x: q.x, z: q.z, yaw: q.yaw, h: q.h };
   const L = BOAT_CLASSES[boat.cls].length, mid = boat.x - L / 2, lead = Math.min(8, boat.v * 1.2);
   if (raceT < 0 && mode !== 'rower') {
     // Before the start: a slow pan along the start line.

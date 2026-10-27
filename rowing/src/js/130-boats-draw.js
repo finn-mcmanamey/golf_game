@@ -37,9 +37,10 @@ function drawBoat(mb, boat, dtFrame, time) {
   let vs = visualState.get(boat);
   if (!vs) { vs = { bladeY: 0.15, phase: boat.phase, skin: SKIN[(boat.lane * 7 + boat.crewName.length) % SKIN.length] }; visualState.set(boat, vs) }
 
-  const cy = Math.cos(boat.yaw), sy = Math.sin(boat.yaw), bob = Math.sin(time * 2 + boat.lane) * 0.015;
+  const q = pose(boat);
+  const cy = Math.cos(q.yaw), sy = Math.sin(q.yaw), bob = Math.sin(time * 2 + boat.lane) * 0.015;
   // Boat-local (u along the boat towards the bow, y up, w to starboard) to world.
-  const P = (u, y, w) => [boat.x + cy * u - sy * w, y + bob, boat.z + sy * u + cy * w];
+  const P = (u, y, w) => [q.x + cy * u - sy * w, y + bob, q.z + sy * u + cy * w];
   const F = [cy, 0, sy], S = [-sy, 0, cy], UP = [0, 1, 0];
   const piece = (a, b, w, h, colour) => mb.beam(P(...a), P(...b), w, h, colour);
 
@@ -56,14 +57,14 @@ function drawBoat(mb, boat, dtFrame, time) {
   mb.box(...P(0.05, 0.16, 0), 0.12, 0.12, 0.12, [1, 1, 1]);   // bow ball
 
   // Blade height follows the stroke: buried on the drive, lifted and feathered on the recovery.
-  const target = boat.phase === 'drive' && boat.h < 0.995 ? -0.16 : boat.phase === 'front' ? 0.1 : boat.phase === 'crab' ? -0.3 : 0.32;
+  const target = boat.phase === 'drive' && q.h < 0.995 ? -0.16 : boat.phase === 'front' ? 0.1 : boat.phase === 'crab' ? -0.3 : 0.32;
   vs.bladeY += (target - vs.bladeY) * Math.min(1, dtFrame * 16);
   const released = vs.phase === 'drive' && boat.phase !== 'drive';
   vs.phase = boat.phase;
 
   const sculls = c.sculls, Li = sculls ? 0.88 : 1.15, Lo = sculls ? 2.0 : 2.55, pinW = sculls ? 0.8 : 0.86, pinY = 0.42;
-  const theta = lerp(1.0, -0.72, boat.h) + (boat.phase === 'crab' ? -0.3 : 0);
-  const legT = smooth(0, 0.62, boat.h), backT = smooth(0.25, 0.85, boat.h);
+  const theta = lerp(1.0, -0.72, q.h) + (boat.phase === 'crab' ? -0.3 : 0);
+  const legT = smooth(0, 0.62, q.h), backT = smooth(0.25, 0.85, q.h);
   const shirt = hex(col.shirt), skin = hex(vs.skin), shorts = hex(0x1d2330);
   const bladeCols = col.blade.map(hex);
 

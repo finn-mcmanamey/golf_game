@@ -51,6 +51,19 @@ function cycleCamera() {
   toast(label + ' camera', 900);
 }
 
+function cycleQuality() {
+  settings.quality = R.quality = (R.quality + 1) % QUALITY_LABELS.length;
+  saveSettings();
+  toast('Graphics: ' + QUALITY_LABELS[R.quality], 900);
+}
+
+// Frame rate, smoothed, so it's easy to see what a graphics setting costs.
+const fpsMeter = { avg: 60, shown: 0 };
+function updateFps(dt) {
+  if (dt > 0) fpsMeter.avg += (1 / dt - fpsMeter.avg) * 0.05;
+  if (game.time - fpsMeter.shown > 0.5) { fpsMeter.shown = game.time; $('fps').textContent = Math.round(fpsMeter.avg) + ' fps' }
+}
+
 // Turns what just happened on the water into sound and on-screen feedback.
 function handleEvents() {
   for (const b of race.boats) {
@@ -104,6 +117,7 @@ function frame(now) {
     let steps = 0;
     while (game.acc >= TUNE.dt && steps++ < 400) {
       game.acc -= TUNE.dt;
+      rememberPoses([...race.boats, race.ghost]);
       stepRace(race, readInput());
       handleEvents();
       if (race.falseStart) {
@@ -113,6 +127,7 @@ function frame(now) {
       }
       if (race.done) break;
     }
+    frameBlend.alpha = clamp(game.acc / TUNE.dt, 0, 1);
     startSequence();
     const p = race.player, d = race.course.distance;
     AU.ambient(p.v, smooth(d - 400, d, p.x) * (p.finishTime != null ? 0.6 : 1));
@@ -124,6 +139,7 @@ function frame(now) {
     if (game.state === 'menu') menuCamera(dt);
     else updateCamera(race.player, race.t, dt);
     renderFrame(race, game.time, dt);
+    updateFps(dt);
   }
   requestAnimationFrame(frame);
 }
