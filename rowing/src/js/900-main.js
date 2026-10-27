@@ -242,6 +242,7 @@ function simulate(dt, inputFor, quiet = false, input2For = () => 0, now = null, 
     if (!quiet && settings.oneButton && race.started) game.oneButtonUsed = true;   // used at any point: not a record
     if (!quiet && gameSpeed() < 1 && race.started) game.slowed = true;   // a slowed race is practice, not a record
     recordSplits(race);
+    if (!quiet) recordStreamLine(race);
     if (!quiet) sampleForce(race.player);
     if (quiet) { for (const b of race.boats) b.events.length = 0; if (race.ghost) race.ghost.events.length = 0 }
     else handleEvents();

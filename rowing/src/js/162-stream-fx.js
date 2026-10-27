@@ -21,3 +21,21 @@ function drawStreamFlecks(mb, dt, course) {
     mb.box(x, 0.03, z, 0.5, 0.02, 0.18, foam);
   }
 }
+
+/* ----- how much your line gained from the stream, for the results (read-only) ----- */
+const streamLine = { race: null, metres: 0 };
+
+// Each step: the extra metres the stream carried you on your line, against rowing mid-river.
+function recordStreamLine(race) {
+  const p = race.player, c = race.course;
+  if (c.kind !== 'head' || !c.current || !(race.opts.rules >= 5) || !race.started || p.finishTime != null) return;
+  if (streamLine.race !== race) Object.assign(streamLine, { race, metres: 0 });
+  streamLine.metres += (streamAt(c, p, race) - c.current * TUNE.streamMid) * TUNE.dt;
+}
+
+// "line gained 0.8 s vs mid-river", or nothing when the stream played no part.
+function streamLineNote(race) {
+  if (streamLine.race !== race || Math.abs(streamLine.metres) < 0.5) return '';
+  const secs = streamLine.metres / Math.max(1, race.course.distance / race.player.finishTime);
+  return ` · stream: your line ${secs > 0 ? 'gained' : 'lost'} ${Math.abs(secs).toFixed(1)} s vs mid-river`;
+}

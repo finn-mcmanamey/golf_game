@@ -198,7 +198,7 @@ function showResults(race) {
   renderBoard();   // fills the results board for a daily, with working buttons
   $('nextUp').textContent = game.mode === 'training' ? trainingSummary() : counts && !bumps ? nextChallenge(race, place) : '';
   $('resStats').textContent = `${p.strokes} strokes · average rate ${(p.strokes / (p.finishTime ?? p.out?.t ?? race.t) * 60).toFixed(1)} · ${Math.round(s.perfect / strokes * 100)}% perfect catches`
-    + (s.crabs ? ` · ${s.crabs} crab${s.crabs > 1 ? 's' : ''}` : '') + (s.buoys ? ` · hit the buoys ${s.buoys}×` : '');
+    + (s.crabs ? ` · ${s.crabs} crab${s.crabs > 1 ? 's' : ''}` : '') + (s.buoys ? ` · hit the ${race.course.bends ? 'bank' : 'buoys'} ${s.buoys}×` : '') + (p.finishTime != null ? streamLineNote(race) : '');
   if (race.course.kind === 'head' && place === 1 && counts) celebrate();
   // Say which rule kept a race out of a campaign, so a player on 75% speed knows why progress didn't move.
   const why = !finished ? 'unfinished' : game.slowed ? 'rowed at 75% speed' : game.oneButtonUsed ? 'one-button rowing' : 'tuned physics';
