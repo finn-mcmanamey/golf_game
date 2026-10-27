@@ -24,6 +24,14 @@ one feature per branch. This file adds what is specific to the rowing game. See 
 - The golden times in `test/sim.test.mjs` must not change. New physics goes behind a new **rules version**
   (`RULES_LATEST` in `050-race.js`): check `race.opts.rules` before applying it. New races get the latest rules;
   codes and ghosts carry the rules they were rowed under (code version 3 stores it). A new race `kind` works too.
+  The daily regatta pins its rules in `dailyOpts()`, so a new rules version never splits today's leaderboard.
+
+## Bumps
+
+- A bumps race has `race.order` (lanes from the head of the river down); `placeOf` reads it. Check `race.order`,
+  not `course.bends`, for bumps behaviour: `course.bends` is true for head races too.
+- A bumped or bumping crew has `b.out` and never gets a `finishTime`. Anything that asks "is this crew done?"
+  must check `b.finishTime != null || b.out`.
 
 ## Writing new code
 

@@ -72,3 +72,9 @@ function bumpsChart(w) {
 }
 
 $('btnWeek').onclick = startWeekRace;
+
+// Returning players get one note about the new mode.
+if (!STORE.get('seenBumps', false) && STORE.get('history', []).length) {
+  STORE.set('seenBumps', true);
+  setTimeout(() => toast('New: bumps racing! Pick Bumps under Event, or row a four-day bumps week.', 5000), 1200);
+}
