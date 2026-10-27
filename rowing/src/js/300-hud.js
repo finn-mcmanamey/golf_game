@@ -1,0 +1,100 @@
+/* ===== heads-up display: stroke meter, numbers, standings and the course strip ===== */
+
+const GRADE_TEXT = {
+  perfect: ['PERFECT', 'var(--good)'], good: ['GOOD', '#a3e635'], early: ['EARLY', 'var(--warn)'], late: ['LATE', 'var(--warn)'],
+  short: ['SHORT STROKE', 'var(--warn)'], crab: ['CAUGHT A CRAB!', 'var(--bad)'], buoy: ['ON THE BUOYS', 'var(--bad)'],
+};
+
+let toastTimer = 0;
+function toast(text, ms = 1800) {
+  const el = $('toast');
+  el.textContent = text;
+  el.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('on'), ms);
+}
+
+function showGrade(kind, extra = '') {
+  const el = $('grade'), [text, colour] = GRADE_TEXT[kind];
+  el.textContent = text + extra;
+  el.style.color = colour;
+  el.classList.remove('pop');
+  void el.offsetWidth;   // restart the animation
+  el.classList.add('pop');
+}
+
+function setStartMsg(text) {
+  const el = $('startMsg');
+  if (el.textContent !== text) el.textContent = text;
+  el.classList.toggle('on', !!text);
+}
+
+// Average split over the last few seconds, as rowers read it: time per 500 m.
+const splitHistory = [];
+function currentSplit(boat, t) {
+  splitHistory.push([t, boat.x]);
+  while (splitHistory.length > 2 && splitHistory[0][0] < t - 4) splitHistory.shift();
+  const [t0, x0] = splitHistory[0], dx = boat.x - x0;
+  return dx > 0.5 ? 500 * (t - t0) / dx : null;
+}
+
+function updateHud(race) {
+  const p = race.player, D = race.course.distance, t = Math.max(0, race.t);
+  $('clockT').textContent = fmtTime(p.finishTime ?? t).slice(0, -1);
+  $('togoT').textContent = p.finishTime != null ? `Finished · ${ordinal(placeOf(race, p))}` : `${Math.max(0, Math.ceil(D - p.x))} m to go`;
+  $('rateT').textContent = p.strokes ? Math.round(liveRate(p, race.t)) : p.rate;
+  $('rateTarget').textContent = `target ${p.rate}`;
+  $('splitT').textContent = race.started ? fmtSplit(currentSplit(p, race.t)) : '–:––';
+  $('speedT').textContent = p.v.toFixed(1);
+  const e = $('energyB');
+  e.style.width = (p.energy * 100).toFixed(1) + '%';
+  e.style.background = p.energy < 0.22 ? 'var(--bad)' : p.energy < 0.45 ? 'var(--warn)' : 'var(--good)';
+  $('swingB').style.width = (p.swing * 100).toFixed(1) + '%';
+
+  // Slide meter: handle position, glowing catch zone as the slide comes forward.
+  const h = $('handle');
+  h.style.left = (4 + p.h * 92) + '%';
+  h.classList.toggle('drive', p.phase === 'drive');
+  const toFront = p.phase === 'recover' ? p.h / p.recSpeed : p.phase === 'front' ? 0 : 9;
+  $('catchZone').classList.toggle('ready', race.started && toFront < 0.25);
+
+  updateStandings(race);
+  updateCourseStrip(race);
+}
+
+const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
+
+// Stroke rate as measured from the last few catches (what a cox box shows), not just the target.
+const catchTimes = [];
+function liveRate(p, t) {
+  if (catchTimes.length < 2) return p.rate;
+  const n = Math.min(4, catchTimes.length - 1), span = catchTimes[catchTimes.length - 1] - catchTimes[catchTimes.length - 1 - n];
+  return span > 0 ? 60 * n / span : p.rate;
+}
+
+let standingsTick = 0;
+function updateStandings(race) {
+  if (standingsTick++ % 6) return;   // a few updates a second is plenty
+  const boats = [...race.boats].sort((a, b) => (a.finishTime ?? 1e9) - (b.finishTime ?? 1e9) || b.x - a.x);
+  const leader = boats[0];
+  $('standings').innerHTML = boats.map((b, i) => {
+    const gap = b.finishTime != null ? fmtTime(b.finishTime) : i === 0 ? 'lead' : '+' + ((leader.x - b.x) / Math.max(1, leader.v)).toFixed(1) + 's';
+    const sw = '#' + coloursFor(b).shirt.toString(16).padStart(6, '0');
+    return `<div class="${b === race.player ? 'me' : ''}"><span>${i + 1}</span><i class="sw" style="background:${sw}"></i><span>${b.crewName}</span><span class="gap">${gap}</span></div>`;
+  }).join('');
+}
+
+function updateCourseStrip(race) {
+  const el = $('courseBar'), D = race.course.distance;
+  if (el.childElementCount !== race.boats.length + (race.ghost ? 1 : 0) + 1) {
+    el.innerHTML = '<span class="line" style="left:100%"></span>' + race.boats.map(() => '<i></i>').join('') + (race.ghost ? '<i></i>' : '');
+  }
+  const dots = el.querySelectorAll('i');
+  [...race.boats, race.ghost].filter(Boolean).forEach((b, i) => {
+    const d = dots[i];
+    d.style.left = clamp(b.x / D, 0, 1) * 100 + '%';
+    d.style.top = (b.isGhost ? race.player.lane : b.lane) * 6 + 'px';
+    d.style.background = b.isGhost ? 'rgba(255,255,255,.4)' : '#' + coloursFor(b).shirt.toString(16).padStart(6, '0');
+    d.className = b === race.player ? 'me' : '';
+  });
+}
