@@ -61,6 +61,7 @@ function updateHud(race) {
   catchCue(p);
   updateStandings(race);
   updateCourseStrip(race);
+  updateWind(race.course.wind);
 }
 
 const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
@@ -151,4 +152,13 @@ function updateHud2(race) {
   $('p2handle').style.left = (4 + p.h * 92) + '%';
   $('p2handle').classList.toggle('drive', p.phase === 'drive');
   $('p2stats').textContent = `rate ${p.rate} · ${p.v.toFixed(1)} m/s · energy ${Math.round(p.energy * 100)}%`;
+}
+
+// Wind arrow: the course runs left to right, so a tailwind points right and a crosswind up or down.
+function updateWind(w) {
+  const el = $('windT');
+  if (el.dataset.w === String(w.speed)) return;
+  el.dataset.w = String(w.speed);
+  const ang = Math.atan2(w.cross, w.along) * 180 / Math.PI;
+  el.innerHTML = w.speed < 0.4 ? 'Calm' : `<svg viewBox="0 0 20 20" style="transform:rotate(${ang}deg)"><path d="M2 10h12M10 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>${w.speed.toFixed(1)} m/s ${windLabel(w).split(' ')[1].replace('wind', '')}`;
 }

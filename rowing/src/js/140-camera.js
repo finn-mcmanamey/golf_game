@@ -32,8 +32,16 @@ function cameraTarget(src, mode, raceT) {
   }
 }
 
+// As you cross the line, the TV director cuts to the finish camera for a moment.
+function finishShot(boat) {
+  const D = race.course.distance, since = boat.finishTime != null ? race.t - boat.finishTime - boat.startAt : -1;
+  if (cam.mode !== 'tv' || since < 0 || since > 3 || race.player2) return null;
+  const z = riverZ(race.course, D);
+  return { eye: [D - 0.5, 4, z + (race.course.bends ? race.course.halfW + 4 : BANK_Z - 6)], at: [D + 4, 0.5, boat.z], fov: 0.55 };
+}
+
 function updateCamera(boat, raceT, dt) {
-  const t = cameraTarget(boat, cam.mode, raceT);
+  const t = (race && boat === race.player && finishShot(boat)) || cameraTarget(boat, cam.mode, raceT);
   const k = cam.mode === 'rower' ? 1 : 1 - Math.exp(-dt * 4);
   for (let i = 0; i < 3; i++) { cam.eye[i] += (t.eye[i] - cam.eye[i]) * k; cam.at[i] += (t.at[i] - cam.at[i]) * k }
   cam.fov += (t.fov - cam.fov) * k;

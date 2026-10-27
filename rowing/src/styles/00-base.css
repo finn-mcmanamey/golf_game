@@ -158,3 +158,4 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 .badge.got { opacity: 1; border: 1px solid var(--acc); background: rgba(255,210,58,.1) } .badge.got b::before { content: '★ '; color: var(--acc) }
 #bhBody { overflow-x: auto }
 #boathouse { background: rgba(8, 18, 34, .88) }
+#windT { display: flex; gap: 4px; align-items: center; color: var(--dim); font-size: 12px } #windT svg { width: 14px; height: 14px; color: #7dd3fc }
