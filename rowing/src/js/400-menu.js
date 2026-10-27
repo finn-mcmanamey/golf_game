@@ -15,12 +15,19 @@ function segmented(id, items, current, onPick) {
 }
 
 const KIND_LABEL = { head: ' (head race)', erg: ' (indoor erg)', knockout: ' (match race)' };
+// Head races also come in a long, 4 km version: a procession down the river, like the real thing.
+function distanceChoices() {
+  const list = settings.kind === 'head' ? [...DISTANCES, 4000] : DISTANCES;
+  if (!list.includes(settings.distance)) settings.distance = 2000;
+  segmented('segDist', list.map(d => [d, d >= 1000 ? d / 1000 + ' km' : d + ' m']), settings.distance, v => { settings.distance = v; menuChanged() });
+}
+
 const currentOpts = () => ({ seed: settings.seed, distance: settings.distance, cls: settings.kind === 'erg' ? '1x' : settings.cls, difficulty: settings.difficulty, lane: 2, kind: settings.kind });
 
 function buildMenu() {
   if (!settings.seed) settings.seed = 1 + Math.floor(Math.random() * 99999);
-  segmented('segKind', [['regatta', 'Regatta'], ['head', 'Head race'], ['erg', 'Indoor erg']], settings.kind, v => { settings.kind = v; menuChanged() });
-  segmented('segDist', DISTANCES.map(d => [d, d + ' m']), settings.distance, v => { settings.distance = v; menuChanged() });
+  segmented('segKind', [['regatta', 'Regatta'], ['head', 'Head race'], ['erg', 'Indoor erg']], settings.kind, v => { settings.kind = v; distanceChoices(); menuChanged() });
+  distanceChoices();
   segmented('segCls', Object.entries(BOAT_CLASSES).map(([k, c]) => [k, k]), settings.cls, v => { settings.cls = v; menuChanged() });
   segmented('segDiff', FIELD_ORDER.map(k => [k, DIFFICULTY[k].label]), settings.difficulty, v => { settings.difficulty = v; menuChanged() });
   segmented('segQuality', QUALITY_LABELS.map((l, i) => [i, l]), settings.quality, v => { settings.quality = v; R.quality = v; saveSettings() });

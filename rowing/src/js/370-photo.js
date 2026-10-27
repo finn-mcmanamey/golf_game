@@ -28,5 +28,15 @@ addEventListener('pointermove', e => {
   photo.drag = { x: e.clientX, y: e.clientY };
 });
 addEventListener('pointerup', () => { photo.drag = null });
+// Two fingers: pinch to zoom.
+let pinch = null;
+addEventListener('touchmove', e => {
+  if (!photo.on || e.touches.length !== 2) { pinch = null; return }
+  const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  if (pinch) photo.dist = clamp(photo.dist * pinch / d, 4, 120);
+  pinch = d;
+  photo.drag = null;
+}, { passive: true });
+addEventListener('touchend', () => { pinch = null });
 addEventListener('wheel', e => { if (photo.on) photo.dist = clamp(photo.dist * (e.deltaY > 0 ? 1.1 : 0.9), 4, 120) }, { passive: true });
 addEventListener('keydown', e => { if (e.code === 'KeyF' && (game.state === 'race' || photo.on)) togglePhoto() });
