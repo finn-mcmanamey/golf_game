@@ -17,6 +17,7 @@ const AU = {
       this.water = this.loop(500, 0.6, 'lowpass');
       this.crowd = this.loop(1100, 0.8, 'bandpass');
       this.rain = this.loop(5000, 0.3, 'highpass');
+      this.slide = this.loop(160, 2.5, 'bandpass');
     } catch (e) { this.ctx = null }
   },
 
@@ -62,6 +63,7 @@ const AU = {
       case 'attention': this.tone(660, 660, 0.25, 0.15, 'triangle'); break;
       case 'go': this.tone(440, 440, 0.9, 0.3, 'sawtooth'); this.tone(442, 442, 0.9, 0.2, 'square'); break;
       case 'finish': [523, 659, 784, 1047].forEach((f, i) => this.tone(f, f, 0.3, 0.16, 'triangle', i * 0.1)); break;
+      case 'cheer': this.hiss(900, 0.4, 2.6, 0.5, 'bandpass'); this.hiss(2400, 0.6, 2.2, 0.25, 'bandpass', 0.1); break;
       case 'win': [523, 659, 784, 1047, 1319].forEach((f, i) => this.tone(f, f, 0.45, 0.18, 'square', i * 0.11)); break;
       case 'ui': this.tone(900, 1100, 0.04, 0.08); break;
       case 'cue': this.tone(1200, 1150, 0.035, 0.07, 'sine'); break;
@@ -70,13 +72,14 @@ const AU = {
   },
 
   // Ambient beds follow the race: water rush with boat speed, crowd swelling near the finish.
-  ambient(speed, crowd, rain = 0) {
+  ambient(speed, crowd, rain = 0, sliding = 0) {
     if (!this.ready()) return;
     const t = this.ctx.currentTime;
     this.water.g.gain.setTargetAtTime(0.03 + Math.min(1, speed / 6) * 0.12, t, 0.2);
     this.water.f.frequency.setTargetAtTime(300 + speed * 90, t, 0.2);
     this.crowd.g.gain.setTargetAtTime(crowd * 0.18, t, 0.4);
     this.rain.g.gain.setTargetAtTime(rain * 0.05, t, 0.5);
+    this.slide.g.gain.setTargetAtTime(sliding * 0.22, t, 0.05);   // seat wheels rumbling on the recovery
   },
 
   setOn(on) { if (this.master) this.master.gain.value = on ? 0.8 : 0 },
