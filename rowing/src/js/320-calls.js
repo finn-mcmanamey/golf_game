@@ -46,6 +46,9 @@ function updateCalls(race) {
   if (pushing && !calls.pushing) say('Power ten, on this one!', null, 1.5);
   calls.pushing = pushing;
   if (p.energy < 0.18) say('Breathe! Hold the length!', 'tired');
+  // Head races (rules 5): where the stream is kindest, said once, early.
+  if (race.course.kind === 'head' && race.opts.rules >= 5 && race.course.current && p.strokes === 20)
+    say(race.course.current < 0 ? 'Stream against us: slacker water by the bank. Mind the edge!' : 'Stream with us: stay mid-river, it runs fastest there!', 'stream');
   // Head races: a crew that started behind and is now on your stern.
   if (race.course.bends) {
     const hunter = race.boats.find(b => b !== p && b.startAt > 0 && b.finishTime == null && p.x - b.x > 0 && p.x - b.x < 18);

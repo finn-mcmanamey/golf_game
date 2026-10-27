@@ -58,9 +58,10 @@ function makeRace(opts) {
 //  2: wash from crews in the next lane (its reach was too short to matter; kept exactly for races rowed under it).
 //  3: wash that reaches: felt as soon as you drift from your lane centre towards a faster crew just ahead.
 //  4: bumps crews push when a bump is close (ahead or behind). Other kinds row exactly as under rules 3.
-const RULES_LATEST = 4;
+//  5: head-race streams run fastest mid-river and slackest by the banks. Other kinds row exactly as under rules 3.
+const RULES_LATEST = 5;
 const WASH = { 2: { reach: 9.5, span: 2.5, drag: () => TUNE.washDrag }, 3: { reach: LANE_W - 0.5, span: 3, drag: () => TUNE.washDrag3 } };
-WASH[4] = WASH[3];
+WASH[4] = WASH[5] = WASH[3];
 
 // Wash: a faster crew just ahead in the next lane leaves rough water. Felt when the boats drift towards each
 // other, so it rewards holding the middle of your lane. Computed for every boat before any moves.

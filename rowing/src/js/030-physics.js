@@ -132,7 +132,7 @@ function stepBoat(b, input, course, race) {
   b.yaw += (steer * TUNE.steerRate * grip * Math.min(1, b.v / 3) / Math.sqrt(n) + course.wind.cross * 0.0012 - b.yaw * TUNE.yawDamp * 0.05) * dt;
   b.yaw = course.kind === 'erg' ? 0 : clamp(b.yaw, course.bends ? -0.7 : -0.25, course.bends ? 0.7 : 0.25);   // ergs don't steer
   const prevX = b.x;
-  b.x += (b.v + course.current) * dt;
+  b.x += (b.v + streamAt(course, b, race)) * dt;
   b.z += (b.v * b.yaw + course.wind.cross * TUNE.crossDrift) * dt;
 
   if (course.bends) hitBanks(b, course, dt);
@@ -160,6 +160,14 @@ function hitBuoys(b, dt) {
 }
 
 // On a river the blades can hit the bank: a heavier penalty than buoys, and the boat is turned back to the stream.
+// The stream a boat feels (F-109): from rules 5 a head-race river runs fastest mid-river and slackest by the banks,
+// so against the stream a crew can gain by hugging a bank, at the risk of hitting it.
+function streamAt(course, b, race) {
+  if (course.kind !== 'head' || !(race.opts.rules >= 5)) return course.current;
+  const off = Math.min(1, Math.abs(b.z - riverZ(course, b.x)) / course.halfW);
+  return course.current * (TUNE.streamMid - TUNE.streamDrop * off * off);
+}
+
 function hitBanks(b, course, dt) {
   const off = b.z - riverZ(course, b.x), limit = course.halfW - 3.2;
   if (Math.abs(off) > limit) {

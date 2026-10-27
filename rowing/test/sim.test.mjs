@@ -16,7 +16,7 @@ assert.deepEqual(unsafe, [], `engine-dependent Math in the simulation: ${unsafe.
 assert.ok(!simCode.includes('**'), 'the ** operator is Math.pow by another name: precompute instead');
 
 const ctx = vm.createContext({ console });
-vm.runInContext(src + '\n;globalThis.api={makeRace,stepRace,simulateRace,encodeRace,decodeRace,packInput,IN,TUNE,placeOf,fmtTime,steerError,laneZ};', ctx);
+vm.runInContext(src + '\n;globalThis.api={makeCourse,riverZ,riverSlope,makeRace,stepRace,simulateRace,encodeRace,decodeRace,packInput,IN,TUNE,placeOf,fmtTime,steerError,laneZ};', ctx);
 const { makeRace, stepRace, simulateRace, encodeRace, decodeRace, packInput, IN, placeOf, fmtTime } = ctx.api;
 
 // A scripted "player" that rows like a decent human, so tests cover the player's path too.
@@ -107,4 +107,24 @@ assert.ok(u1.boats.some(b => b.out), 'somebody bumps on a club river');
 assert.equal(u2.order.join(), u1.order.join(), 'bumps codes re-row to the same order');
 assert.equal(new Set(u1.order).size, 6, 'every crew keeps exactly one place');
 console.log(`1km bumps: river order ${u1.order.map(l => l + 1).join(' ')}, you ${placeOf(u1, u1.player)} from station ${u1.player.lane + 1}`);
+
+// Rules 5 (F-109): head-race streams run fastest mid-river. Against the stream the bank line wins; with it, the middle.
+const { makeCourse, riverZ, riverSlope } = ctx.api;
+function rowLine(opts, off) {
+  const race = makeRace(opts);
+  while (!race.done) {
+    const b = race.player, v = scriptedPlayer(race, 32) & ~(IN.LEFT | IN.RIGHT);
+    const err = (b.z - riverZ(race.course, b.x + 12) - off) + (b.yaw - riverSlope(race.course, b.x + 10)) * 10;
+    stepRace(race, v | (err > 0.8 ? IN.LEFT : err < -0.8 ? IN.RIGHT : 0));
+  }
+  return race.player.finishTime;
+}
+const streamSeed = test => { for (let s = 1; s < 500; s++) if (test(makeCourse(s, 1000, 'head').current)) return s };
+const against = { seed: streamSeed(c => c < -0.12), distance: 1000, cls: '1x', difficulty: 'club', lane: 2, kind: 'head', rules: 5 };
+const withIt = { ...against, seed: streamSeed(c => c > 0.15) };
+const bankAgainst = rowLine(against, 18), laneAgainst = rowLine(against, 0), bankWith = rowLine(withIt, 18), midWith = rowLine(withIt, 0);
+assert.ok(bankAgainst < laneAgainst, 'against the stream, the bank line is faster');
+assert.ok(midWith < bankWith, 'with the stream, mid-river is faster');
+assert.equal(rowLine({ ...against, rules: 4 }, 0), rowLine({ ...against, rules: 4 }, 0), 'rules 4 head races re-row the same');
+console.log(`rules 5 head: against the stream bank ${fmtTime(bankAgainst)} vs mid ${fmtTime(laneAgainst)}; with it mid ${fmtTime(midWith)} vs bank ${fmtTime(bankWith)}`);
 console.log('ok');

@@ -23,6 +23,8 @@ const TUNE_DEFAULTS = Object.freeze({
   crossDrift: 0.02,        // sideways drift per m/s of crosswind
   washDrag: 0.22,          // speed lost per second in a crew's wash under rules 2 (kept exactly for old races)
   washDrag3: 0.09,         // the same under rules 3, where wash really reaches the next lane
+  streamMid: 1.2,          // head-race stream mid-river, × the course's stream (rules 5)
+  streamDrop: 1.25,        // how much slacker it is at the bank (× off², off = 1 at the bank)
   buoyLimit: 3.3,          // lateral distance from lane centre where the oars hit the buoys (m)
 });
 const TUNE = { ...TUNE_DEFAULTS };
