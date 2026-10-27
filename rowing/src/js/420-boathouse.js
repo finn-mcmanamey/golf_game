@@ -33,6 +33,8 @@ const BADGES = [
   { id: 'olympic', name: 'Olympian', how: 'Win against an olympic field', test: c => c.place === 1 && c.o.difficulty === 'olympic' },
   { id: 'distance', name: 'Full distance', how: 'Row 2000 m', test: c => c.o.distance >= 2000 },
   { id: 'sprint', name: 'Sprinter', how: 'Single scull 500 m under 1:30', test: c => c.o.cls === '1x' && c.o.distance === 500 && c.p.finishTime < 90 },
+  { id: 'bump', name: 'Bumped up', how: 'Catch the crew ahead in a bumps race', bumps: true, test: c => c.p.out?.up },
+  { id: 'blades', name: 'Blades', how: 'Bump up two places in one bumps race', bumps: true, test: c => c.p.lane + 1 - c.place >= 2 },
   { id: 'medals', name: 'Medal haul', how: 'Win three season medals', test: () => (career?.medals.length || 0) >= 3 },
 ];
 
@@ -40,7 +42,7 @@ function checkBadges(race, place) {
   if (game.mode === 'replay' || game.mode === 'duel' || tuneEdited()) return [];
   const p = race.player, order = [...race.boats].sort((a, b) => placeOf(race, a) - placeOf(race, b));
   const c = { p, o: race.opts, place, margin: order.length > 1 && place === 1 ? order[1].finishTime - p.finishTime : 9, lastAtHalf: game.lastAtHalf };
-  const got = STORE.get('badges', {}), fresh = BADGES.filter(b => !got[b.id] && b.test(c));
+  const got = STORE.get('badges', {}), fresh = BADGES.filter(b => !got[b.id] && (b.id === 'first' || !b.bumps === (c.o.kind !== 'bumps')) && b.test(c));
   for (const b of fresh) got[b.id] = Date.now();
   STORE.set('badges', got);
   return fresh;

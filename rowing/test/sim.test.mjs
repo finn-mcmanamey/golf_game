@@ -91,4 +91,12 @@ const e1 = row(erg, 34), ecode = encodeRace(erg, e1.inputs), e2 = simulateRace(d
 assert.equal(e2.player.finishTime, e1.player.finishTime, 'erg codes re-row exactly');
 assert.ok(e1.boats.every(b => b.z === ctx.api.laneZ(b.lane) && b.yaw === 0), 'ergs never steer');
 console.log(`500m erg: player ${fmtTime(e1.player.finishTime)} place ${placeOf(e1, e1.player)}`);
+
+// Bumps: crews in single file; a catch swaps two places, and codes re-row to the same river order.
+const bumps = { ...opts, kind: 'bumps', distance: 1000, difficulty: 'club', rules: 3 };
+const u1 = row(bumps, 32), ucode = encodeRace(bumps, u1.inputs), u2 = simulateRace(decodeRace(ucode).opts, decodeRace(ucode).inputs);
+assert.ok(u1.boats.some(b => b.out), 'somebody bumps on a club river');
+assert.equal(u2.order.join(), u1.order.join(), 'bumps codes re-row to the same order');
+assert.equal(new Set(u1.order).size, 6, 'every crew keeps exactly one place');
+console.log(`1km bumps: river order ${u1.order.map(l => l + 1).join(' ')}, you ${placeOf(u1, u1.player)} from station ${u1.player.lane + 1}`);
 console.log('ok');

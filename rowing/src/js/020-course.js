@@ -39,7 +39,7 @@ function makeCourse(seed, distance, kind = 'regatta') {
     night: makeRng(hashSeed(seed, 0x416))() < 0.12,  // drawing only: an evening regatta under lights
     shower: showerFor(seed),                          // drawing only: rain that sweeps in partway down the course
     theme: ['parkland', 'parkland', 'alpine', 'city', 'coast'][(makeRng(hashSeed(seed, 0x7E3))() * 5) | 0],   // drawing only
-    kind, ...(kind === 'head' ? riverFor(seed, distance) : {}),
+    kind, ...(kind === 'head' || kind === 'bumps' ? riverFor(seed, distance) : {}),
     // Indoors on rowing machines: still air, no stream (the draws above still happen, so seeds line up).
     ...(kind === 'erg' ? { wind: { speed: 0, along: 0, cross: 0 }, current: 0, rain: false, name: 'Indoor ' + VENUE_A[seed % VENUE_A.length] + ' Arena' } : {}),
   };
@@ -80,7 +80,7 @@ function riverSlope(course, x) {
 }
 
 // Where a crew wants to be: its lane centre on a regatta course, its own line down the river in a head race.
-const targetZ = (course, b, ahead = 0) => course.bends ? riverZ(course, b.x + ahead) + (b.lane - 2.5) * 3.5 : laneZ(b.lane);
+const targetZ = (course, b, ahead = 0) => course.bends ? riverZ(course, b.x + ahead) + (course.kind === 'bumps' ? 0 : (b.lane - 2.5) * 3.5) : laneZ(b.lane);
 
 // How far a boat is off its line, looking a little ahead: positive means steer left.
 function steerError(course, b) {

@@ -11,6 +11,7 @@ const MODES = [
   { name: 'regatta', setup: "settings.kind='regatta';settings.cls='1x'", button: '#btnRace' },
   { name: 'eight', setup: "settings.kind='regatta';settings.cls='8+'", button: '#btnRace' },
   { name: 'head race', setup: "settings.kind='head';settings.cls='1x'", button: '#btnRace' },
+  { name: 'bumps', setup: "settings.kind='bumps';settings.cls='4x'", button: '#btnRace', distance: 500 },
   { name: 'erg', setup: "settings.kind='erg'", button: '#btnRace' },
   { name: 'cup', setup: "settings.kind='regatta';settings.cls='2x'", button: '#btnCup' },
   { name: 'season', setup: "settings.kind='regatta'", button: '#btnCareer' },
@@ -27,14 +28,14 @@ const MODES = [
     const t0 = Date.now();
     try {
       await p.goto(page);
-      await p.evaluate(m.setup + ';settings.distance=250;menuChanged()');
+      await p.evaluate(m.setup + `;settings.distance=${m.distance || 250};menuChanged()`);
       await p.click(m.button);
       await p.waitForFunction(() => race.started, null, { timeout: 120000 });
       await p.waitForTimeout(1500);
       if (shots) await p.screenshot({ path: path.join(shots, m.name.replace(/ /g, '-') + '.png') });
       await p.evaluate(() => { game.fastForward = true });
       await p.waitForFunction(() => game.state === 'results', null, { timeout: 300000 });
-      const r = await p.evaluate(() => ({ time: race.player.finishTime, place: placeOf(race, race.player), boats: race.boats.length }));
+      const r = await p.evaluate(() => ({ time: race.player.finishTime ?? race.player.out?.t, place: placeOf(race, race.player), boats: race.boats.length }));
       if (r.time == null) errors.push('player did not finish');
       console.log(`${errors.length ? 'FAIL' : 'ok  '} ${m.name.padEnd(10)} ${fmt(r.time)} place ${r.place}/${r.boats} (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
     } catch (e) { errors.push(e.message.split('\n')[0]); console.log(`FAIL ${m.name}`) }

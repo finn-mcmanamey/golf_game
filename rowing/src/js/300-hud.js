@@ -40,8 +40,9 @@ function currentSplit(boat, t) {
 
 function updateHud(race) {
   const p = race.player, D = race.course.distance, t = Math.max(0, race.t);
-  $('clockT').textContent = fmtTime(p.finishTime ?? t).slice(0, -1);
-  $('togoT').textContent = p.finishTime != null ? `Finished · ${ordinal(placeOf(race, p))}` : `${Math.max(0, Math.ceil(D - p.x))} m to go`;
+  $('clockT').textContent = fmtTime(p.finishTime ?? p.out?.t ?? t).slice(0, -1);
+  $('togoT').textContent = race.order && (p.out || p.finishTime != null) ? bumpOutcome(race, p)
+    : p.finishTime != null ? `Finished · ${ordinal(placeOf(race, p))}` : `${Math.max(0, Math.ceil(D - p.x))} m to go`;
   $('rateT').textContent = p.strokes ? Math.round(liveRate(p, race.t)) : p.rate;
   $('rateTarget').textContent = `target ${p.rate}`;
   $('splitT').textContent = race.started ? fmtSplit(currentSplit(p, race.t)) : '–:––';
@@ -50,7 +51,7 @@ function updateHud(race) {
   e.style.width = (p.energy * 100).toFixed(1) + '%';
   e.style.background = p.energy < 0.22 ? 'var(--bad)' : p.energy < 0.45 ? 'var(--warn)' : 'var(--good)';
   $('swingB').style.width = (p.swing * 100).toFixed(1) + '%';
-  $('rateTarget').textContent = p.finishTime != null ? 'paddling' : coxing() ? `target ${p.rate} · tens ${coxState.tens}` : `target ${p.rate}`;
+  $('rateTarget').textContent = p.finishTime != null || p.out ? 'paddling' : coxing() ? `target ${p.rate} · tens ${coxState.tens}` : `target ${p.rate}`;
 
   // Slide meter: handle position, glowing catch zone as the slide comes forward.
   const h = $('handle');
@@ -84,7 +85,7 @@ function updateStandings(race) {
   const leader = boats[0], D = race.course.distance;
   $('standings').innerHTML = boats.map((b, i) => {
     // Head races are against the clock: show each crew's projected time, or when it starts.
-    const gap = b.finishTime != null ? fmtTime(b.finishTime)
+    const gap = race.order ? bumpStatus(race, b) : b.finishTime != null ? fmtTime(b.finishTime)
       : race.course.bends ? (race.t < b.startAt ? `starts ${Math.ceil(b.startAt - race.t)}s` : b.x > 20 ? '≈' + fmtTime((race.t - b.startAt) * D / b.x).slice(0, -3) : '…')
       : i === 0 ? 'lead' : '+' + ((leader.x - b.x) / Math.max(1, leader.v)).toFixed(1) + 's';
     const sw = '#' + coloursFor(b).shirt.toString(16).padStart(6, '0');

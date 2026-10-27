@@ -16,10 +16,19 @@ function makeRace(opts) {
     boats.push(makeBoat(cls, l, duel && l === lane + 1 ? 'Player 2' : name, seed, human ? 0.035 : DIFFICULTY[difficulty].crewSd));
     brains[l] = human ? null : makeBrain(seed, l, difficulty);   // indexed by lane, since some lanes may be empty
   }
-  if (course.bends) {
+  if (kind === 'head') {
     // Head race: you go first; the other crews follow at 8-second intervals, each on its own line.
     let k = 1;
     for (const b of boats) { b.z = targetZ(course, b); if (b.lane !== lane) b.startAt = 8 * k++ }
+  }
+  // Bumps: one line of crews with clear water between them; the crew at the head of the river starts furthest on.
+  if (kind === 'bumps') {
+    const form = makeRng(hashSeed(seed, 0xB0B));   // crews on form or off it, so bumps happen all down the river
+    for (const b of boats) {
+      b.x = (LANES - 1 - b.lane) * BUMP_GAP * BOAT_CLASSES[cls].length;
+      b.z = targetZ(course, b);
+      if (brains[b.lane]) brains[b.lane].cruise += ((form() * 5) | 0) - 2;
+    }
   }
   // A ghost re-rows its own race unseen alongside this one (same field, same wash), so it matches its code exactly.
   let ghost = null, ghostRace = null;
@@ -37,6 +46,7 @@ function makeRace(opts) {
     t: -(4 + rng() * 2.5),        // seconds until the start (t0 remembers it, for the start-line camera)
     attentionAt: -(1.2 + rng() * 1.6),  // "Attention!" comes a varying time before the horn, so nobody can anticipate it
     started: false, inputs: [], done: false, falseStart: false, finishOrder: [],
+    order: kind === 'bumps' ? boats.map(b => b.lane) : null,   // bumps: lanes from the head of the river down
   };
   race.t0 = race.t;
   return race;
@@ -78,11 +88,13 @@ function stepRace(race, playerInput, player2Input = 0) {
   for (let i = 0; i < race.boats.length; i++) {
     const b = race.boats[i];
     if (wash && wash[i] > 0) { b.v *= 1 - w.drag() * wash[i] * TUNE.dt; b.inWash = wash[i] } else b.inWash = 0;
+    if (b.out) { pullOver(b, race.course, dt); continue }
     if (b.finishTime != null && b.x > race.course.distance + 40) { b.v *= 0.99; b.x += b.v * dt; continue }
     const input = b === race.player ? playerInput : b === race.player2 ? player2Input : botInput(race.brains[b.lane], b, race);
     stepBoat(b, b.finishTime != null ? packInput(0, 18) : input, race.course, race);
     if (b.finishTime != null && !race.finishOrder.includes(b)) race.finishOrder.push(b);
   }
+  if (race.order) checkBumps(race);
   if (race.ghostRace) {
     const g = race.ghost, gi = race.ghostInputs;
     if (g.finishTime == null) stepRace(race.ghostRace, race.tick < gi.length ? gi[race.tick] : packInput(0, 18));
@@ -91,19 +103,49 @@ function stepRace(race, playerInput, player2Input = 0) {
   }
   race.tick++;
   const p = race.player;
-  const allIn = race.boats.every(b => b.finishTime != null);
+  const allIn = race.boats.every(b => b.finishTime != null || b.out);
   if (race.player2 && race.player2.finishTime == null && race.t < 1200) return;   // a duel ends when both humans are home
-  if (p.finishTime != null && (allIn || race.t > p.finishTime + (race.course.bends ? 70 : 25))) race.done = true;
+  const home = p.out ? p.out.t : p.finishTime;
+  if (home != null && (allIn || race.t > home + (race.course.kind === 'head' ? 70 : 25))) race.done = true;
   if (race.t > 60 * 20) race.done = true;  // safety net
 }
 
 // Place: finished crews by time; the rest by distance (or, in a head race, by the time they're on course for).
 function placeOf(race, boat) {
+  if (race.order) return 1 + race.order.indexOf(boat.lane);
   const D = race.course.distance;
   const score = b => b.finishTime != null ? b.finishTime : race.course.bends
     ? 1e6 + (b.x > 20 ? (race.t - b.startAt) * D / b.x : 1e5 + b.startAt) : 1e6 - b.x;
   const me = score(boat);
   return 1 + race.boats.filter(b => b !== boat && score(b) < me).length;
+}
+
+/* ----- bumps: catch the crew ahead before the crew behind catches you ----- */
+const BUMP_GAP = 2.5;   // bow to bow, in boat lengths: a length and a half of clear water
+
+// A bump: the chaser's bow reaches the stern of the nearest crew ahead still racing. Both pull over and swap places.
+function checkBumps(race) {
+  const racing = b => !b.out && b.finishTime == null;
+  for (const c of race.boats) {
+    if (!racing(c)) continue;
+    const t = race.boats.filter(o => o.lane < c.lane && racing(o)).pop();
+    if (!t || c.x < t.x - BOAT_CLASSES[t.cls].length) continue;
+    c.out = { t: race.t, up: true, side: 9 };
+    t.out = { t: race.t, up: false, side: -9 };
+    const o = race.order, i = o.indexOf(c.lane), j = o.indexOf(t.lane);
+    o[i] = t.lane; o[j] = c.lane;
+    c.events.push({ type: 'bump', up: true, other: t });
+    t.events.push({ type: 'bump', up: false, other: c });
+  }
+}
+
+// A bumped (or bumping) crew stops rowing, drifts to a halt and moves over to let the others by.
+function pullOver(b, course, dt) {
+  b.v *= 1 - 0.8 * dt;
+  b.x += b.v * dt;
+  b.z += (riverZ(course, b.x) + b.out.side - b.z) * dt;
+  b.yaw *= 1 - 2 * dt;
+  b.rate = 18;
 }
 
 // Re-rows a race from its recorded inputs without drawing anything: used to verify codes and build ghosts.

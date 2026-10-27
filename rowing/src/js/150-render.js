@@ -39,7 +39,7 @@ function setWetness(k) {
 function wetnessNow(race) {
   const c = race.course;
   if (c.rain) return 1;
-  if (!c.shower || c.kind !== 'regatta' && c.kind !== 'head') return 0;
+  if (!c.shower || !['regatta', 'head', 'bumps'].includes(c.kind)) return 0;
   const f = Math.max(...race.boats.map(b => b.x)) / c.distance;
   return smooth(c.shower.from - 0.05, c.shower.from + 0.05, f) * (1 - smooth(c.shower.to - 0.05, c.shower.to + 0.05, f));
 }

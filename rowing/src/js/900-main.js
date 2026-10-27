@@ -127,6 +127,7 @@ function handleEvents() {
       const near = 1 - Math.min(1, Math.hypot(b.x - cam.eye[0], b.z - cam.eye[2]) / 45);
       for (const e of b.events) {
         commentEvent(b, e);
+        if (e.type === 'bump' && e.up) bumpEvent(b, e);
         if (near > 0 && e.type === 'catch') AU.play('catch', near * 0.45);
         if (near > 0 && e.type === 'release' && e.grade === 'crab') AU.play('crab');
       }
@@ -146,6 +147,7 @@ function handleEvents() {
         if (e.grade === 'crab') { showGrade('crab'); AU.play('crab'); buzz('crab'); cam.shake = 1 }
         else if (e.grade === 'short') showGrade('short');
       } else if (e.type === 'buoy' || e.type === 'bank') { showGrade(e.type); AU.play('buoy'); if (e.type === 'bank') cam.shake = 0.6 }
+      else if (e.type === 'bump') bumpEvent(b, e);
       else if (e.type === 'finish') {
         AU.play(placeOf(race, b) === 1 ? 'cheer' : 'finish');
         // Fireworks for beating a field on a regatta course (a head race isn't decided until everyone's home).
@@ -172,8 +174,9 @@ function startSequence() {
     if (msg === 'GO!') AU.play('go');
     game.cue = msg;
   }
-  if (game.finishShown && game.time < game.finishMsgUntil) msg = `${ordinal(placeOf(race, race.player))} · ${fmtTime(race.player.finishTime)}`;
-  else if (race.player.finishTime != null) msg = '';
+  const p = race.player;
+  if (game.finishShown && game.time < game.finishMsgUntil) msg = race.order ? bumpOutcome(race, p) : `${ordinal(placeOf(race, p))} · ${fmtTime(p.finishTime)}`;
+  else if (p.finishTime != null || p.out) msg = '';
   setStartMsg(msg);
 }
 

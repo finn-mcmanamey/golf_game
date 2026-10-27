@@ -31,7 +31,8 @@ function say(text, key = text, gap = 2.5) {
 
 function updateCalls(race) {
   const p = race.player, D = race.course.distance, left = D - p.x;
-  if (!race.started || p.finishTime != null) return;
+  if (race.order && race.started) bumpCalls(race);
+  if (!race.started || p.finishTime != null || p.out) return;
   const place = placeOf(race, p);
   if (p.strokes === 1) say('Go! Wind it up!', 'go', 0);
   if (p.strokes === 12) say('Lengthen… and settle.', 'settle');
@@ -50,7 +51,7 @@ function updateCalls(race) {
     const hunter = race.boats.find(b => b !== p && b.startAt > 0 && b.finishTime == null && p.x - b.x > 0 && p.x - b.x < 18);
     if (hunter) say(`${hunter.crewName} on our stern! Hold them off!`, 'hunt-' + hunter.lane, 3);
   }
-  if (calls.place && p.strokes > 15) {
+  if (calls.place && p.strokes > 15 && !race.order) {
     const ahead = race.boats.filter(b => b !== p && b.finishTime == null).sort((a, b) => Math.abs(a.x - p.x) - Math.abs(b.x - p.x))[0];
     if (place < calls.place && ahead) say(`We've got ${ahead.crewName}! Keep moving!`, null, 3);
     else if (place > calls.place && ahead) say(`${ahead.crewName} coming through. Respond!`, null, 3);

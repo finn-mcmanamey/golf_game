@@ -14,10 +14,10 @@ function segmented(id, items, current, onPick) {
   }
 }
 
-const KIND_LABEL = { head: ' (head race)', erg: ' (indoor erg)', knockout: ' (match race)' };
+const KIND_LABEL = { bumps: ' (bumps)', head: ' (head race)', erg: ' (indoor erg)', knockout: ' (match race)' };
 // Head races also come in a long, 4 km version: a procession down the river, like the real thing.
 function distanceChoices() {
-  const list = settings.kind === 'head' ? [...DISTANCES, 4000] : DISTANCES;
+  const list = settings.kind === 'head' ? [...DISTANCES, 4000] : settings.kind === 'bumps' ? DISTANCES.slice(1) : DISTANCES;
   if (!list.includes(settings.distance)) settings.distance = 2000;
   segmented('segDist', list.map(d => [d, d >= 1000 ? d / 1000 + ' km' : d + ' m']), settings.distance, v => { settings.distance = v; menuChanged() });
 }
@@ -26,7 +26,7 @@ const currentOpts = () => ({ seed: settings.seed, distance: settings.distance, c
 
 function buildMenu() {
   if (!settings.seed) settings.seed = 1 + Math.floor(Math.random() * 99999);
-  segmented('segKind', [['regatta', 'Regatta'], ['head', 'Head race'], ['erg', 'Indoor erg']], settings.kind, v => { settings.kind = v; distanceChoices(); menuChanged() });
+  segmented('segKind', [['regatta', 'Regatta'], ['head', 'Head race'], ['bumps', 'Bumps'], ['erg', 'Indoor erg']], settings.kind, v => { settings.kind = v; distanceChoices(); menuChanged() });
   distanceChoices();
   segmented('segCls', Object.entries(BOAT_CLASSES).map(([k, c]) => [k, k]), settings.cls, v => { settings.cls = v; menuChanged() });
   segmented('segDiff', FIELD_ORDER.map(k => [k, DIFFICULTY[k].label]), settings.difficulty, v => { settings.difficulty = v; menuChanged() });
@@ -76,7 +76,7 @@ const soundLabel = () => { $('btnSound').textContent = settings.sound ? '🔊 So
 function menuChanged() {
   saveSettings();
   const c = makeCourse(settings.seed, settings.distance, settings.kind);
-  $('venue').textContent = c.kind === 'erg' ? `${c.name} · six rowing machines, one big screen` : `${c.name}${c.bends ? ' · winding river, crews start 8 s apart' : ''} · ${{ alpine: 'Mountains · ', city: 'City · ', coast: 'Coast · ' }[c.theme] || ''}${c.rain ? 'Rain · ' : c.night ? 'Evening, under lights · ' : ''}${windLabel(c.wind)}${c.current ? ` · ${c.current > 0 ? 'following' : 'opposing'} stream` : ''}`;
+  $('venue').textContent = c.kind === 'erg' ? `${c.name} · six rowing machines, one big screen` : `${c.name}${c.kind === 'bumps' ? ' · single file, catch the crew ahead before the crew behind catches you' : c.bends ? ' · winding river, crews start 8 s apart' : ''} · ${{ alpine: 'Mountains · ', city: 'City · ', coast: 'Coast · ' }[c.theme] || ''}${c.rain ? 'Rain · ' : c.night ? 'Evening, under lights · ' : ''}${windLabel(c.wind)}${c.current ? ` · ${c.current > 0 ? 'following' : 'opposing'} stream` : ''}`;
   // Erg races are always singles, so look records up with the options a race would really use.
   const o = currentOpts(), pb = getPB(o.distance, o.cls, o.kind);
   const here = STORE.get('history', []).filter(r => r.seed === o.seed && r.distance === o.distance && r.cls === o.cls && (r.kind || 'regatta') === o.kind);
@@ -130,20 +130,22 @@ function showResults(race) {
   // In a live race the field is your friends, not the bots: count the crews already home ahead of you.
   const place = game.mode === 'live' ? 1 + [...live.remote.values()].filter(r => r.finishTime != null && r.finishTime < p.finishTime).length : order.indexOf(p) + 1;
   const p2 = race.player2;
-  $('resTitle').textContent = p2 ? (placeOf(race, p) < placeOf(race, p2) ? 'Player 1 wins the duel!' : 'Player 2 wins the duel!')
+  const bumps = !!race.order;
+  $('resTitle').textContent = bumps ? bumpOutcome(race, p) : p2 ? (placeOf(race, p) < placeOf(race, p2) ? 'Player 1 wins the duel!' : 'Player 2 wins the duel!')
     : place === 1 ? 'Winner!' : `${ordinal(place)} place`;
   const code = encodeRace(opts, race.inputs);
   game.lastCode = code;
   const pb = getPB(opts.distance, opts.cls, opts.kind);
   let pbNote = '';
   if (settings.oneButton) game.oneButtonUsed = true;
-  const finished = p.finishTime != null, counts = finished && !game.oneButtonUsed && !game.tuned && !tuneEdited() && !['duel', 'replay', 'learn', 'training', 'live'].includes(game.mode);
+  const finished = p.finishTime != null || !!p.out, counts = finished && !game.oneButtonUsed && !game.tuned && !tuneEdited() && !['duel', 'replay', 'learn', 'training', 'live'].includes(game.mode);
   if (!finished) pbNote = ' · did not finish';
   else if (game.oneButtonUsed) pbNote = ' · one-button rowing';
   else if (game.tuned || tuneEdited()) pbNote = ' · tuned physics, not recorded';
   else if (game.mode === 'duel') pbNote = ' · duel';
   else if (game.mode === 'replay' || practiceMode()) pbNote = practiceMode() ? ' · practice' : ' · replay';
   else if (!counts) pbNote = game.mode === 'live' ? ' · live race' : '';
+  else if (bumps) pbNote = '';   // bumps are about places, not times
   else if (!pb || p.finishTime < pb.time) {
     savePB(opts.distance, opts.cls, opts.kind, { time: p.finishTime, code, venue: race.course.name, date: Date.now() });
     pbNote = pb ? ` · new personal best (was ${fmtTime(pb.time)})` : ' · first personal best';
@@ -156,21 +158,21 @@ function showResults(race) {
     const today = localDay(), s = STORE.get('dailyStreak', { n: 0, day: 0 });
     if (s.day !== today) STORE.set('dailyStreak', { n: s.day === today - 1 ? s.n + 1 : 1, day: today });
   }
-  $('resSub').textContent = `${fmtTime(p.finishTime)} · ${race.course.name}, ${opts.distance} m ${BOAT_CLASSES[opts.cls].name.toLowerCase()}${pbNote}`;
-  $('resTable').innerHTML = order.map((b, i) => `<tr class="${b === p ? 'me' : ''}"><td>${i + 1}</td><td>${race.course.bends ? 'Start ' + (b.startAt / 8 + 1) : 'Lane ' + (b.lane + 1)}</td><td>${displayName(b)}</td>
-    <td class="t">${b.finishTime != null ? fmtTime(b.finishTime) : '–'}</td><td class="t">${i && b.finishTime != null ? '+' + (b.finishTime - win).toFixed(2) : ''}</td></tr>`).join('')
+  $('resSub').textContent = bumps ? `Started ${ordinal(p.lane + 1)} on the river, finished ${ordinal(place)} · ${race.course.name}` : `${fmtTime(p.finishTime)} · ${race.course.name}, ${opts.distance} m ${BOAT_CLASSES[opts.cls].name.toLowerCase()}${pbNote}`;
+  $('resTable').innerHTML = order.map((b, i) => `<tr class="${b === p ? 'me' : ''}"><td>${i + 1}</td><td>${bumps ? 'Station ' + (b.lane + 1) : race.course.bends ? 'Start ' + (b.startAt / 8 + 1) : 'Lane ' + (b.lane + 1)}</td><td>${displayName(b)}</td>
+    <td class="t">${bumps ? bumpStatus(race, b) : b.finishTime != null ? fmtTime(b.finishTime) : '–'}</td><td class="t">${bumps ? '' : i && b.finishTime != null ? '+' + (b.finishTime - win).toFixed(2) : ''}</td></tr>`).join('')
     + (race.ghost?.finishTime ? `<tr><td></td><td></td><td>Ghost</td><td class="t">${fmtTime(race.ghost.finishTime)}</td><td class="t">${(race.ghost.finishTime - p.finishTime >= 0 ? '+' : '') + (race.ghost.finishTime - p.finishTime).toFixed(2)}</td></tr>` : '');
   const s = p.stats, strokes = Math.max(1, s.perfect + s.good + s.off);
-  $('resChart').innerHTML = splitChart(race, order[0]) + timingChart();
+  $('resChart').innerHTML = (bumps ? '' : splitChart(race, order[0])) + timingChart();
   $('resBoard').innerHTML = game.mode === 'live' ? $('liveStand').innerHTML : '';
   renderBoard();   // fills the results board for a daily, with working buttons
-  $('nextUp').textContent = game.mode === 'training' ? trainingSummary() : counts ? nextChallenge(race, place) : '';
-  $('resStats').textContent = `${p.strokes} strokes · average rate ${(p.strokes / p.finishTime * 60).toFixed(1)} · ${Math.round(s.perfect / strokes * 100)}% perfect catches`
+  $('nextUp').textContent = game.mode === 'training' ? trainingSummary() : counts && !bumps ? nextChallenge(race, place) : '';
+  $('resStats').textContent = `${p.strokes} strokes · average rate ${(p.strokes / (p.finishTime ?? p.out?.t ?? race.t) * 60).toFixed(1)} · ${Math.round(s.perfect / strokes * 100)}% perfect catches`
     + (s.crabs ? ` · ${s.crabs} crab${s.crabs > 1 ? 's' : ''}` : '') + (s.buoys ? ` · hit the buoys ${s.buoys}×` : '');
-  if (race.course.bends && place === 1 && counts) celebrate();
+  if (race.course.kind === 'head' && place === 1 && counts) celebrate();
   const careerNote = game.mode === 'career' ? (counts ? careerResult(race, place) : 'Not counted for the season: tuned physics or unfinished.')
     : game.mode === 'cup' ? (counts ? cupResult(race) : 'Not counted for the cup: tuned physics or unfinished.') : '';
-  if (counts) recordHistory(race, place);
+  if (counts && !bumps) recordHistory(race, place);
   const badges = counts ? checkBadges(race, place) : [];
   if (badges.length) setTimeout(() => toast('Badge earned: ' + badges.map(b => b.name).join(', '), 3200), 600);
   $('careerNote').textContent = careerNote;
