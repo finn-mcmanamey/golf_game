@@ -36,6 +36,8 @@ const driveHist = { base: false, ev: [] };
 let inputClock = null;   // real time (ms) of the step being simulated; null means "now"
 
 function driveChanged(t) {
+  // Some older WebKit builds stamp events on a different clock; such a stamp can't be placed in time, so use now.
+  if (!(Math.abs(t - performance.now()) < 1000)) t = performance.now();
   const held = keys.has('Space') || keys.has('Mouse') || touchState.drive, ev = driveHist.ev;
   if (held === (ev.length ? ev[ev.length - 1].down : driveHist.base)) return;
   ev.push({ t, down: held });

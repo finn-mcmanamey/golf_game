@@ -41,11 +41,11 @@ function startCupRace() {
 // `speed` is the race's average speed (m/s) and `len` the boat's length (m).
 function byVerdict(secs, speed, len) {
   const lengths = secs * speed / len, feet = Math.round(secs * speed * 3.28);
-  if (secs < 0.01) return 'in a dead heat';
+  if (secs === 0) return 'in a dead heat';   // finish times are interpolated, so anything else had a winner
   const call = lengths > 5 ? 'easily' : lengths < 0.05 ? 'by a canvas' : lengths < 0.2 ? `by ${feet} feet`
     : lengths < 0.875 ? `by ${['¼', '⅓', '½', '⅔', '¾'][[0.25, 1 / 3, 0.5, 2 / 3, 0.75].reduce((k, f, i, a) => Math.abs(f - lengths) < Math.abs(a[k] - lengths) ? i : k, 0)]} length`
     : (() => { const q = Math.round(lengths * 4) / 4, whole = Math.floor(q), frac = ['', '¼', '½', '¾'][Math.round((q - whole) * 4)]; return `by ${whole}${frac} length${q > 1 ? 's' : ''}` })();
-  return `${call} (${secs.toFixed(2)} s)`;
+  return `${call} (${secs.toFixed(secs < 0.01 ? 3 : 2)} s)`;
 }
 
 function cupResult(race) {
