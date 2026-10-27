@@ -45,7 +45,7 @@ function buildMenu() {
   $('btnLearn').onclick = startLearning;
   $('btnWelcome').onclick = startLearning;
   $('btnBoathouse').onclick = () => openBoathouse();
-  $('bhClose').onclick = () => $('boathouse').classList.add('hide');
+  $('bhClose').onclick = () => { $('boathouse').classList.add('hide'); $('menu').classList.remove('hide'); closeShowroom() };
   $('btnDuel').onclick = () => startRace({ ...currentOpts(), duel: true }, null, 'duel');
   $('btnCareer').onclick = startCareerRace;
   $('btnCup').onclick = startCupRace;

@@ -166,7 +166,10 @@ function frame(now) {
     if (game.state === 'menu' && race.done) showPreview(currentOpts());
   }
 
-  if (gl && race) {
+  if (gl && showroom.on) {
+    animateShowroom(dt, game.time);
+    renderFrame(showroom.race, game.time, dt);
+  } else if (gl && race) {
     if (game.state === 'menu') menuCamera(dt);
     else {
       // Wide shots frame both crews in a duel or match race; on-board shots stay with your boat.

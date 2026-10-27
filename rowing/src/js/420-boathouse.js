@@ -49,6 +49,8 @@ function checkBadges(race, place) {
 /* ----- the boathouse screen ----- */
 function openBoathouse(tab = 'crew') {
   $('boathouse').classList.remove('hide');
+  $('menu').classList.add('hide');
+  openShowroom();
   segmented('bhTabs', [['crew', 'Crew'], ['history', 'History'], ['badges', 'Badges']], tab, renderBoathouse);
   renderBoathouse(tab);
 }
@@ -84,6 +86,7 @@ function raceHistoryGhost(code) {
   try {
     const { opts, inputs } = decodeRace(code);
     $('boathouse').classList.add('hide');
+    showroom.on = false;   // startRace sets up its own scene
     startRace(opts, inputs);
   } catch (e) { toast('That run could not be loaded.') }
 }

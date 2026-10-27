@@ -18,7 +18,7 @@ const visualState = new WeakMap();   // per-boat drawing memory (blade height, l
 const puddles = [];                  // swirls left on the water where blades came out
 
 function coloursFor(boat) {
-  if (boat === race?.player || boat.isGhost) return PLAYER_COLOURS;
+  if (boat === race?.player || boat.isGhost || boat.isShowroom) return PLAYER_COLOURS;
   if (boat === race?.player2) return PLAYER2_COLOURS;
   let h = 0; for (const ch of boat.crewName) h = (h * 31 + ch.charCodeAt(0)) | 0;
   return CLUB_COLOURS[Math.abs(h) % CLUB_COLOURS.length];

@@ -86,7 +86,8 @@ function renderFrame(race, time, dtFrame) {
   const indoors = race.course.kind === 'erg';
   if (indoors) { for (const b of race.boats) drawErg(mb, b, time); drawErgScreen(mb, race) }
   else for (const b of race.boats) if (Math.abs(b.x - cam.at[0]) < 700) drawBoat(mb, b, dtFrame, time);
-  if (!indoors) drawFx(mb, dtFrame, time, race.course);
+  if (race.course.kind === 'showroom') drawMedalWall(mb, time);
+  else if (!indoors) drawFx(mb, dtFrame, time, race.course);
   const n = mb.upload(R.boatBuf, gl.DYNAMIC_DRAW);
   bindLitAttribs(R.boatBuf);
   gl.drawArrays(gl.TRIANGLES, 0, n);
