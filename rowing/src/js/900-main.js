@@ -15,6 +15,7 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   game.opts = opts;
   game.ghostInputs = ghostInputs;
   race = makeRace({ ...opts, ghostInputs });
+  if (race.order && mode !== 'replay') bumpsTip();
   if (gl) setScene(race.course, opts.cls);
   targetRate = targetRate2 = 36;
   catchTimes.length = 0;

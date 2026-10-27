@@ -46,7 +46,7 @@ function updateHud(race) {
   $('rateT').textContent = p.strokes ? Math.round(liveRate(p, race.t)) : p.rate;
   $('rateTarget').textContent = `target ${p.rate}`;
   $('splitT').textContent = race.started ? fmtSplit(currentSplit(p, race.t)) : '–:––';
-  $('speedT').textContent = p.v.toFixed(1);
+  $('speedT').textContent = Math.max(0, p.v).toFixed(1);
   const e = $('energyB');
   e.style.width = (p.energy * 100).toFixed(1) + '%';
   e.style.background = p.energy < 0.22 ? 'var(--bad)' : p.energy < 0.45 ? 'var(--warn)' : 'var(--good)';

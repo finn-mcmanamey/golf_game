@@ -98,3 +98,12 @@ function drawCannon(mb, course) {
     mb.box(x + 0.9 + age * (0.8 + (i % 4) * 0.5), 1 + age * 0.5 + (i % 3) * 0.6, z + ((i * 7) % 5 - 2) * 0.3 * (1 + age), s, s, s, [g, g, g * 1.02]);
   }
 }
+
+// The rules in one line, for a player's first few bumps races.
+function bumpsTip() {
+  const n = STORE.get('bumpsTips', 0);
+  if (n >= 3) return;
+  STORE.set('bumpsTips', n + 1);
+  const push = matchMedia('(pointer: coarse)').matches ? 'the push button' : 'Shift';
+  setTimeout(() => toast(`Bumps: touch the stern of the crew ahead before the crew behind touches yours. Whistles call the gap; ${push} is a power ten.`, 6000), 300);
+}
