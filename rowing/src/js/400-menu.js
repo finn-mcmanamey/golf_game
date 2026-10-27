@@ -229,7 +229,8 @@ function showResults(race) {
   $('btnAgain').textContent = game.mode === 'live' ? 'Back to the lobby' : game.mode === 'career' || game.mode === 'cup' && !cup.out && !cup.won ? 'Next race' : game.mode === 'week' ? (weekOver() ? 'Start a new week' : `Row day ${week.day + 1}`) : game.mode === 'cup' ? 'Enter a new cup' : 'Race again';
   // A duel's code only holds player 1's strokes, so it can't be replayed or shared.
   // Duel and practice codes can't be re-rowed (a code holds one crew in a full field), so no replay or link.
-  $('btnCard').classList.toggle('hide', !counts || game.mode !== 'daily' || p.finishTime == null);   // only results that count get a card
+  // Only results that count get a card: a daily that finished, or the last day of a bumps week.
+  $('btnCard').classList.toggle('hide', !counts || !(game.mode === 'daily' && p.finishTime != null || game.mode === 'week' && weekOver()));
   for (const id of ['btnReplay', 'btnShare']) $(id).classList.toggle('hide', !!race.player2 || practiceMode() || game.mode === 'live');
   $('results').classList.remove('hide');
   $('hud').classList.add('hide');

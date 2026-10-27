@@ -71,6 +71,14 @@ function bumpsChart(w) {
   return `<svg class="bumpsChart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Bumps chart">${lines.join('')}</svg>`;
 }
 
+// A finished week as one line to share: each day's move, where you ended up, and blades or spoons.
+function weekCard() {
+  const days = week.results.map(r => r > 0 ? '↑' + r : r < 0 ? '↓' + -r : '=').join(' '), end = weekStation() + 1, moved = 5 - end;
+  const ups = week.results.filter(r => r > 0).length, downs = week.results.filter(r => r < 0).length;
+  const verdict = ups === WEEK_DAYS ? ' · 🌿 Blades!' : downs === WEEK_DAYS ? ' · 🥄 Spoons' : '';
+  return `Voxel Regatta bumps week · ${days} · ${moved > 0 ? `up ${moved} to` : moved < 0 ? `down ${-moved} to` : 'held'} ${ordinal(end)}${verdict}`;
+}
+
 $('btnWeek').onclick = startWeekRace;
 
 // Returning players get one note about the new mode.

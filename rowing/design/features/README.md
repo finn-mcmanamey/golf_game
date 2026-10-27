@@ -29,3 +29,4 @@ Build order follows `Depends on`. Status: idea → spec'd → approved → build
 | F-117 | Bumps daily with a place-based board | idea | P2 | Fair | F-005, F-115 | Bumps results are places, not times; the board would rank bumps made, then distance |
 | F-118 | Crew selection: pick seats with trade-offs (power vs timing spread) | idea | P2 | Truth | F-001 | Must stay a choice, not an upgrade (brief: no stat progression); behind a rules version |
 | F-119 | Second research pass once fetch works | idea | P1 | — | — | Re-run the five questions; the source hosts were blocked by the network policy this time |
+| F-120 | Bumps week share card: each day's move, final place, blades or spoons | shipped | P2 | Fair | F-005, F-102 | 418-bumps-week.js weekCard |
