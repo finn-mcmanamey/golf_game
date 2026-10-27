@@ -24,6 +24,7 @@ function drawFx(mb, dt, time, course) {
   drawFlags(mb, time, course);
   if (course.night && !course.rain) drawLamps(mb, course);
   drawStartLights(mb, course);
+  drawLaunch(mb, dt, time, course);
   drawCrowd(mb, time, course);
   drawBirds(mb, time, course);
   if (course.rain && R.quality > 0) drawRain(mb, time);
@@ -110,4 +111,26 @@ function drawLamps(mb, course) {
     mb.box(x, 12.2, z - side * 0.4, 1.6, 0.6, 0.6, glow);
   }
   for (const b of race.boats) mb.box(b.x + 0.1, 0.32, b.z, 0.12, 0.12, 0.12, [6, 6, 5]);
+}
+
+// The umpire's launch: a motorboat following the field down the middle, umpire standing with a white flag.
+const launch = { x: -60, v: 0 };
+function drawLaunch(mb, dt, time, course) {
+  if (!race) return;
+  const rowing = race.boats.filter(b => b.finishTime == null);
+  const target = rowing.length ? rowing.reduce((n, b) => n + b.x, 0) / rowing.length - 32 : launch.x;
+  launch.v += clamp((target - launch.x) * 0.6 - launch.v, -4, 4) * dt;
+  launch.x += launch.v * dt;
+  if (race.t < 0 || launch.x < -80) launch.x = Math.min(launch.x, -50);
+  const x = launch.x, z = riverZ(course, x) + (course.bends ? 0 : (race.boats.length === 2 ? 0 : LANE_W * 0.5)), bob = Math.sin(time * 3) * 0.04;
+  const hull = [0.92, 0.92, 0.9], trim = hex(0x1f3d72);
+  mb.box(x, 0.35 + bob, z, 7, 0.7, 2.4, hull);
+  mb.box(x + 3.8, 0.4 + bob, z, 1.2, 0.5, 1.4, hull);
+  mb.box(x, 0.58 + bob, z, 7.1, 0.12, 2.5, trim);   // a band round the hull, below the white deck
+  mb.box(x - 1, 1.5 + bob, z, 1.6, 1.3, 1.8, [0.3, 0.45, 0.6]);   // cabin
+  // The umpire, flag raised.
+  mb.box(x + 1.4, 1.4 + bob, z + 0.4, 0.45, 0.9, 0.35, hex(0x203040));
+  mb.box(x + 1.4, 2.05 + bob, z + 0.4, 0.3, 0.3, 0.3, hex(0xe0b590));
+  mb.beam([x + 1.6, 1.8 + bob, z + 0.6], [x + 2.2, 3.0 + bob, z + 0.7], 0.04, 0.04, [0.4, 0.3, 0.2]);
+  mb.box(x + 2.5, 2.8 + bob + Math.sin(time * 6) * 0.05, z + 0.7, 0.6, 0.4, 0.03, [1.4, 1.4, 1.4]);
 }

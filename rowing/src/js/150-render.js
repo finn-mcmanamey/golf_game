@@ -148,6 +148,11 @@ function drawWater(race, vp, time, dtFrame, reflect) {
     const q = pose(b);
     boatUniform.set([q.x, q.z, Math.min(1, b.v / 5.5), BOAT_CLASSES[b.cls].length], i * 4);
   });
+  // The umpire's launch leaves a wake too.
+  if (race.boats.length < 8 && race.course.kind !== 'showroom') {
+    const lz = riverZ(race.course, launch.x) + (race.course.bends || race.boats.length === 2 ? 0 : LANE_W * 0.5);
+    boatUniform.set([launch.x + 3.5, lz, Math.min(1, Math.abs(launch.v) / 5), 7], race.boats.length * 4);
+  }
   gl.uniform4fv(u.uBoats, boatUniform);
   for (const p of puddles) p.age += dtFrame;
   while (puddles.length && puddles[0].age > 7) puddles.shift();
