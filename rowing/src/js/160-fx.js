@@ -34,7 +34,7 @@ function drawBirds(mb, time, course) {
   const cx = cam.at[0] + 40, dark = [0.15, 0.17, 0.2];
   for (let i = 0; i < 7; i++) {
     const a = time * 0.12 + i * 0.35, r = 60 + i * 4;
-    const x = cx + Math.cos(a) * r, z = Math.sin(a) * r * 0.6 - 20, y = 28 + Math.sin(time * 0.7 + i) * 3;
+    const x = cx + Math.cos(a) * r, z = Math.sin(a) * r * 0.6 - 20, y = Math.max(28, cam.eye[1] + 18) + Math.sin(time * 0.7 + i) * 3;   // always well above the camera
     const flap = Math.sin(time * 9 + i * 1.7) * 0.5, dir = [-Math.sin(a), 0, Math.cos(a) * 0.6];
     const side = norm3(cross3(dir, [0, 1, 0]));
     mb.box(x, y, z, 0.4, 0.15, 0.4, dark);

@@ -57,7 +57,7 @@ const WATER = gl && makeProgram(
      vec2 p=vW.xz;
      // Cat's paws: patches of rougher water drifting downwind, more of them in a stronger breeze.
      vec2 drift=p*0.018-uWindDir*uT*0.09;float paw=smoothstep(0.55-0.12*uWind,0.85,gn(drift)*0.65+gn(drift*2.3)*0.35)*min(uWind,1.0);
-     float a=0.035+0.03*uWind+paw*0.09;
+     float a=0.035+0.03*uWind+paw*0.03;
      vec2 g=vec2(0.0);
      g+=vec2(0.8,0.6)*cos(dot(p,vec2(0.8,0.6))*0.9+uT*1.6)*0.9;
      g+=vec2(-0.3,0.95)*cos(dot(p,vec2(-0.3,0.95))*1.7+uT*2.3)*0.55;
@@ -79,7 +79,7 @@ const WATER = gl && makeProgram(
      float bank=smoothstep(uBankZ-28.0,uBankZ+4.0,abs(vW.z+r.z*8.0));
      sky=mix(sky,uBank,bank*0.75);
      vec3 col=mix(uDeep,sky,clamp(fres*1.3+0.12-paw*0.18,0.0,1.0));
-     col+=uSunCol*pow(max(dot(r,uSun),0.0),220.0)*2.2;
+     col+=uSunCol*pow(max(dot(r,uSun),0.0),220.0)*2.2*(1.0-paw*0.6);
      col=mix(col,vec3(0.93,0.97,1.0),clamp(foam,0.0,0.8));
      float alpha=uReflect>0.5?clamp(0.5+0.5*(1.0-fres)-foam*0.3,0.55,0.92):1.0;alpha=max(alpha,clamp(foam,0.0,1.0));
      gl_FragColor=vec4(applyFog(col,vW),alpha);}`);
