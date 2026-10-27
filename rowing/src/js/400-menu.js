@@ -36,6 +36,8 @@ function buildMenu() {
   };
   $('btnDaily').onclick = () => startRace(dailyOpts(), null, 'daily');
   $('btnLearn').onclick = startLearning;
+  $('btnBoathouse').onclick = () => openBoathouse();
+  $('bhClose').onclick = () => $('boathouse').classList.add('hide');
   $('btnDuel').onclick = () => startRace({ ...currentOpts(), duel: true }, null, 'duel');
   $('btnCareer').onclick = startCareerRace;
   $('btnSound').onclick = () => { settings.sound = !settings.sound; AU.init(); AU.setOn(settings.sound); saveSettings(); soundLabel() };
@@ -99,7 +101,7 @@ function showResults(race) {
     if (!best || p.finishTime < best) STORE.set(key, p.finishTime);
   }
   $('resSub').textContent = `${fmtTime(p.finishTime)} · ${race.course.name}, ${opts.distance} m ${BOAT_CLASSES[opts.cls].name.toLowerCase()}${pbNote}`;
-  $('resTable').innerHTML = order.map((b, i) => `<tr class="${b === p ? 'me' : ''}"><td>${i + 1}</td><td>${race.course.bends ? 'Start ' + (b.startAt / 8 + 1) : 'Lane ' + (b.lane + 1)}</td><td>${b.crewName}</td>
+  $('resTable').innerHTML = order.map((b, i) => `<tr class="${b === p ? 'me' : ''}"><td>${i + 1}</td><td>${race.course.bends ? 'Start ' + (b.startAt / 8 + 1) : 'Lane ' + (b.lane + 1)}</td><td>${displayName(b)}</td>
     <td class="t">${b.finishTime != null ? fmtTime(b.finishTime) : '–'}</td><td class="t">${i && b.finishTime != null ? '+' + (b.finishTime - win).toFixed(2) : ''}</td></tr>`).join('')
     + (race.ghost?.finishTime ? `<tr><td></td><td></td><td>Ghost</td><td class="t">${fmtTime(race.ghost.finishTime)}</td><td class="t">${(race.ghost.finishTime - p.finishTime >= 0 ? '+' : '') + (race.ghost.finishTime - p.finishTime).toFixed(2)}</td></tr>` : '');
   const s = p.stats, strokes = Math.max(1, s.perfect + s.good + s.off);
@@ -107,6 +109,9 @@ function showResults(race) {
   $('resStats').textContent = `${p.strokes} strokes · average rate ${(p.strokes / p.finishTime * 60).toFixed(1)} · ${Math.round(s.perfect / strokes * 100)}% perfect catches`
     + (s.crabs ? ` · ${s.crabs} crab${s.crabs > 1 ? 's' : ''}` : '') + (s.buoys ? ` · hit the buoys ${s.buoys}×` : '');
   const careerNote = game.mode === 'career' ? careerResult(race, place) : '';
+  if (game.mode !== 'replay' && game.mode !== 'duel') recordHistory(race, place);
+  const badges = checkBadges(race, place);
+  if (badges.length) setTimeout(() => toast('Badge earned: ' + badges.map(b => b.name).join(', '), 3200), 600);
   $('careerNote').textContent = careerNote;
   $('careerNote').classList.toggle('hide', !careerNote);
   $('btnAgain').textContent = game.mode === 'career' ? 'Next race' : 'Race again';

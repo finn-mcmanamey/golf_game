@@ -84,7 +84,7 @@ function updateStandings(race) {
       : race.course.bends ? (race.t < b.startAt ? `starts ${Math.ceil(b.startAt - race.t)}s` : b.x > 20 ? '≈' + fmtTime((race.t - b.startAt) * D / b.x).slice(0, -3) : '…')
       : i === 0 ? 'lead' : '+' + ((leader.x - b.x) / Math.max(1, leader.v)).toFixed(1) + 's';
     const sw = '#' + coloursFor(b).shirt.toString(16).padStart(6, '0');
-    return `<div class="${b === race.player ? 'me' : ''}"><span>${i + 1}</span><i class="sw" style="background:${sw}"></i><span>${b.crewName}</span><span class="gap">${gap}</span></div>`;
+    return `<div class="${b === race.player ? 'me' : ''}"><span>${i + 1}</span><i class="sw" style="background:${sw}"></i><span>${displayName(b)}</span><span class="gap">${gap}</span></div>`;
   }).join('');
 }
 

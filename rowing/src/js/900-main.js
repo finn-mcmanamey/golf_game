@@ -23,6 +23,8 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   game.finishShown = false;
   game.cue = null;
   game.replay = null;
+  game.lastAtHalf = false;
+  game.halfSeen = false;
   resetCalls();
   resetSplits();
   $('replayTag').classList.toggle('hide', mode !== 'replay');
@@ -127,6 +129,7 @@ function frame(now) {
     const p = race.player, d = race.course.distance;
     AU.ambient(p.v, smooth(d - 400, d, p.x) * (p.finishTime != null ? 0.6 : 1), race.course.rain ? 1 : 0);
     if (race.done) { game.state = 'results'; game.replay ? showReplayEnd() : showResults(race) }
+    if (!game.halfSeen && race.player.x > race.course.distance / 2) { game.halfSeen = true; game.lastAtHalf = placeOf(race, race.player) === race.boats.length && race.boats.length > 1 }
     if (game.state === 'race') { updateHud(race); updateHud2(race); if (!game.replay && game.mode !== 'learn') updateCalls(race); updateLearning(race) }
   } else if ((game.state === 'menu' || game.state === 'results') && race) {
     // Behind the menu a demo race rows itself; after a race the field rows on past the line.

@@ -147,3 +147,14 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 #p2handle.drive { background: #38bdf8 }
 #p2stats { color: var(--dim) }
 .touchy .keysOnly { display: none }
+#bhTabs { margin: 6px 0 12px } #bhBody { min-height: 220px }
+#clubIn { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.07); color: var(--ink); width: 180px }
+.swatches { display: flex; gap: 6px; flex-wrap: wrap } .sw { width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255,255,255,.2) }
+.sw.on { border-color: #fff; box-shadow: 0 0 0 2px var(--acc) }
+.bladePreview { width: 180px; height: 34px; margin: 10px auto; border-radius: 4px 18px 18px 4px; border: 1px solid var(--line) }
+.hist { width: 100%; border-collapse: collapse; font-size: 12.5px } .hist td { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: left } .hist td.t { text-align: right }
+.badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; text-align: left }
+.badge { padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--line); opacity: .55 } .badge b { display: block; font-size: 13px } .badge span { font-size: 11.5px; color: var(--dim) }
+.badge.got { opacity: 1; border: 1px solid var(--acc); background: rgba(255,210,58,.1) } .badge.got b::before { content: '★ '; color: var(--acc) }
+#bhBody { overflow-x: auto }
+#boathouse { background: rgba(8, 18, 34, .88) }
