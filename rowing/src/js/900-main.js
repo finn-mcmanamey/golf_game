@@ -118,6 +118,7 @@ function handleEvents() {
       } else if (e.type === 'buoy' || e.type === 'bank') { showGrade(e.type); AU.play('buoy'); if (e.type === 'bank') cam.shake = 0.6 }
       else if (e.type === 'finish') {
         AU.play(placeOf(race, b) === 1 ? 'cheer' : 'finish');
+        if (placeOf(race, b) === 1 && !game.replay) celebrate();
         buzz('finish');
         game.finishShown = true;
         game.finishMsgUntil = game.time + 3;

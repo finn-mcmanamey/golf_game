@@ -39,7 +39,8 @@ function finishShot(boat) {
   const D = race.course.distance, since = boat.finishTime != null ? race.t - boat.finishTime - boat.startAt : -1;
   if (cam.mode !== 'tv' || race.course.kind === 'erg' || since < 0 || since > 3 || race.player2) return null;
   const z = riverZ(race.course, D);
-  return { eye: [D - 0.5, 4, z + (race.course.bends ? race.course.halfW + 4 : BANK_Z - 6)], at: [D + 4, 0.5, boat.z], fov: 0.55 };
+  // Just past the line, so the finish post isn't in front of the lens.
+  return { eye: [D + 1.6, 4.5, z + (race.course.bends ? race.course.halfW - 3 : LANES * LANE_W / 2 - 3)], at: [D + 1, 1.5, boat.z - 8], fov: 0.6 };   // inside the posts, over the outside lane
 }
 
 // Director: cuts between angles every few seconds, like a broadcast. Bank cameras stay put while the boats pass.

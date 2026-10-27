@@ -25,6 +25,7 @@ function drawFx(mb, dt, time, course) {
   if (course.night && !course.rain) drawLamps(mb, course);
   drawStartLights(mb, course);
   drawLaunch(mb, dt, time, course);
+  drawFireworks(mb, dt, course);
   drawCrowd(mb, time, course);
   drawBirds(mb, time, course);
   if (course.rain && R.quality > 0) drawRain(mb, time);
@@ -133,4 +134,34 @@ function drawLaunch(mb, dt, time, course) {
   mb.box(x + 1.4, 2.05 + bob, z + 0.4, 0.3, 0.3, 0.3, hex(0xe0b590));
   mb.beam([x + 1.6, 1.8 + bob, z + 0.6], [x + 2.2, 3.0 + bob, z + 0.7], 0.04, 0.04, [0.4, 0.3, 0.2]);
   mb.box(x + 2.5, 2.8 + bob + Math.sin(time * 6) * 0.05, z + 0.7, 0.6, 0.4, 0.03, [1.4, 1.4, 1.4]);
+}
+
+// Fireworks over the finish when you win: rockets burst into coloured sparks that fall and fade.
+const fireworks = { until: 0, next: 0, sparks: [] };
+const FIREWORK_COLOURS = [[3, 0.8, 0.5], [0.6, 2.6, 0.9], [0.7, 1.2, 3], [3, 2.6, 0.6], [2.6, 0.8, 2.6]];
+
+function celebrate(seconds = 7) { fireworks.until = game.time + seconds; fireworks.next = game.time }
+
+function drawFireworks(mb, dt, course) {
+  if (game.time < fireworks.until && game.time >= fireworks.next) {
+    fireworks.next = game.time + 0.35 + Math.random() * 0.5;
+    // Over the far bank, behind the grandstand: where the TV and finish cameras look.
+    const x = course.distance - 40 + Math.random() * 80, z = riverZ(course, course.distance) - 45 - Math.random() * 35, y = 14 + Math.random() * 14;
+    const col = FIREWORK_COLOURS[(Math.random() * FIREWORK_COLOURS.length) | 0];
+    for (let i = 0; i < 60; i++) {
+      // A random direction on a sphere, scaled for a round burst.
+      const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, r = Math.sqrt(1 - u * u), s = 9 + Math.random() * 3;
+      fireworks.sparks.push({ p: [x, y, z], v: [r * Math.cos(a) * s, u * s, r * Math.sin(a) * s], life: 1.6 + Math.random() * 0.6, col });
+    }
+    AU.tone(90, 40, 0.5, 0.25, 'sine', 0.05); AU.hiss(2000, 0.5, 0.6, 0.2, 'bandpass', 0.05);
+  }
+  for (let i = fireworks.sparks.length - 1; i >= 0; i--) {
+    const s = fireworks.sparks[i];
+    s.life -= dt;
+    if (s.life <= 0) { fireworks.sparks.splice(i, 1); continue }
+    s.v[1] -= 6 * dt;
+    for (let k = 0; k < 3; k++) { s.v[k] *= 1 - 1.2 * dt; s.p[k] += s.v[k] * dt }
+    const size = 0.25 + s.life * 0.2, fade = Math.min(1, s.life);
+    mb.box(s.p[0], s.p[1], s.p[2], size, size, size, s.col.map(c => c * fade));
+  }
 }
