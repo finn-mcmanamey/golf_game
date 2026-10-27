@@ -70,10 +70,22 @@ function cycleQuality() {
   toast('Graphics: ' + QUALITY_LABELS[R.quality], 900);
 }
 
+// If the device can't keep up early in a race, step the graphics down once (it remembers, like choosing it yourself).
+function autoQuality() {
+  if (game.state !== 'race' || game.autoQualityDone || game.autopilot || R.quality === 0 || race.t < 4 || race.t > 12) return;
+  if (fpsMeter.avg < 32) {
+    game.autoQualityDone = true;
+    settings.quality = R.quality = R.quality - 1;
+    saveSettings();
+    toast(`Graphics set to ${QUALITY_LABELS[R.quality]} to keep it smooth (change it in Settings)`, 3000);
+  }
+}
+
 // Frame rate, smoothed, so it's easy to see what a graphics setting costs.
 const fpsMeter = { avg: 60, shown: 0 };
 function updateFps(dt) {
   if (dt > 0) fpsMeter.avg += (1 / dt - fpsMeter.avg) * 0.05;
+  autoQuality();
   if (game.time - fpsMeter.shown > 0.5) { fpsMeter.shown = game.time; $('fps').textContent = Math.round(fpsMeter.avg) + ' fps' }
 }
 
