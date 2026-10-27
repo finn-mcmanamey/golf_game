@@ -14,6 +14,7 @@ function segmented(id, items, current, onPick) {
   }
 }
 
+const KIND_LABEL = { head: ' (head race)', erg: ' (indoor erg)', knockout: ' (match race)' };
 const currentOpts = () => ({ seed: settings.seed, distance: settings.distance, cls: settings.kind === 'erg' ? '1x' : settings.cls, difficulty: settings.difficulty, lane: 2, kind: settings.kind });
 
 function buildMenu() {
@@ -35,7 +36,7 @@ function buildMenu() {
   $('btnRnd').onclick = () => { settings.seed = 1 + Math.floor(Math.random() * 99999); $('seedIn').value = settings.seed; menuChanged() };
   $('btnRace').onclick = () => startRace(currentOpts());
   $('btnGhost').onclick = () => {
-    const pb = getPB(settings.distance, settings.cls, settings.kind);
+    const o = currentOpts(), pb = getPB(o.distance, o.cls, o.kind);
     if (pb) { const d = decodeRace(pb.code); startRace(d.opts, d.inputs) }
   };
   $('btnDaily').onclick = () => startRace(dailyOpts(), null, 'daily');
@@ -63,8 +64,9 @@ function menuChanged() {
   saveSettings();
   const c = makeCourse(settings.seed, settings.distance, settings.kind);
   $('venue').textContent = c.kind === 'erg' ? `${c.name} · six rowing machines, one big screen` : `${c.name}${c.bends ? ' · winding river, crews start 8 s apart' : ''} · ${c.rain ? 'Rain · ' : c.night ? 'Evening, under lights · ' : ''}${windLabel(c.wind)}${c.current ? ` · ${c.current > 0 ? 'following' : 'opposing'} stream` : ''}`;
-  const pb = getPB(settings.distance, settings.cls, settings.kind);
-  $('pbLine').textContent = pb ? `Your best over ${settings.distance} m in the ${BOAT_CLASSES[settings.cls].name.toLowerCase()}${settings.kind === 'head' ? ' (head race)' : ''}: ${fmtTime(pb.time)} (${pb.venue})` : '';
+  // Erg races are always singles, so look records up with the options a race would really use.
+  const o = currentOpts(), pb = getPB(o.distance, o.cls, o.kind);
+  $('pbLine').textContent = pb ? `Your best over ${o.distance} m in the ${BOAT_CLASSES[o.cls].name.toLowerCase()}${KIND_LABEL[o.kind] || ''}: ${fmtTime(pb.time)} (${pb.venue})` : '';
   $('btnGhost').classList.toggle('hide', !pb);
   renderCareer();
   renderCup();
@@ -129,7 +131,7 @@ function showResults(race) {
   if (badges.length) setTimeout(() => toast('Badge earned: ' + badges.map(b => b.name).join(', '), 3200), 600);
   $('careerNote').textContent = careerNote;
   $('careerNote').classList.toggle('hide', !careerNote);
-  $('btnAgain').textContent = game.mode === 'career' || game.mode === 'cup' && !cup.out && !cup.won ? 'Next race' : 'Race again';
+  $('btnAgain').textContent = game.mode === 'career' || game.mode === 'cup' && !cup.out && !cup.won ? 'Next race' : game.mode === 'cup' ? 'Enter a new cup' : 'Race again';
   // A duel's code only holds player 1's strokes, so it can't be replayed or shared.
   // Duel and practice codes can't be re-rowed (a code holds one crew in a full field), so no replay or link.
   for (const id of ['btnReplay', 'btnShare']) $(id).classList.toggle('hide', !!race.player2 || game.mode === 'learn');

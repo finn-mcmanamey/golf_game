@@ -165,7 +165,11 @@ function frame(now) {
 
   if (gl && race) {
     if (game.state === 'menu') menuCamera(dt);
-    else updateCamera(race.player2 || race.course.kind === 'knockout' ? duelCameraBoat(race) : race.player, race.t, dt);
+    else {
+      // Wide shots frame both crews in a duel or match race; on-board shots stay with your boat.
+      const pair = (race.player2 || race.course.kind === 'knockout') && !['rower', 'chase'].includes(cam.mode);
+      updateCamera(pair ? duelCameraBoat(race) : race.player, race.t, dt);
+    }
     renderFrame(race, game.time, dt);
     updateFps(dt);
   }

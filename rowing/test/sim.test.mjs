@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 const dir = fileURLToPath(new URL('../src/js/', import.meta.url));
 const src = readdirSync(dir).filter(f => /^0\d\d-.*\.js$/.test(f)).sort().map(f => readFileSync(dir + f, 'utf8')).join('\n');
 const ctx = vm.createContext({ console });
-vm.runInContext(src + '\n;globalThis.api={makeRace,stepRace,simulateRace,encodeRace,decodeRace,packInput,IN,TUNE,placeOf,fmtTime,steerError};', ctx);
+vm.runInContext(src + '\n;globalThis.api={makeRace,stepRace,simulateRace,encodeRace,decodeRace,packInput,IN,TUNE,placeOf,fmtTime,steerError,laneZ};', ctx);
 const { makeRace, stepRace, simulateRace, encodeRace, decodeRace, packInput, IN, placeOf, fmtTime } = ctx.api;
 
 // A scripted "player" that rows like a decent human, so tests cover the player's path too.
@@ -72,6 +72,6 @@ console.log('golden times unchanged');
 const erg = { ...opts, kind: 'erg', distance: 500 };
 const e1 = row(erg, 34), ecode = encodeRace(erg, e1.inputs), e2 = simulateRace(decodeRace(ecode).opts, decodeRace(ecode).inputs);
 assert.equal(e2.player.finishTime, e1.player.finishTime, 'erg codes re-row exactly');
-assert.ok(e1.boats.every(b => b.z === e1.boats[b.lane].z && b.yaw === 0), 'ergs never steer');
+assert.ok(e1.boats.every(b => b.z === ctx.api.laneZ(b.lane) && b.yaw === 0), 'ergs never steer');
 console.log(`500m erg: player ${fmtTime(e1.player.finishTime)} place ${placeOf(e1, e1.player)}`);
 console.log('ok');

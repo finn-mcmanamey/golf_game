@@ -40,7 +40,13 @@ function startCareerRace() {
   startRace(careerOpts(), null, 'career');
   // A name only: the rival rows with the field's own skill, so race codes still re-row exactly.
   const r = rivalBoat(race);
-  if (r) { r.crewName = rivalName(); r.isRival = true }
+  if (r) {
+    // If the draw already gave another crew the rival's name, swap names so nobody appears twice.
+    const twin = race.boats.find(b => b !== r && b.crewName === rivalName());
+    if (twin) twin.crewName = r.crewName;
+    r.crewName = rivalName();
+    r.isRival = true;
+  }
 }
 
 // Called from the results screen: moves the season on and says what happened.

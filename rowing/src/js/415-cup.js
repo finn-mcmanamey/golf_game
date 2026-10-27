@@ -39,7 +39,9 @@ function startCupRace() {
 
 function cupResult(race) {
   const opp = race.boats.find(b => b !== race.player), won = placeOf(race, race.player) === 1;
-  const round = CUP_ROUNDS[cup.round].name, margin = opp.finishTime != null ? Math.abs(opp.finishTime - race.player.finishTime) : 0;
+  // If the loser was still rowing when the race was called, estimate the gap from where they were.
+  const D = race.course.distance, behind = opp.finishTime == null ? race.t - race.player.finishTime + (D - opp.x) / Math.max(1, opp.v) : 0;
+  const round = CUP_ROUNDS[cup.round].name, margin = opp.finishTime != null ? Math.abs(opp.finishTime - race.player.finishTime) : behind;
   cup.history.push({ round, opp: opp.crewName, won, margin });
   let note;
   if (!won) { cup.out = true; note = `Beaten by ${opp.crewName} in the ${round.toLowerCase()} by ${margin.toFixed(2)} s. Out of the cup.` }

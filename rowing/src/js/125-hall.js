@@ -4,7 +4,7 @@ const ergZ = lane => (lane - (LANES - 1) / 2) * 2.6;
 
 function buildHall(course) {
   const mb = new ChunkedMesh(), L = lightingFor({ ...course, timeOfDay: 0.5 });
-  Object.assign(L, { sun: norm3([0.2, 1, 0.35]), sunCol: [0.95, 0.92, 0.85], sky: [0.62, 0.62, 0.66], ground: [0.42, 0.36, 0.3], horizon: [0.2, 0.22, 0.26], cloud: 0 });
+  Object.assign(L, { sun: norm3([0.2, 1, 0.35]), sunCol: [0.95, 0.92, 0.85], sky: [0.62, 0.62, 0.66], ground: [0.42, 0.36, 0.3], horizon: [0.2, 0.22, 0.26], cloud: 0, stars: 0 });
   const wood = hex(0xc8955a), wall = hex(0x3b4a63), line = hex(0xe8e2d0);
   // Floor planks, walls and ceiling.
   for (let x = -22; x < 22; x += 2) mb.box(x + 1, -0.05, 1, 1.96, 0.1, 30, shade(wood, 0.92 + ((x / 2) & 1) * 0.08));

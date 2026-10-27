@@ -57,7 +57,7 @@ function directorShot(boat, raceT, L, mid, lead) {
 }
 
 function updateCamera(boat, raceT, dt) {
-  const t = (race && boat === race.player && finishShot(boat)) || cameraTarget(boat, cam.mode, raceT);
+  const t = (race && finishShot(race.player)) || cameraTarget(boat, cam.mode, raceT);
   // A director's cut jumps straight to the new angle; other cameras glide.
   const cutNow = t.cut && Math.hypot(t.eye[0] - cam.eye[0], t.eye[1] - cam.eye[1], t.eye[2] - cam.eye[2]) > 15;
   const k = cam.mode === 'rower' || cutNow ? 1 : 1 - Math.exp(-dt * 4);
