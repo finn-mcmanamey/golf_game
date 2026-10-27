@@ -36,18 +36,18 @@ const FOG_GLSL = `vec3 applyFog(vec3 col, vec3 w){float d=distance(uEye,w);float
 
 // Lit voxel geometry: flat colours, sun plus sky light, fog.
 const LIT = gl && makeProgram(
-  `precision highp float;attribute vec3 aP,aN,aC;uniform mat4 uVP;varying vec3 vN,vC,vW;
-   void main(){vN=aN;vC=aC;vW=aP;gl_Position=uVP*vec4(aP,1.0);}`,
-  `precision highp float;varying vec3 vN,vC,vW;uniform vec3 uEye,uSun,uSunCol,uSky,uGround,uHorizon;uniform float uFogK,uAlpha;
+  `precision highp float;attribute vec3 aP,aN,aC;uniform mat4 uVP;uniform float uMirror;varying vec3 vN,vC,vW;
+   void main(){vec3 p=vec3(aP.x,aP.y*uMirror,aP.z);vN=vec3(aN.x,aN.y*uMirror,aN.z);vC=aC;vW=p;gl_Position=uVP*vec4(p,1.0);}`,
+  `precision highp float;varying vec3 vN,vC,vW;uniform vec3 uEye,uSun,uSunCol,uSky,uGround,uHorizon;uniform float uFogK,uAlpha,uMirror;
    ${FOG_GLSL}
-   void main(){vec3 n=normalize(vN);float d=max(dot(n,uSun),0.0);vec3 amb=mix(uGround,uSky,n.y*0.5+0.5);
+   void main(){if(uMirror<0.0&&vW.y>0.02)discard;vec3 n=normalize(vN);float d=max(dot(n,uSun),0.0);vec3 amb=mix(uGround,uSky,n.y*0.5+0.5);
      vec3 col=vC*(amb*0.62+uSunCol*d*0.78);
      gl_FragColor=vec4(applyFog(col,vW),uAlpha);}`);
 
 // Water: rippled normals, sky reflection, sun glitter, and wakes trailing each boat.
 const WATER = gl && makeProgram(
   `precision highp float;attribute vec3 aP;uniform mat4 uVP;varying vec3 vW;void main(){vW=aP;gl_Position=uVP*vec4(aP,1.0);}`,
-  `precision highp float;varying vec3 vW;uniform vec3 uEye,uSun,uSunCol,uSky,uHorizon,uDeep,uBank;uniform float uT,uFogK,uWind,uBankZ;
+  `precision highp float;varying vec3 vW;uniform vec3 uEye,uSun,uSunCol,uSky,uHorizon,uDeep,uBank;uniform float uT,uFogK,uWind,uBankZ,uReflect;
    uniform vec4 uBoats[8];uniform vec4 uPuddles[24];
    ${FOG_GLSL}
    float wave(vec2 p,vec2 d,float f,float s){return sin(dot(p,d)*f+uT*s);}
@@ -76,7 +76,8 @@ const WATER = gl && makeProgram(
      vec3 col=mix(uDeep,sky,clamp(fres*1.3+0.12,0.0,1.0));
      col+=uSunCol*pow(max(dot(r,uSun),0.0),220.0)*2.2;
      col=mix(col,vec3(0.93,0.97,1.0),clamp(foam,0.0,0.8));
-     gl_FragColor=vec4(applyFog(col,vW),1.0);}`);
+     float alpha=uReflect>0.5?clamp(0.5+0.5*(1.0-fres)-foam*0.3,0.55,0.92):1.0;alpha=max(alpha,clamp(foam,0.0,1.0));
+     gl_FragColor=vec4(applyFog(col,vW),alpha);}`);
 
 // Sky: a full-screen triangle; each pixel works out its view direction from the camera basis.
 const SKY = gl && makeProgram(

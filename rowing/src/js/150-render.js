@@ -74,6 +74,7 @@ function renderFrame(race, time, dtFrame) {
   gl.uniformMatrix4fv(LIT.u.uVP, false, vp);
   setLightUniforms(LIT.u, L);
   gl.uniform1f(LIT.u.uAlpha, 1);
+  gl.uniform1f(LIT.u.uMirror, 1);
   bindLitAttribs(R.sceneBuf);
   // Only slices of scenery within sight; beyond this the fog has swallowed them anyway.
   const sight = R.quality === 0 ? 550 : 800, lo = Math.min(cam.eye[0], cam.at[0]) - sight, hi = Math.max(cam.eye[0], cam.at[0]) + sight;
@@ -88,8 +89,22 @@ function renderFrame(race, time, dtFrame) {
   bindLitAttribs(R.boatBuf);
   gl.drawArrays(gl.TRIANGLES, 0, n);
 
-  // Water over the top hides the parts of blades below the surface.
-  drawWater(race, vp, time, dtFrame);
+  // Reflections: the boats and nearby banks again, upside down under the surface, seen through the water.
+  const reflect = R.quality > 0 && cam.eye[1] > 0.2;
+  if (reflect) {
+    gl.uniform1f(LIT.u.uMirror, -1);
+    gl.uniform1f(LIT.u.uAlpha, 1);
+    gl.drawArrays(gl.TRIANGLES, 0, n);
+    bindLitAttribs(R.sceneBuf);
+    const near = R.quality > 1 ? 450 : 260, lo2 = cam.at[0] - near, hi2 = cam.at[0] + near;
+    for (const c of R.sceneRanges) if (c.x1 > lo2 && c.x0 < hi2) gl.drawArrays(gl.TRIANGLES, c.first, c.count);
+    gl.uniform1f(LIT.u.uMirror, 1);
+  }
+
+  // Water over the top hides the parts of blades below the surface and tints the reflections.
+  if (reflect) { gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA) }
+  drawWater(race, vp, time, dtFrame, reflect);
+  gl.disable(gl.BLEND);
 
   // The ghost is see-through, so it goes last.
   if (race.ghost) {
@@ -101,6 +116,7 @@ function renderFrame(race, time, dtFrame) {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.depthMask(false);
     gl.uniform1f(LIT.u.uAlpha, 0.38);
+    gl.uniform1f(LIT.u.uMirror, 1);
     bindLitAttribs(R.ghostBuf);
     gl.drawArrays(gl.TRIANGLES, 0, gn);
     gl.depthMask(true);
@@ -111,7 +127,7 @@ function renderFrame(race, time, dtFrame) {
 
 const boatUniform = new Float32Array(32), puddleUniform = new Float32Array(96);
 
-function drawWater(race, vp, time, dtFrame) {
+function drawWater(race, vp, time, dtFrame, reflect) {
   const u = WATER.u, L = R.L;
   gl.useProgram(WATER.p);
   gl.uniformMatrix4fv(u.uVP, false, vp);
@@ -119,6 +135,7 @@ function drawWater(race, vp, time, dtFrame) {
   gl.uniform3fv(u.uDeep, L.deep);
   gl.uniform3fv(u.uBank, L.bank);
   gl.uniform1f(u.uBankZ, BANK_Z);
+  gl.uniform1f(u.uReflect, reflect ? 1 : 0);
   gl.uniform1f(u.uT, time);
   gl.uniform1f(u.uWind, Math.min(1.5, race.course.wind.speed / 3));
   boatUniform.fill(0);
