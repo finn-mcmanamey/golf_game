@@ -3,16 +3,17 @@
    rebuild the same race exactly (race codes and ghosts). */
 
 function makeRace(opts) {
-  const { seed, distance, cls, difficulty, lane = 2, ghostInputs = null, solo = false, kind = 'regatta' } = opts;
+  const { seed, distance, cls, difficulty, lane = 2, ghostInputs = null, solo = false, kind = 'regatta', duel = false } = opts;
   const course = makeCourse(seed, distance, kind);
   const rng = makeRng(hashSeed(seed, 0x57A));
   const names = CREW_NAMES.slice();
   const boats = [], brains = [];
   for (let l = 0; l < LANES; l++) {
     if (solo && l !== lane) continue;   // practice: just you on the water
-    const name = l === lane ? 'You' : names.splice((rng() * names.length) | 0, 1)[0];
-    boats.push(makeBoat(cls, l, name, seed, l === lane ? 0.035 : DIFFICULTY[difficulty].crewSd));
-    brains.push(l === lane ? null : makeBrain(seed, l, difficulty));
+    const name = l === lane ? (duel ? 'Player 1' : 'You') : names.splice((rng() * names.length) | 0, 1)[0];
+    const human = l === lane || (duel && l === lane + 1);   // a duel puts a second human crew in the next lane
+    boats.push(makeBoat(cls, l, duel && l === lane + 1 ? 'Player 2' : name, seed, human ? 0.035 : DIFFICULTY[difficulty].crewSd));
+    brains.push(human ? null : makeBrain(seed, l, difficulty));
   }
   if (course.bends) {
     // Head race: you go first; the other crews follow at 8-second intervals, each on its own line.
@@ -24,6 +25,7 @@ function makeRace(opts) {
   return {
     opts, course, boats, brains, ghost, ghostInputs,
     player: boats.find(b => b.lane === lane),
+    player2: duel ? boats.find(b => b.lane === lane + 1) : null,
     tick: 0,
     t: -(4 + rng() * 2.5),        // seconds until the start
     attentionAt: -(1.2 + rng() * 1.6),  // "Attention!" comes a varying time before the horn, so nobody can anticipate it
@@ -31,7 +33,7 @@ function makeRace(opts) {
   };
 }
 
-function stepRace(race, playerInput) {
+function stepRace(race, playerInput, player2Input = 0) {
   const dt = TUNE.dt;
   race.t += dt;
   const wasStarted = race.started;
@@ -39,14 +41,15 @@ function stepRace(race, playerInput) {
   if (race.started && !wasStarted) race.startTick = race.tick;
   // Before the horn the blade stays still; holding the drive after "Attention" is a false start.
   if (!race.started) {
-    if ((playerInput & IN.DRIVE) && race.t > race.attentionAt) race.falseStart = true;
+    if (((playerInput | player2Input) & IN.DRIVE) && race.t > race.attentionAt) race.falseStart = true;
     playerInput &= ~(IN.DRIVE | IN.PUSH);
+    player2Input &= ~(IN.DRIVE | IN.PUSH);
   }
   race.inputs.push(playerInput);
   for (let i = 0; i < race.boats.length; i++) {
     const b = race.boats[i];
     if (b.finishTime != null && b.x > race.course.distance + 40) { b.v *= 0.99; b.x += b.v * dt; continue }
-    const input = b === race.player ? playerInput : botInput(race.brains[b.lane], b, race);
+    const input = b === race.player ? playerInput : b === race.player2 ? player2Input : botInput(race.brains[b.lane], b, race);
     stepBoat(b, b.finishTime != null ? packInput(0, 18) : input, race.course, race);
     if (b.finishTime != null && !race.finishOrder.includes(b)) race.finishOrder.push(b);
   }
@@ -58,6 +61,7 @@ function stepRace(race, playerInput) {
   race.tick++;
   const p = race.player;
   const allIn = race.boats.every(b => b.finishTime != null);
+  if (race.player2 && race.player2.finishTime == null && race.t < 1200) return;   // a duel ends when both humans are home
   if (p.finishTime != null && (allIn || race.t > p.finishTime + (race.course.bends ? 70 : 25))) race.done = true;
   if (race.t > 60 * 20) race.done = true;  // safety net
 }

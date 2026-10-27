@@ -2,7 +2,7 @@
 
 const keys = new Set();
 const touchState = { drive: false, left: false, right: false, push: false };
-let targetRate = 34;
+let targetRate = 34, targetRate2 = 36;
 
 function changeRate(d) {
   targetRate = clamp(targetRate + d, RATE_MIN + 2, RATE_MAX - 2);
@@ -17,14 +17,27 @@ function autoRow(b) {
   return bits | assistSteer(b);
 }
 
+// In a duel the arrow keys, Enter and right Shift belong to player 2; otherwise they're spare keys for player 1.
 function readInput() {
+  const duel = !!race.player2;
   let bits = game.autopilot && race.started ? autoRow(race.player) : 0;
   if (keys.has('Space') || keys.has('Mouse') || touchState.drive) bits |= IN.DRIVE;
-  if (keys.has('KeyA') || keys.has('ArrowLeft') || touchState.left) bits |= IN.LEFT;
-  if (keys.has('KeyD') || keys.has('ArrowRight') || touchState.right) bits |= IN.RIGHT;
+  if (keys.has('KeyA') || (!duel && keys.has('ArrowLeft')) || touchState.left) bits |= IN.LEFT;
+  if (keys.has('KeyD') || (!duel && keys.has('ArrowRight')) || touchState.right) bits |= IN.RIGHT;
   if (settings.assist && !(bits & (IN.LEFT | IN.RIGHT)) && race) bits |= assistSteer(race.player);
-  if (keys.has('ShiftLeft') || keys.has('ShiftRight') || touchState.push) bits |= IN.PUSH;
+  if (keys.has('ShiftLeft') || (!duel && keys.has('ShiftRight')) || touchState.push) bits |= IN.PUSH;
   return packInput(bits, targetRate);
+}
+
+function readInput2() {
+  if (!race.player2) return 0;
+  let bits = 0;
+  if (keys.has('Enter') || keys.has('NumpadEnter')) bits |= IN.DRIVE;
+  if (keys.has('ArrowLeft')) bits |= IN.LEFT;
+  if (keys.has('ArrowRight')) bits |= IN.RIGHT;
+  if (settings.assist && !(bits & (IN.LEFT | IN.RIGHT))) bits |= assistSteer(race.player2);
+  if (keys.has('ShiftRight')) bits |= IN.PUSH;
+  return packInput(bits, targetRate2);
 }
 
 addEventListener('keydown', e => {
@@ -39,12 +52,15 @@ addEventListener('blur', () => { keys.clear(); Object.keys(touchState).forEach(k
 
 function onKey(code) {
   if (game.state !== 'race') return;
-  if (code === 'KeyW' || code === 'ArrowUp') changeRate(2);
-  if (code === 'KeyS' || code === 'ArrowDown') changeRate(-2);
+  const duel = !!race.player2;
+  if (code === 'KeyW' || (!duel && code === 'ArrowUp')) changeRate(2);
+  if (code === 'KeyS' || (!duel && code === 'ArrowDown')) changeRate(-2);
+  if (duel && code === 'ArrowUp') targetRate2 = clamp(targetRate2 + 2, RATE_MIN + 2, RATE_MAX - 2);
+  if (duel && code === 'ArrowDown') targetRate2 = clamp(targetRate2 - 2, RATE_MIN + 2, RATE_MAX - 2);
   if (code === 'KeyC') cycleCamera();
   if (code === 'KeyG') cycleQuality();
   if (code === 'Escape' || code === 'KeyP') togglePause();
-  if (code === 'Enter' && race.player.finishTime != null) game.fastForward = true;
+  if (code === 'Enter' && race.player.finishTime != null && !race.player2) game.fastForward = true;
 }
 
 // Steering assist nudges the boat back to the lane centre when the player isn't steering.

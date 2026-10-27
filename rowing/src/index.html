@@ -19,6 +19,7 @@
   <div id="standings" class="panel"></div>
   <div id="startMsg"></div>
   <div id="replayTag" class="hide">● REPLAY</div>
+  <div id="p2" class="panel hide"><small>Player 2 · <kbd>Enter</kbd> drive · arrows · right Shift</small><div id="p2slide"><div id="p2handle"></div></div><div id="p2stats"></div></div>
   <div id="tunedTag" class="hide">TUNED · not recorded</div>
   <div id="lesson" class="panel hide"></div>
   <div id="grade"></div>
@@ -57,12 +58,12 @@
       <div class="row"><label>Cox voice</label><div class="seg" id="segVoice"></div></div>
     </details>
 
-    <div class="row"><button id="btnRace" class="big">Race</button><button id="btnGhost" class="sec hide">Race your best</button><button id="btnDaily" class="sec">Daily regatta</button><button id="btnLearn" class="sec">Learn to row</button></div>
+    <div class="row"><button id="btnRace" class="big">Race</button><button id="btnGhost" class="sec hide">Race your best</button><button id="btnDaily" class="sec">Daily regatta</button><button id="btnLearn" class="sec">Learn to row</button><button id="btnDuel" class="sec keysOnly" title="Two players on one keyboard">Duel</button></div>
     <div id="pbLine" class="sub small"></div>
     <div id="careerBox"><div id="careerT"></div><div id="medals"></div><button id="btnCareer" class="sec"></button></div>
     <div id="friend" class="row hide"><span id="friendT"></span><button id="btnFriend" class="sec">Race their ghost</button></div>
     <div class="help keys"><kbd>Space</kbd> hold to drive, release to recover · catch again as the slide reaches the front<br>
-      <kbd>W</kbd>/<kbd>S</kbd> stroke rate · <kbd>A</kbd>/<kbd>D</kbd> steer · <kbd>Shift</kbd> push · <kbd>C</kbd> camera · <kbd>G</kbd> graphics · <kbd>Esc</kbd> pause</div>
+      <kbd>W</kbd>/<kbd>S</kbd> stroke rate · <kbd>A</kbd>/<kbd>D</kbd> steer · <kbd>Shift</kbd> push · <kbd>C</kbd> camera · <kbd>G</kbd> graphics · <kbd>Esc</kbd> pause<br>Duel: player 2 drives with <kbd>Enter</kbd>, steers with the arrows, rate with ↑ ↓, pushes with right <kbd>Shift</kbd></div>
     <div class="help tap">Touch and hold anywhere on the water to drive, let go to recover. ◀ ▶ steer, − + set the stroke rate, PUSH for a power ten.</div>
     <button id="btnSound" class="ghost"></button>
   </div>

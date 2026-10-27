@@ -36,6 +36,7 @@ function buildMenu() {
   };
   $('btnDaily').onclick = () => startRace(dailyOpts(), null, 'daily');
   $('btnLearn').onclick = startLearning;
+  $('btnDuel').onclick = () => startRace({ ...currentOpts(), duel: true }, null, 'duel');
   $('btnCareer').onclick = startCareerRace;
   $('btnSound').onclick = () => { settings.sound = !settings.sound; AU.init(); AU.setOn(settings.sound); saveSettings(); soundLabel() };
   soundLabel();
@@ -79,12 +80,15 @@ function showResults(race) {
   const p = race.player, opts = race.opts;
   const order = [...race.boats].sort((a, b) => placeOf(race, a) - placeOf(race, b));
   const win = order[0].finishTime, place = order.indexOf(p) + 1;
-  $('resTitle').textContent = place === 1 ? 'Winner!' : `${ordinal(place)} place`;
+  const p2 = race.player2;
+  $('resTitle').textContent = p2 ? (placeOf(race, p) < placeOf(race, p2) ? 'Player 1 wins the duel!' : 'Player 2 wins the duel!')
+    : place === 1 ? 'Winner!' : `${ordinal(place)} place`;
   const code = encodeRace(opts, race.inputs);
   game.lastCode = code;
   const pb = getPB(opts.distance, opts.cls, opts.kind);
   let pbNote = '';
   if (tuneEdited()) pbNote = ' · tuned physics, not recorded';
+  else if (game.mode === 'duel') pbNote = ' · duel';
   else if (game.mode === 'replay' || game.mode === 'learn') pbNote = game.mode === 'learn' ? ' · practice' : ' · replay';
   else if (!pb || p.finishTime < pb.time) {
     savePB(opts.distance, opts.cls, opts.kind, { time: p.finishTime, code, venue: race.course.name, date: Date.now() });
@@ -106,6 +110,8 @@ function showResults(race) {
   $('careerNote').textContent = careerNote;
   $('careerNote').classList.toggle('hide', !careerNote);
   $('btnAgain').textContent = game.mode === 'career' ? 'Next race' : 'Race again';
+  // A duel's code only holds player 1's strokes, so it can't be replayed or shared.
+  for (const id of ['btnReplay', 'btnShare']) $(id).classList.toggle('hide', !!race.player2);
   $('results').classList.remove('hide');
   $('hud').classList.add('hide');
   AU.play(place === 1 ? 'win' : 'finish');

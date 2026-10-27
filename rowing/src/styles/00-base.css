@@ -140,3 +140,10 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 .medal { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 800 11px system-ui; font-style: normal; color: #3a2a00; box-shadow: inset 0 -2px 0 rgba(0,0,0,.2) }
 .medal.gold { background: #ffd23a } .medal.silver { background: #cfd8e3 } .medal.bronze { background: #d08a4a }
 #careerNote { margin: 6px 0 10px; font-size: 18px; font-weight: 800; color: var(--acc) }
+#p2 { position: absolute; right: 12px; bottom: 150px; width: 260px; padding: 8px 12px; font-size: 12px }
+#p2 small { color: #38bdf8; font-weight: 700 }
+#p2slide { position: relative; height: 14px; border-radius: 7px; background: rgba(255,255,255,.1); margin: 6px 0 }
+#p2handle { position: absolute; top: 2px; bottom: 2px; width: 12px; margin-left: -6px; border-radius: 6px; background: #fff }
+#p2handle.drive { background: #38bdf8 }
+#p2stats { color: var(--dim) }
+.touchy .keysOnly { display: none }

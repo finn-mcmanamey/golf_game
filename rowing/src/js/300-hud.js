@@ -142,3 +142,13 @@ function catchCue(p) {
   if (settings.cue && cuePhase === 'recover' && p.phase === 'front') AU.play('cue');
   cuePhase = p.phase;
 }
+
+// Player 2's own small stroke meter in a duel.
+function updateHud2(race) {
+  const p = race.player2, el = $('p2');
+  el.classList.toggle('hide', !p);
+  if (!p) return;
+  $('p2handle').style.left = (4 + p.h * 92) + '%';
+  $('p2handle').classList.toggle('drive', p.phase === 'drive');
+  $('p2stats').textContent = `rate ${p.rate} · ${p.v.toFixed(1)} m/s · energy ${Math.round(p.energy * 100)}%`;
+}

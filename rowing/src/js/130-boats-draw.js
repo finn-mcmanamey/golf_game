@@ -11,6 +11,7 @@ const CLUB_COLOURS = [
   { hull: 0xe6e0d0, shirt: 0x0f8a8a, blade: [0xffffff, 0x0f8a8a] },
 ];
 const PLAYER_COLOURS = { hull: 0xfbfbf6, shirt: 0xffd23a, blade: [0xffd23a, 0x1a1a1a] };
+const PLAYER2_COLOURS = { hull: 0xfbfbf6, shirt: 0x38bdf8, blade: [0x38bdf8, 0xffffff] };
 const SKIN = [0xe0b590, 0xc68a62, 0x8d5a3a, 0xf0c8a8];
 
 const visualState = new WeakMap();   // per-boat drawing memory (blade height, last phase): never part of the race
@@ -18,6 +19,7 @@ const puddles = [];                  // swirls left on the water where blades ca
 
 function coloursFor(boat) {
   if (boat === race?.player || boat.isGhost) return PLAYER_COLOURS;
+  if (boat === race?.player2) return PLAYER2_COLOURS;
   let h = 0; for (const ch of boat.crewName) h = (h * 31 + ch.charCodeAt(0)) | 0;
   return CLUB_COLOURS[Math.abs(h) % CLUB_COLOURS.length];
 }

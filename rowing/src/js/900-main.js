@@ -15,7 +15,7 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   game.ghostInputs = ghostInputs;
   race = makeRace({ ...opts, ghostInputs });
   if (gl) setScene(race.course, opts.cls);
-  targetRate = 36;
+  targetRate = targetRate2 = 36;
   catchTimes.length = 0;
   splitHistory.length = 0;
   game.acc = 0;
@@ -121,13 +121,13 @@ function frame(now) {
 
   if (game.state === 'race' && race) {
     const slow = game.replay && photoFinishSlowdown(race);
-    simulate(dt * (game.fastForward ? 8 : slow || 1), () => game.replay ? (game.replay[race.tick] ?? packInput(0, 18)) : readInput());
+    simulate(dt * (game.fastForward ? 8 : slow || 1), () => game.replay ? (game.replay[race.tick] ?? packInput(0, 18)) : readInput(), false, readInput2);
     frameBlend.alpha = clamp(game.acc / TUNE.dt, 0, 1);
     startSequence();
     const p = race.player, d = race.course.distance;
     AU.ambient(p.v, smooth(d - 400, d, p.x) * (p.finishTime != null ? 0.6 : 1), race.course.rain ? 1 : 0);
     if (race.done) { game.state = 'results'; game.replay ? showReplayEnd() : showResults(race) }
-    if (game.state === 'race') { updateHud(race); if (!game.replay && game.mode !== 'learn') updateCalls(race); updateLearning(race) }
+    if (game.state === 'race') { updateHud(race); updateHud2(race); if (!game.replay && game.mode !== 'learn') updateCalls(race); updateLearning(race) }
   } else if ((game.state === 'menu' || game.state === 'results') && race) {
     // Behind the menu a demo race rows itself; after a race the field rows on past the line.
     simulate(dt, () => packInput(race.started ? autoRow(race.player) : 0, 35), true);
@@ -137,7 +137,7 @@ function frame(now) {
 
   if (gl && race) {
     if (game.state === 'menu') menuCamera(dt);
-    else updateCamera(race.player, race.t, dt);
+    else updateCamera(race.player2 ? duelCameraBoat(race) : race.player, race.t, dt);
     renderFrame(race, game.time, dt);
     updateFps(dt);
   }
@@ -145,13 +145,13 @@ function frame(now) {
 }
 
 // Steps the race at 60 Hz for the time that has passed. `quiet` skips sound and on-screen feedback.
-function simulate(dt, inputFor, quiet = false) {
+function simulate(dt, inputFor, quiet = false, input2For = () => 0) {
   game.acc += dt;
   let steps = 0;
   while (game.acc >= TUNE.dt && steps++ < 400) {
     game.acc -= TUNE.dt;
     rememberPoses([...race.boats, race.ghost]);
-    stepRace(race, inputFor());
+    stepRace(race, inputFor(), input2For());
     recordSplits(race);
     if (quiet) { for (const b of race.boats) b.events.length = 0; if (race.ghost) race.ghost.events.length = 0 }
     else handleEvents();
@@ -186,6 +186,12 @@ function showReplayEnd() {
   game.mode = game.modeBeforeReplay || 'race';
   $('hud').classList.add('hide');
   $('results').classList.remove('hide');
+}
+
+// In a duel the camera frames both human crews: it follows a point between them.
+function duelCameraBoat(race) {
+  const a = pose(race.player), b = pose(race.player2);
+  return { ...race.player, x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 - 3, yaw: 0 };
 }
 
 // On the menu the camera drifts slowly along the start, showing off the venue.
