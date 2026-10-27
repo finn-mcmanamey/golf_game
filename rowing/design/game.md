@@ -64,6 +64,17 @@ Loops:
 ## Features
 See [features/README.md](features/README.md).
 
+**Shipped this phase:**
+- **Feel:** F-101 calibration, F-108 timestamped presses (both players), F-106 75% speed, F-112 touch-aware lessons, F-113 idle frame cap.
+- **Social:**
+  - F-102 daily share card, with week and cup cards (F-120, F-121).
+  - F-103 board around you, F-104 streak shields, F-107 codes that travel.
+  - F-115 weekday daily formats, F-117 Friday bumps daily.
+- **Truth:** F-109 stream lines, with foam (F-110) and results feedback; F-114 rivals read the river; F-111 Henley verdicts.
+- **Fair:** F-105 sim maths guard, checked against QuickJS.
+
+**Next:** F-118 crew selection, then F-116 and F-119 once browsers and network access allow.
+
 ## Open decisions
 1. **Should calibration also move the judging window?** Recommendation: no. It shifts only cues and drawing, so codes and the board stay valid and identical across devices.
 2. **Should the share card show the time, or only place and catches?** Recommendation: show the time. The daily course is identical for everyone, so the time is the result. Codes stay out of the card, so it gives away nothing about the route.
