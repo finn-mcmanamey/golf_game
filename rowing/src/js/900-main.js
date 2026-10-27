@@ -50,7 +50,10 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
 
 // A live race goes back to its lobby; everything else restarts its own way.
 const backToLiveLobby = () => { live.state = 'lobby'; sendPresence(true); toMenu(); $('live').classList.remove('hide'); renderLiveLobby() };
-const restartRace = () => game.mode === 'live' ? backToLiveLobby() : game.mode === 'career' ? startCareerRace() : game.mode === 'cup' ? startCupRace() : game.mode === 'replay' ? watchReplay() : game.mode === 'learn' ? startLearning() : game.mode === 'training' ? startTraining() : startRace(game.opts, game.ghostInputs, game.mode);
+// How each mode starts again from the results screen; anything else re-rows the same race.
+const RESTARTS = { live: () => backToLiveLobby(), career: () => startCareerRace(), cup: () => startCupRace(),
+  replay: () => watchReplay(), learn: () => startLearning(), training: () => startTraining() };
+const restartRace = () => (RESTARTS[game.mode] || (() => startRace(game.opts, game.ghostInputs, game.mode)))();
 
 function toMenu() {
   if (live.state === 'racing') { live.state = 'lobby'; sendPresence(true) }   // quitting a live race: back to the lobby for everyone
