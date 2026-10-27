@@ -29,7 +29,7 @@ function watchDailyBoard() {
 
 // Re-row each new code (one per frame, so the page stays smooth) and keep only rows that check out.
 // A row is checked as the pair (code, claimed time): reusing someone's honest code with a better time fails.
-const rowKey = r => r.dailyCode + '|' + r.dailyTime;
+const rowKey = r => r.dailySeed + '|' + r.dailyCode + '|' + r.dailyTime;   // the day is part of what was checked
 
 function verifyRows(seed) {
   const todo = board.rows.filter(r => !board.verified.has(rowKey(r)));

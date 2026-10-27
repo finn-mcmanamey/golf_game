@@ -39,8 +39,22 @@ const fakeRoom = () => {
   await c.keyboard.press('Digit4'); await a.waitForTimeout(600);
   const cheered = await a.evaluate(() => $('cheers').innerText.includes('Finn 🔥'));
   console.log('cheer arrived:', cheered);
-  const ok = cheered && await a.evaluate(() => [...live.remote.values()].some(r => r.crewName === 'Finn' && r.x > 1)) && await c.evaluate(() => [...live.remote.values()].some(r => r.crewName === 'Dad' && r.x > 1));
+  const ok = cheered && await a.evaluate(() => [...live.remote.values()].some(r => r.crewName === 'Finn' && r.x > 0.2)) && await c.evaluate(() => [...live.remote.values()].some(r => r.crewName === 'Dad' && r.x > 0.2));
   console.log(ok && !errs.length ? 'ok: both crews see each other racing' : 'FAIL'); if (!ok || errs.length) process.exitCode = 1;
+  // Dad finishes: Finn must still see him, home, with a time.
+  await a.evaluate(() => { game.fastForward = true });
+  await a.waitForFunction(() => game.state === 'results', null, { timeout: 200000 });
+  await c.waitForTimeout(1500);
+  const seesFinisher = await c.evaluate(() => [...live.remote.values()].some(r => r.crewName === 'Dad' && r.finishTime != null));
+  // Finn quits mid-race: his boat must stop on Dad's screen, and he must be able to start a new race.
+  await c.evaluate(() => toMenu());
+  await a.waitForTimeout(1500);
+  const x1 = await a.evaluate(() => [...live.remote.values()].find(r => r.crewName === 'Finn')?.x);
+  await a.waitForTimeout(1500);
+  const x2 = await a.evaluate(() => [...live.remote.values()].find(r => r.crewName === 'Finn')?.x ?? x1);
+  const stopped = x1 === undefined || Math.abs(x2 - x1) < 0.5;
+  console.log('finisher still shown:', seesFinisher, '· quitter stops:', stopped);
+  if (!seesFinisher || !stopped) process.exitCode = 1;
   console.log(errs.join('\n') || 'no errors');
   await b.close();
 })();

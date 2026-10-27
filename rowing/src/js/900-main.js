@@ -53,6 +53,7 @@ const backToLiveLobby = () => { live.state = 'lobby'; sendPresence(true); toMenu
 const restartRace = () => game.mode === 'live' ? backToLiveLobby() : game.mode === 'career' ? startCareerRace() : game.mode === 'cup' ? startCupRace() : game.mode === 'replay' ? watchReplay() : game.mode === 'learn' ? startLearning() : game.mode === 'training' ? startTraining() : startRace(game.opts, game.ghostInputs, game.mode);
 
 function toMenu() {
+  if (live.state === 'racing') { live.state = 'lobby'; sendPresence(true) }   // quitting a live race: back to the lobby for everyone
   game.state = 'menu';
   for (const id of ['results', 'pause', 'hud']) $(id).classList.add('hide');
   $('menu').classList.remove('hide');
@@ -61,7 +62,7 @@ function toMenu() {
 }
 
 function togglePause() {
-  if (game.state === 'race') { game.state = 'paused'; $('pause').classList.remove('hide'); buildPauseSettings() }
+  if (game.state === 'race') { game.state = 'paused'; $('pause').classList.remove('hide'); $('btnRestart').classList.toggle('hide', game.mode === 'live'); buildPauseSettings() }
   else if (game.state === 'paused') { game.state = 'race'; $('pause').classList.add('hide'); game.last = performance.now() }
 }
 
@@ -219,6 +220,8 @@ function simulate(dt, inputFor, quiet = false, input2For = () => 0) {
     else handleEvents();
     if (race.falseStart && !quiet) {
       toast('False start! Wait for the horn.', 2200);
+      // In a live race the others are already counting down: hold still instead of restarting alone.
+      if (game.mode === 'live') { race.falseStart = false; continue }
       restartRace();
       break;
     }

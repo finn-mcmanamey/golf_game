@@ -64,9 +64,13 @@ function renderLiveLobby() {
 
 // Everyone in the room starts on the same message, so all the countdowns run together.
 function startLiveRace(data) {
-  if (live.state === 'racing' || !data?.opts) return;
+  // Only crews waiting in the lobby (dialog open, or back from a live race) are pulled into a new race.
+  const waiting = live.state === 'lobby' || live.state === 'done';
+  const here = !$('live').classList.contains('hide') || game.mode === 'live' && game.state !== 'race';
+  if (!waiting || !here || !data?.opts) return;
   const o = data.opts;
-  if (!BOAT_CLASSES[o.cls] || !DIFFICULTY[o.difficulty] || !(o.distance > 0 && o.distance <= 4000)) return;   // untrusted: check before using
+  // Untrusted: only our own boat classes and distances, whole-number seeds.
+  if (!Object.hasOwn(BOAT_CLASSES, o.cls) || !Object.hasOwn(DIFFICULTY, o.difficulty) || ![...DISTANCES, 4000].includes(o.distance) || !Number.isInteger(o.seed)) return;
   live.state = 'racing';
   live.remote.clear();
   $('live').classList.add('hide');
@@ -84,25 +88,33 @@ function pressLiveStart() {
 function updateLiveBoats(dt) {
   if (!live.lobby || live.state !== 'racing' || !race) return;
   sendPresence();
-  const others = live.lobby.peers().filter(p => !p.sameTab && p.kind === 'viewer' && p.presence.state === 'racing' && p.presence.x != null)
+  // Crews still racing, and crews already home (they stay on the water and in the standings).
+  const others = live.lobby.peers().filter(p => !p.sameTab && p.kind === 'viewer' && (p.presence.state === 'racing' || p.presence.state === 'done') && Number.isFinite(p.presence.x))
     .sort((a, b) => a.peer < b.peer ? -1 : 1).slice(0, LIVE_LANES.length);
   const seen = new Set();
-  others.forEach((p, i) => {
-    const s = p.presence, cls = BOAT_CLASSES[s.cls] ? s.cls : '1x';
+  others.forEach(p => {
+    const s = p.presence, cls = Object.hasOwn(BOAT_CLASSES, s.cls) ? s.cls : '1x';
     let r = live.remote.get(p.peer);
-    if (!r) { r = makeBoat(cls, LIVE_LANES[i], String(s.name || 'Rower').slice(0, 14)); r.isRemote = true; r.shirt = s.shirt; live.remote.set(p.peer, r) }
+    if (!r) {
+      // Each newcomer takes the first free lane, so two crews never share one.
+      const taken = new Set([...live.remote.values()].map(b => b.lane)), lane = LIVE_LANES.find(l => !taken.has(l)) ?? LIVE_LANES[0];
+      r = makeBoat(cls, lane, String(s.name || 'Rower').slice(0, 14)); r.isRemote = true; r.shirt = Number.isInteger(s.shirt) ? s.shirt : 0xffffff; live.remote.set(p.peer, r);
+    }
     seen.add(p.peer);
     if (r.stamp !== p.updatedAt) {
       // A fresh report: steer towards it rather than jumping, so the boat never stutters.
       r.stamp = p.updatedAt;
-      r.targetX = Number(s.x) || 0;
-      r.v = Number(s.v) || 0;
-      r.h = clamp(Number(s.h) || 0, 0, 1);
+      // Untrusted numbers: finite and in range, or ignored.
+      const num = (v, lo, hi, d) => Number.isFinite(v) ? clamp(v, lo, hi) : d;
+      r.targetX = num(s.x, 0, race.course.distance + 100, 0);
+      r.v = num(s.v, 0, 8, 0);
+      r.h = num(s.h, 0, 1, 0);
       r.phase = ['drive', 'recover', 'front', 'crab'].includes(s.ph) ? s.ph : 'front';
-      r.finishTime = typeof s.ft === 'number' ? s.ft : null;
-      r.z = laneZ(r.lane) + clamp(Number(s.off) || 0, -4, 4);
+      r.finishTime = Number.isFinite(s.ft) && s.ft > 0 && s.ft < 3600 ? s.ft : null;
+      r.z = laneZ(r.lane) + num(s.off, -4, 4, 0);
     }
-    r.targetX += r.v * dt;
+    // Between reports, coast on at the last speed, but not for long: a crew that has gone quiet stops.
+    if (Date.now() - p.updatedAt < 1000) r.targetX += r.v * dt;
     r.x += (r.targetX - r.x) * Math.min(1, dt * 6);
   });
   for (const k of [...live.remote.keys()]) if (!seen.has(k)) live.remote.delete(k);
@@ -135,12 +147,15 @@ const CHEERS = ['💪', '👏', '😅', '🔥'];
 let lastCheer = 0;
 
 function sendCheer(i) {
-  if (!live.lobby || live.state !== 'racing' || game.time - lastCheer < 1) return;   // one a second is plenty
+  if (!live.lobby || live.state !== 'racing' || game.state !== 'race' || game.time - lastCheer < 1) return;   // one a second is plenty
   lastCheer = game.time;
   live.lobby.emit('cheer', { i }).catch(() => {});
 }
 
+const cheerSeen = new Map();   // peer -> last time, so one crew can't flood the screen
 function showCheer(msg) {
+  if (Date.now() - (cheerSeen.get(msg.peer) || 0) < 800 || $('cheers').childElementCount > 5) return;
+  cheerSeen.set(msg.peer, Date.now());
   const i = msg.data?.i, who = msg.sameTab ? 'You' : String(live.lobby?.peers().find(p => p.peer === msg.peer)?.presence.name || 'Rower').slice(0, 14);
   if (!(i >= 0 && i < CHEERS.length)) return;   // untrusted: only our own four reactions are ever shown
   const el = document.createElement('div');

@@ -124,7 +124,9 @@ function checkFriendLink() {
 function showResults(race) {
   const p = race.player, opts = race.opts;
   const order = [...race.boats].sort((a, b) => placeOf(race, a) - placeOf(race, b));
-  const win = order[0].finishTime, place = order.indexOf(p) + 1;
+  const win = order[0].finishTime;
+  // In a live race the field is your friends, not the bots: count the crews already home ahead of you.
+  const place = game.mode === 'live' ? 1 + [...live.remote.values()].filter(r => r.finishTime != null && r.finishTime < p.finishTime).length : order.indexOf(p) + 1;
   const p2 = race.player2;
   $('resTitle').textContent = p2 ? (placeOf(race, p) < placeOf(race, p2) ? 'Player 1 wins the duel!' : 'Player 2 wins the duel!')
     : place === 1 ? 'Winner!' : `${ordinal(place)} place`;
@@ -137,6 +139,7 @@ function showResults(race) {
   else if (game.tuned || tuneEdited()) pbNote = ' · tuned physics, not recorded';
   else if (game.mode === 'duel') pbNote = ' · duel';
   else if (game.mode === 'replay' || practiceMode()) pbNote = practiceMode() ? ' · practice' : ' · replay';
+  else if (!counts) pbNote = game.mode === 'live' ? ' · live race' : '';
   else if (!pb || p.finishTime < pb.time) {
     savePB(opts.distance, opts.cls, opts.kind, { time: p.finishTime, code, venue: race.course.name, date: Date.now() });
     pbNote = pb ? ` · new personal best (was ${fmtTime(pb.time)})` : ' · first personal best';
