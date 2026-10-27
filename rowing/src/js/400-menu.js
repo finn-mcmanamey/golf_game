@@ -139,9 +139,11 @@ function dailyOptsFor(day) {
   const base = { seed: hashSeed(day, 0xDA1) % 999999 + 1, distance: 1000, cls: CLASS_KEYS[day % 4], difficulty: 'national', lane: 2, rules: 3, kind: 'regatta' };
   if (day < DAILY_FORMATS_FROM) return base;
   const weekday = (day + 4) % 7;   // day 0 was a Thursday; 0 = Sunday
-  if (weekday === 3) return { ...base, kind: 'erg', cls: '1x', distance: 500 };
-  if (weekday === 5) return { ...base, kind: 'bumps', rules: 6 };   // Fridays: bumps from station 3 (F-117)
-  if (weekday === 0 || weekday === 6) return { ...base, kind: 'head', rules: 6 };   // streams and all
+  // Other formats get their own seed, so their board never mixes with regatta rows from a stale tab.
+  const as = (kind, more) => ({ ...base, ...more, kind, seed: hashSeed(day, 0xDA1, KIND_KEYS.indexOf(kind)) % 999999 + 1 });
+  if (weekday === 3) return as('erg', { cls: '1x', distance: 500 });
+  if (weekday === 5) return as('bumps', { rules: 6 });   // Fridays: bumps from station 3 (F-117)
+  if (weekday === 0 || weekday === 6) return as('head', { rules: 6 });   // streams and all
   return base;
 }
 const dailyOpts = () => dailyOptsFor(localDay());
@@ -224,7 +226,7 @@ function showResults(race) {
   $('resSub').textContent = bumps ? `Started ${ordinal(p.lane + 1)} on the river, finished ${ordinal(place)} · ${race.course.name}` : `${fmtTime(p.finishTime)} · ${race.course.name}, ${opts.distance} m ${BOAT_CLASSES[opts.cls].name.toLowerCase()}${pbNote}`;
   $('resTable').innerHTML = order.map((b, i) => `<tr class="${b === p ? 'me' : ''}"><td>${i + 1}</td><td>${bumps ? 'Station ' + (b.lane + 1) : race.course.kind === 'boatrace' ? (b.lane === 2 ? 'Surrey' : 'Middlesex') : race.course.bends ? 'Start ' + (b.startAt / 8 + 1) : 'Lane ' + (b.lane + 1)}</td><td>${displayName(b)}</td>
     <td class="t">${bumps ? bumpStatus(race, b) : b.finishTime != null ? fmtTime(b.finishTime) : '–'}</td><td class="t">${bumps ? '' : i && b.finishTime != null ? '+' + (b.finishTime - win).toFixed(2) : ''}</td></tr>`).join('')
-    + (race.ghost?.finishTime ? `<tr><td></td><td></td><td>Ghost</td><td class="t">${fmtTime(race.ghost.finishTime)}</td><td class="t">${(race.ghost.finishTime - p.finishTime >= 0 ? '+' : '') + (race.ghost.finishTime - p.finishTime).toFixed(2)}</td></tr>` : '');
+    + (race.ghost?.finishTime && p.finishTime != null ? `<tr><td></td><td></td><td>Ghost</td><td class="t">${fmtTime(race.ghost.finishTime)}</td><td class="t">${(race.ghost.finishTime - p.finishTime >= 0 ? '+' : '') + (race.ghost.finishTime - p.finishTime).toFixed(2)}</td></tr>` : '');
   const s = p.stats, strokes = Math.max(1, s.perfect + s.good + s.off);
   $('resChart').innerHTML = (bumps ? '' : splitChart(race, order[0])) + timingChart();
   $('resBoard').innerHTML = game.mode === 'live' ? $('liveStand').innerHTML : '';
