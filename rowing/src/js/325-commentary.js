@@ -3,7 +3,7 @@
 
 const comm = { leader: null, lastT: -99, lastLine: '', said: new Set(), excite: 0 };
 
-function resetCommentary() { Object.assign(comm, { leader: null, lastT: -99, lastLine: '', excite: 0, introLane: -1 }); comm.said.clear() }
+function resetCommentary() { Object.assign(comm, { leader: null, lastT: -99, lastLine: '', excite: 0, introLane: -1, warnT: -99 }); comm.said.clear() }
 
 const who = b => `${displayName(b)}${race.course.bends ? '' : ` in lane ${b.lane + 1}`}`;
 
@@ -37,6 +37,7 @@ function introduceCrews(race) {
 
 function updateCommentary(race) {
   if (!race.started || race.player2 && race.player2.finishTime != null && race.player.finishTime != null) return;
+  if (race.course.kind === 'boatrace') boatRaceCalls(race);
   const D = race.course.distance, order = [...race.boats].sort((a, b) => placeOf(race, a) - placeOf(race, b));
   const lead = order[0], second = order[1];
   comm.excite = Math.max(0, comm.excite - 0.01);
