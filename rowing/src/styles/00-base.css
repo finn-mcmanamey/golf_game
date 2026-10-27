@@ -225,3 +225,10 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 #paceT { font-size: 12px; font-weight: 700 } #paceT:empty { display: none }
 .bumpsChart { display: block; margin: 6px auto 2px; max-width: 100%; height: auto }
 #strain { position: absolute; inset: 0; opacity: 0; transition: opacity .6s; background: radial-gradient(ellipse at center, transparent 50%, rgba(60, 0, 10, .9) 100%) }
+/* Bumps week (green, for the greenery) and the Boat Race (navy) cards, laid out like the season and cup cards. */
+#weekBox, #boatRaceBox { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; margin: 0; padding: 10px 12px; border-radius: 12px; font-size: 13px }
+#weekBox { background: rgba(74, 222, 128, .07); border: 1px solid rgba(74, 222, 128, .3) }
+#boatRaceBox { background: rgba(129, 140, 248, .08); border: 1px solid rgba(129, 140, 248, .32) }
+#weekT, #boatRaceT { flex: 1 1 260px; text-align: left }
+#weekT b { color: #86efac } #boatRaceT b { color: #a5b4fc }
+#weekChart { flex: 1 1 100%; order: 2 } #weekChart:empty { display: none }
