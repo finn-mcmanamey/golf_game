@@ -188,3 +188,5 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 @media (max-width: 760px) { .menuGrid { grid-template-columns: 1fr } }
 .sec.mini { padding: 3px 8px; font-size: 11.5px; border-radius: 7px }
 #rateTarget.flash { color: var(--acc) }
+#welcome { margin: 4px 0 10px; text-align: left; font-size: 13.5px; border-color: rgba(255, 210, 58, .4) } #welcome b { color: var(--acc) }
+#nextUp { color: var(--acc); margin-top: -6px }

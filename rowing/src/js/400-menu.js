@@ -43,6 +43,7 @@ function buildMenu() {
   };
   $('btnDaily').onclick = () => startRace(dailyOpts(), null, 'daily');
   $('btnLearn').onclick = startLearning;
+  $('btnWelcome').onclick = startLearning;
   $('btnBoathouse').onclick = () => openBoathouse();
   $('bhClose').onclick = () => $('boathouse').classList.add('hide');
   $('btnDuel').onclick = () => startRace({ ...currentOpts(), duel: true }, null, 'duel');
@@ -72,7 +73,17 @@ function menuChanged() {
   $('btnGhost').classList.toggle('hide', !pb);
   renderCareer();
   renderCup();
+  $('welcome').classList.toggle('hide', STORE.get('history', []).length > 0);
   showPreview(currentOpts());
+}
+
+// After a race, one suggestion for what to try next.
+function nextChallenge(race, place) {
+  const o = race.opts, i = FIELD_ORDER.indexOf(o.difficulty);
+  if (place === 1 && i < FIELD_ORDER.length - 1) return `Next: try a ${DIFFICULTY[FIELD_ORDER[i + 1]].label} field.`;
+  if (place === 1) return o.kind === 'regatta' ? 'Next: take on a head race down a winding river.' : 'Next: chase your own ghost with "Race your best".';
+  if (race.player.stats.off > race.player.strokes / 3) return 'Next: steadier catches. Try Learn to row, or turn on the catch beep.';
+  return place <= 3 ? 'So close. Save a power ten for the last 250 m.' : 'Next: try the Classic rate plan, and keep energy for the finish.';
 }
 
 // The daily regatta: same course, boat and field for everyone today.
@@ -124,6 +135,7 @@ function showResults(race) {
     + (race.ghost?.finishTime ? `<tr><td></td><td></td><td>Ghost</td><td class="t">${fmtTime(race.ghost.finishTime)}</td><td class="t">${(race.ghost.finishTime - p.finishTime >= 0 ? '+' : '') + (race.ghost.finishTime - p.finishTime).toFixed(2)}</td></tr>` : '');
   const s = p.stats, strokes = Math.max(1, s.perfect + s.good + s.off);
   $('resChart').innerHTML = splitChart(race, order[0]) + timingChart();
+  $('nextUp').textContent = counts ? nextChallenge(race, place) : '';
   $('resStats').textContent = `${p.strokes} strokes · average rate ${(p.strokes / p.finishTime * 60).toFixed(1)} · ${Math.round(s.perfect / strokes * 100)}% perfect catches`
     + (s.crabs ? ` · ${s.crabs} crab${s.crabs > 1 ? 's' : ''}` : '') + (s.buoys ? ` · hit the buoys ${s.buoys}×` : '');
   const careerNote = game.mode === 'career' ? (counts ? careerResult(race, place) : 'Not counted for the season: tuned physics or unfinished.')
