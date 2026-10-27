@@ -11,6 +11,8 @@ const haptics: Record<string, () => Promise<void>> = {
   perfect: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
   crab: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error),
   finish: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
+  whistle: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid),   // bumps: the gap is closing
+  heart: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft),       // energy nearly gone
 };
 
 const onMessage = ({ nativeEvent }: WebViewMessageEvent) => haptics[nativeEvent.data]?.();

@@ -28,7 +28,7 @@ function bumpCalls(race) {
   bumpCall.behind = behind;
 }
 
-function blowWhistle(n) { for (let i = 0; i < n; i++) setTimeout(() => AU.play('whistle'), i * 220) }
+function blowWhistle(n) { for (let i = 0; i < n; i++) setTimeout(() => { AU.play('whistle'); buzz('whistle') }, i * 220) }
 
 // Standings column: clear water to the crew ahead, or how a crew's race ended.
 function bumpStatus(race, b) {

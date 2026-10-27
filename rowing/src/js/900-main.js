@@ -117,7 +117,7 @@ function updateFps(dt) {
 // A haptic tap: through the iPhone app when the game runs inside it (rowing/app), otherwise the browser's vibration.
 function buzz(kind) {
   if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(kind);
-  else navigator.vibrate?.(kind === 'perfect' ? 12 : 40);
+  else navigator.vibrate?.(kind === 'perfect' || kind === 'heart' ? 12 : 40);
 }
 
 // Turns what just happened on the water into sound and on-screen feedback.
