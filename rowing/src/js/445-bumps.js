@@ -2,14 +2,7 @@
    The race itself (single file, catching the crew ahead) lives in 050-race.js; this only reads it. */
 
 const bumpLen = b => BOAT_CLASSES[b.cls].length;
-const stillRacing = b => !b.out && b.finishTime == null;
-
-// The nearest crew ahead (or behind) in the starting line that is still racing.
-function bumpTarget(race, b) { return race.boats.filter(o => o.lane < b.lane && stillRacing(o)).pop() }
-function bumpHunter(race, b) { return race.boats.find(o => o.lane > b.lane && stillRacing(o)) }
-
-// Clear water between a chaser's bow and the stern ahead, in metres.
-const bumpGap = (chaser, target) => target.x - bumpLen(target) - chaser.x;
+const bumpTarget = bumpAhead, bumpHunter = bumpBehind;
 
 // The bank party's whistles, as on a real bumps river: one at a length and a half, two at a length, three at half.
 function whistles(gap, len) { return gap < len * 0.5 ? 3 : gap < len ? 2 : gap < len * 1.5 ? 1 : 0 }

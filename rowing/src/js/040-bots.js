@@ -69,5 +69,6 @@ function botInput(br, b, race) {
   if (err > 0.5) bits |= IN.LEFT; else if (err < -0.5) bits |= IN.RIGHT;
   const left = 1 - b.x / race.course.distance;
   if (left < br.plan.sprintAt * 0.6 && b.energy > 0.12 && br.rng() < br.d.push) bits |= IN.PUSH;
+  if (race.order && race.opts.rules >= 4 && b.energy > 0.15 && bumpPressure(race, b)) return packInput(bits | IN.PUSH, rate + 1);
   return packInput(bits, rate);
 }

@@ -20,7 +20,7 @@ const { chromium } = require('playwright');
   await p.waitForFunction(() => typeof dailyOpts === 'function');
   await p.evaluate(() => {
     // An honest run: re-row today's daily with the autopilot, and a forged one claiming an impossible time.
-    const o = { ...dailyOpts(), kind: 'regatta', rules: RULES_LATEST }, r = makeRace(o);
+    const o = { kind: 'regatta', ...dailyOpts() }, r = makeRace(o);
     while (!r.done) stepRace(r, r.started ? packInput(autoRow(r.player), 34) : packInput(0, 34));
     const code = encodeRace(o, r.inputs);
     __rows.set('u_honest', { name: 'Honest Hans', dailySeed: o.seed, dailyTime: r.player.finishTime, dailyCode: code });

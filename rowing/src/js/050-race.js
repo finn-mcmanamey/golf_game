@@ -56,8 +56,10 @@ function makeRace(opts) {
 //  1: the original physics.
 //  2: wash from crews in the next lane (its reach was too short to matter; kept exactly for races rowed under it).
 //  3: wash that reaches: felt as soon as you drift from your lane centre towards a faster crew just ahead.
-const RULES_LATEST = 3;
+//  4: bumps crews push when a bump is close (ahead or behind). Other kinds row exactly as under rules 3.
+const RULES_LATEST = 4;
 const WASH = { 2: { reach: 9.5, span: 2.5, drag: () => TUNE.washDrag }, 3: { reach: LANE_W - 0.5, span: 3, drag: () => TUNE.washDrag3 } };
+WASH[4] = WASH[3];
 
 // Wash: a faster crew just ahead in the next lane leaves rough water. Felt when the boats drift towards each
 // other, so it rewards holding the middle of your lane. Computed for every boat before any moves.
@@ -123,13 +125,25 @@ function placeOf(race, boat) {
 /* ----- bumps: catch the crew ahead before the crew behind catches you ----- */
 const BUMP_GAP = 2.5;   // bow to bow, in boat lengths: a length and a half of clear water
 
+const bumpRacing = b => !b.out && b.finishTime == null;
+// The nearest crew ahead (or behind) in the starting line still racing; boats are listed in lane order.
+const bumpAhead = (race, b) => race.boats.filter(o => o.lane < b.lane && bumpRacing(o)).pop();
+const bumpBehind = (race, b) => race.boats.find(o => o.lane > b.lane && bumpRacing(o));
+// Clear water between a chaser's bow and the stern ahead, in metres.
+const bumpGap = (chaser, target) => target.x - BOAT_CLASSES[target.cls].length - chaser.x;
+
+// Bots dig in when a bump is close: chasing within a length, or defending in the last half length.
+function bumpPressure(race, b) {
+  const t = bumpAhead(race, b), h = bumpBehind(race, b), len = BOAT_CLASSES[b.cls].length;
+  return (t && bumpGap(b, t) < len) || (h && bumpGap(h, b) < len * 0.5);
+}
+
 // A bump: the chaser's bow reaches the stern of the nearest crew ahead still racing. Both pull over and swap places.
 function checkBumps(race) {
-  const racing = b => !b.out && b.finishTime == null;
   for (const c of race.boats) {
-    if (!racing(c)) continue;
-    const t = race.boats.filter(o => o.lane < c.lane && racing(o)).pop();
-    if (!t || c.x < t.x - BOAT_CLASSES[t.cls].length) continue;
+    if (!bumpRacing(c)) continue;
+    const t = bumpAhead(race, c);
+    if (!t || bumpGap(c, t) > 0) continue;
     c.out = { t: race.t, up: true, side: 9 };
     t.out = { t: race.t, up: false, side: -9 };
     const o = race.order, i = o.indexOf(c.lane), j = o.indexOf(t.lane);

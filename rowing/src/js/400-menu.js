@@ -108,7 +108,8 @@ const localDay = () => { const d = new Date(); return Math.floor(Date.UTC(d.getF
 
 function dailyOpts() {
   const day = localDay();
-  return { seed: hashSeed(day, 0xDA1) % 999999 + 1, distance: 1000, cls: CLASS_KEYS[day % 4], difficulty: 'national', lane: 2 };
+  // Rules pinned, so every row on the board was rowed under the same physics (rules 4 only changes bumps).
+  return { seed: hashSeed(day, 0xDA1) % 999999 + 1, distance: 1000, cls: CLASS_KEYS[day % 4], difficulty: 'national', lane: 2, rules: 3 };
 }
 
 function checkFriendLink() {

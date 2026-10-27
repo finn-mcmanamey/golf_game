@@ -39,7 +39,7 @@ function verifyRows(seed) {
     let ok = false;
     try {
       // The code must be today's daily exactly (course, distance, boat, field, lane, rules) and reproduce the time.
-      const { opts, inputs } = decodeRace(r.dailyCode), want = { ...dailyOpts(), kind: 'regatta', rules: RULES_LATEST };
+      const { opts, inputs } = decodeRace(r.dailyCode), want = { kind: 'regatta', ...dailyOpts() };
       const same = ['seed', 'distance', 'cls', 'difficulty', 'lane', 'kind', 'rules'].every(k => opts[k] === want[k]);
       const race = same && withDefaultTune(() => simulateRace(opts, inputs));
       ok = same && race.player.finishTime != null && Math.abs(race.player.finishTime - r.dailyTime) < 0.005;

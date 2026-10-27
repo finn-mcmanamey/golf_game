@@ -93,7 +93,7 @@ assert.ok(e1.boats.every(b => b.z === ctx.api.laneZ(b.lane) && b.yaw === 0), 'er
 console.log(`500m erg: player ${fmtTime(e1.player.finishTime)} place ${placeOf(e1, e1.player)}`);
 
 // Bumps: crews in single file; a catch swaps two places, and codes re-row to the same river order.
-const bumps = { ...opts, kind: 'bumps', distance: 1000, difficulty: 'club', rules: 3 };
+const bumps = { ...opts, kind: 'bumps', distance: 1000, difficulty: 'club', rules: 4 };
 const u1 = row(bumps, 32), ucode = encodeRace(bumps, u1.inputs), u2 = simulateRace(decodeRace(ucode).opts, decodeRace(ucode).inputs);
 assert.ok(u1.boats.some(b => b.out), 'somebody bumps on a club river');
 assert.equal(u2.order.join(), u1.order.join(), 'bumps codes re-row to the same order');
