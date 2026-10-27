@@ -7,6 +7,8 @@
     "dev": "node build.mjs --dev",
     "build:rowing": "node rowing/build.mjs",
     "dev:rowing": "node rowing/build.mjs --dev",
-    "test:rowing": "node rowing/test/sim.test.mjs"
+    "test:rowing": "node rowing/test/sim.test.mjs",
+    "check:rowing": "npm run build:rowing && npm run test:rowing && node rowing/test/leaderboard.cjs && node rowing/test/live.cjs",
+    "e2e:rowing": "node rowing/test/e2e.cjs"
   }
 }

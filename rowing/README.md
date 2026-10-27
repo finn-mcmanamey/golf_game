@@ -9,7 +9,8 @@ no libraries, one self-contained `dist/index.html`.
 npm run build:rowing   # writes rowing/dist/index.html
 npm run dev:rowing     # serves http://localhost:5174 and rebuilds on save
 npm run test:rowing    # checks the race simulation in Node (no browser needed)
-node rowing/test/e2e.cjs   # plays one race per mode in headless Chromium (needs Playwright)
+npm run check:rowing   # build, simulation tests, leaderboard and live-race checks (needs Playwright)
+npm run e2e:rowing     # one race in every mode in headless Chromium (slow)
 ```
 
 ## How to play
