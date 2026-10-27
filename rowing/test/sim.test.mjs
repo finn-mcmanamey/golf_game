@@ -7,6 +7,13 @@ import assert from 'node:assert/strict';
 
 const dir = fileURLToPath(new URL('../src/js/', import.meta.url));
 const src = readdirSync(dir).filter(f => /^0\d\d-.*\.js$/.test(f)).sort().map(f => readFileSync(dir + f, 'utf8')).join('\n');
+// Only Math functions that give the same bits in every engine (IEEE-exact or integer) may appear in the sim:
+// sin, pow, exp and friends are "implementation-approximated" and differ in the last bit between browsers.
+const SAFE_MATH = new Set(['abs', 'sign', 'sqrt', 'min', 'max', 'floor', 'ceil', 'round', 'trunc', 'imul', 'fround']);
+const simCode = src.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+const unsafe = [...simCode.matchAll(/Math\.(\w+)/g)].map(m => m[1]).filter(n => !SAFE_MATH.has(n));
+assert.deepEqual(unsafe, [], `engine-dependent Math in the simulation: ${unsafe.join(', ')}`);
+
 const ctx = vm.createContext({ console });
 vm.runInContext(src + '\n;globalThis.api={makeRace,stepRace,simulateRace,encodeRace,decodeRace,packInput,IN,TUNE,placeOf,fmtTime,steerError,laneZ};', ctx);
 const { makeRace, stepRace, simulateRace, encodeRace, decodeRace, packInput, IN, placeOf, fmtTime } = ctx.api;
