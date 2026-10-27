@@ -122,7 +122,17 @@ function buzz(kind) {
 // Turns what just happened on the water into sound and on-screen feedback.
 function handleEvents() {
   for (const b of race.boats) {
-    if (b !== race.player) { for (const e of b.events) commentEvent(b, e); b.events.length = 0; continue }
+    if (b !== race.player) {
+      // Other crews near the camera are heard too, quieter with distance, so a close race sounds like one.
+      const near = 1 - Math.min(1, Math.hypot(b.x - cam.eye[0], b.z - cam.eye[2]) / 45);
+      for (const e of b.events) {
+        commentEvent(b, e);
+        if (near > 0 && e.type === 'catch') AU.play('catch', near * 0.45);
+        if (near > 0 && e.type === 'release' && e.grade === 'crab') AU.play('crab');
+      }
+      b.events.length = 0;
+      continue;
+    }
     for (const e of b.events) {
       learnEvent(e);
       if (e.type === 'catch' && b.strokes > 0) coachCatch(e);
