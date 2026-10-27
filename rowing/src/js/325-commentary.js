@@ -3,7 +3,7 @@
 
 const comm = { leader: null, lastT: -99, lastLine: '', said: new Set(), excite: 0 };
 
-function resetCommentary() { Object.assign(comm, { leader: null, lastT: -99, lastLine: '', excite: 0, introLane: -1, warnT: -99 }); comm.said.clear() }
+function resetCommentary() { Object.assign(comm, { leader: null, lastT: -99, lastLine: '', excite: 0, introLane: -1, warnT: -99, bankCalls: 0 }); comm.said.clear() }
 
 const who = b => `${displayName(b)}${race.course.bends ? '' : ` in lane ${b.lane + 1}`}`;
 
@@ -45,6 +45,15 @@ function updateCommentary(race) {
     comm.said.add('start');
     const r = race.boats.find(b => b.isRival);
     comment(r ? `They're away! All eyes on the rivalry: ${displayName(race.player)} against ${r.crewName}.` : `They're away cleanly at ${race.course.name}!`, true);
+  }
+  // Head races (rules 6): a rival crossing to the slack water by the bank is worth a word, once per crew.
+  if (race.course.kind === 'head' && race.opts.rules >= 6) for (const b of race.boats) {
+    if (b === race.player || b.finishTime != null || comm.said.has('bank-' + b.lane) || Math.abs(b.z - riverZ(race.course, b.x)) < 14) continue;
+    comm.said.add('bank-' + b.lane);
+    // The first two by name; after that once for the field, so it doesn't become a list.
+    const n = (comm.bankCalls = (comm.bankCalls || 0) + 1);
+    if (n <= 2) comment(`${displayName(b)} head for the slack water by the bank!`);
+    else if (n === 3) comment('The field is hugging the banks: the stream is strong today!');
   }
   if (!lead || !second || race.order) return;   // bumps have their own story: bumpEvent calls it
   if (lead.finishTime != null) {
