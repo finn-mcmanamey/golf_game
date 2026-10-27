@@ -58,6 +58,8 @@ function drawBoat(mb, boat, dtFrame, time) {
     mb.cuboid(centre, scale3(F, (u1 - u0) / 2), scale3(UP, 0.1), scale3(S, w / 2), [...shade(hullCol, 0.82), ...hullCol]);
   }
   mb.box(...P(0.05, 0.16, 0), 0.12, 0.12, 0.12, [1, 1, 1]);   // bow ball
+  // A crew that has made a bump rows home with greenery on the bow, as bumps crews do.
+  if (boat.out?.up) for (let i = 0; i < 7; i++) mb.box(...P(-0.1 - i * 0.14, 0.24 + (i % 2) * 0.1, ((i * 3) % 5 - 2) * 0.06), 0.2, 0.16, 0.2, i % 2 ? [0.3, 0.68, 0.22] : [0.18, 0.48, 0.15]);
   // A dark patch on the water under the hull grounds the boat (its shadow and reflection).
   mb.cuboid(P(-c.length / 2, 0.012, 0), scale3(F, c.length * 0.5), scale3(UP, 0.004), scale3(S, hullW * 1.1), [0.03, 0.07, 0.1]);
 
