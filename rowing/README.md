@@ -39,7 +39,20 @@ Modes: single races, **head races** on a winding river, **bumps** (single file: 
 three power tens), ghosts of your best race (or any race in your history),
 shareable race links, and a Boathouse with a 3D showroom of your boat, colours, badges and history.
 
+Fairness and feel:
+- **Tune timing** (menu card, or pause → Timing) taps along to ten clicks and moves the catch beep, the catch light
+  and your drawn slide earlier by this device's delay. Judging never moves, so codes and the board stay fair.
+- Presses are judged at the 60 Hz step they happened in, even when the screen runs at 30 fps.
+- **75% speed** gives more time on every catch; slowed races are practice, not records.
+- Head races from rules 5: the stream runs fastest mid-river and slackest by the banks (foam shows it), and the
+  results say what your line gained or lost.
+
+The daily regatta has a **share card** (one spoiler-free line), a board that shows the rows **around you** and offers
+the ghost just above your time, and **streak shields** (one per 7 days, up to 2). Where a link can't be opened (inside
+the artifact viewer), **Copy race link** copies the bare code; paste it into "Race a friend's code" on the menu.
+
 There's also an iPhone app wrapper in [`app/`](app/README.md): Expo plus a WebView, with real haptics.
+Design notes live in [`design/`](design/game.md): the brief, the feature registry and specs.
 
 ## Layout
 
@@ -55,6 +68,7 @@ rowing/
   test/leaderboard.cjs  checks forged or copied leaderboard runs are rejected
   test/live.cjs      two pages race each other live through a fake room
   app/               the iPhone app wrapper (Expo + WebView)
+  design/            design brief, feature registry, feature specs
 ```
 
 | Files | What they are |
