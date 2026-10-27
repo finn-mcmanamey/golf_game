@@ -37,7 +37,7 @@ function updateCalls(race) {
   if (p.strokes === 1) say('Go! Wind it up!', 'go', 0);
   if (p.strokes === 12) say('Lengthen… and settle.', 'settle');
   if (p.x > D * 0.25 && D >= 1000) say('Quarter done. Stay long.', 'q1');
-  if (p.x > D * 0.5) say(place === 1 ? 'Halfway and leading. Keep it clean!' : `Halfway. Lane ${leaderLane(race)} leads, go after them!`, 'half');
+  if (p.x > D * 0.5 && !race.order) say(place === 1 ? 'Halfway and leading. Keep it clean!' : `Halfway. Lane ${leaderLane(race)} leads, go after them!`, 'half');
   if (left < 250 && D > 250) say('Last 250! Take it up!', 'l250', 0.5);
   if (left < 100) say('Everything! Empty the tank!', 'l100', 0.5);
   if (p.swing >= 0.99 && !calls.swingCalled) { calls.swingCalled = true; say("That's swing! Let it run.", null) }

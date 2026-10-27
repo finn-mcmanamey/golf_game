@@ -119,7 +119,8 @@ function checkFriendLink() {
     const { opts, inputs } = decodeRace(m[1]);
     const check = withDefaultTune(() => simulateRace(opts, inputs));
     const c = check.course;
-    $('friendT').textContent = `A friend rowed ${fmtTime(check.player.finishTime)} over ${opts.distance} m (${opts.cls}) on ${c.name}.`;
+    $('friendT').textContent = check.order ? `A friend ${bumpOutcome(check, check.player).replace('!', '').toLowerCase()} in a ${opts.distance} m bumps race (${opts.cls}) on ${c.name}.`
+      : `A friend rowed ${fmtTime(check.player.finishTime)} over ${opts.distance} m (${opts.cls}) on ${c.name}.`;
     $('friend').classList.remove('hide');
     $('btnFriend').onclick = () => startRace(opts, inputs, 'friend');
   } catch (e) { toast('That race link could not be read.') }
@@ -179,6 +180,7 @@ function showResults(race) {
   const badges = counts ? checkBadges(race, place) : [];
   if (badges.length) setTimeout(() => toast('Badge earned: ' + badges.map(b => b.name).join(', '), 3200), 600);
   $('careerNote').textContent = careerNote;
+  if (game.mode === 'week') $('resChart').innerHTML += bumpsChart(week);
   $('careerNote').classList.toggle('hide', !careerNote);
   $('btnAgain').textContent = game.mode === 'live' ? 'Back to the lobby' : game.mode === 'career' || game.mode === 'cup' && !cup.out && !cup.won ? 'Next race' : game.mode === 'week' ? (weekOver() ? 'Start a new week' : `Row day ${week.day + 1}`) : game.mode === 'cup' ? 'Enter a new cup' : 'Race again';
   // A duel's code only holds player 1's strokes, so it can't be replayed or shared.

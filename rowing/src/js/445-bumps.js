@@ -11,7 +11,10 @@ const bumpCall = { ahead: 0, behind: 0 };
 function bumpCalls(race) {
   const p = race.player;
   if (p.strokes < 2) bumpCall.ahead = bumpCall.behind = 0;   // a fresh race
-  if (p.out || p.finishTime != null) return;
+  const home = p.out?.t ?? p.finishTime;
+  // Your race is over but the river's isn't: speed through the rest of the division.
+  if (home != null && race.t > home + 4 && !race.player2) game.fastForward = true;
+  if (home != null) return;
   const t = bumpTarget(race, p), h = bumpHunter(race, p);
   const ahead = t ? whistles(bumpGap(p, t), bumpLen(p)) : 0, behind = h ? whistles(bumpGap(h, p), bumpLen(p)) : 0;
   if (ahead > bumpCall.ahead) {
@@ -84,7 +87,7 @@ function drawBankParty(mb, dt, time, course) {
 
 // The starting gun on the towpath beside the line of crews, and its smoke drifting off after the start.
 function drawCannon(mb, course) {
-  const x = (race.boats.find(b => b.lane === 0)?.x ?? 0) * 0.5, z = riverZ(course, x) - course.halfW - 3, iron = [0.15, 0.15, 0.17];
+  const x = (LANES - 1) * BUMP_GAP * bumpLen(race.player) * 0.5, z = riverZ(course, x) - course.halfW - 3, iron = [0.15, 0.15, 0.17];
   if (Math.abs(x - cam.at[0]) > 200) return;
   mb.box(x, 0.8, z, 1.4, 0.35, 0.35, iron);
   for (const dx of [-0.35, 0.35]) mb.box(x + dx, 0.65, z, 0.5, 0.5, 0.08, [0.35, 0.22, 0.12]);

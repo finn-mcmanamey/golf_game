@@ -108,7 +108,8 @@ function stepRace(race, playerInput, player2Input = 0) {
   const allIn = race.boats.every(b => b.finishTime != null || b.out);
   if (race.player2 && race.player2.finishTime == null && !race.player2.out && race.t < 1200) return;   // a duel ends when both humans are home
   const home = p.out ? p.out.t : p.finishTime;
-  if (home != null && (allIn || race.t > home + (race.course.kind === 'head' ? 70 : 25))) race.done = true;
+  // A bumps race runs until every crew is home or out: the river's order isn't settled before then.
+  if (home != null && (allIn || !race.order && race.t > home + (race.course.kind === 'head' ? 70 : 25))) race.done = true;
   if (race.t > 60 * 20) race.done = true;  // safety net
 }
 

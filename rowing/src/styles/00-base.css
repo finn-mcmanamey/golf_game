@@ -223,3 +223,4 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 #cheerBar button { background: var(--panel); border: 1px solid var(--line); border-radius: 50%; width: 34px; height: 34px; font-size: 16px }
 #liveStand { top: 136px }
 #paceT { font-size: 12px; font-weight: 700 } #paceT:empty { display: none }
+.bumpsChart { display: block; margin: 6px auto 2px; max-width: 100%; height: auto }

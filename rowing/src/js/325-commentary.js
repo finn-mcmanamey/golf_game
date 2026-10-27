@@ -45,7 +45,7 @@ function updateCommentary(race) {
     const r = race.boats.find(b => b.isRival);
     comment(r ? `They're away! All eyes on the rivalry: ${displayName(race.player)} against ${r.crewName}.` : `They're away cleanly at ${race.course.name}!`, true);
   }
-  if (!lead || !second) return;
+  if (!lead || !second || race.order) return;   // bumps have their own story: bumpEvent calls it
   if (lead.finishTime != null) {
     if (!comm.said.has('result')) {
       comm.said.add('result');

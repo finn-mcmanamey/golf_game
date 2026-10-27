@@ -80,7 +80,7 @@ function onKey(code) {
   if (duel && code === 'ArrowDown') targetRate2 = clamp(targetRate2 - 2, RATE_MIN + 2, RATE_MAX - 2);
   if (code === 'KeyC') cycleCamera();
   if (code === 'KeyG') cycleQuality();
-  if (code === 'Enter' && race.player.finishTime != null && !race.player2) game.fastForward = true;
+  if (code === 'Enter' && (race.player.finishTime != null || race.player.out) && !race.player2) game.fastForward = true;
 }
 
 // Learn to row teaches steering, so the assist is off there whatever the setting says.
