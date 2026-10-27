@@ -56,8 +56,17 @@ function toMenu() {
 }
 
 function togglePause() {
-  if (game.state === 'race') { game.state = 'paused'; $('pause').classList.remove('hide') }
+  if (game.state === 'race') { game.state = 'paused'; $('pause').classList.remove('hide'); buildPauseSettings() }
   else if (game.state === 'paused') { game.state = 'race'; $('pause').classList.add('hide'); game.last = performance.now() }
+}
+
+// Quick settings on the pause screen, so nobody has to quit a race to change them.
+function buildPauseSettings() {
+  const onOff = [[true, 'On'], [false, 'Off']];
+  segmented('pSound', onOff, settings.sound, v => { settings.sound = v; AU.setOn(v); saveSettings(); soundLabel() });
+  segmented('pQuality', QUALITY_LABELS.map((l, i) => [i, l]), R.quality, v => { settings.quality = R.quality = v; saveSettings() });
+  segmented('pCue', onOff, settings.cue, v => { settings.cue = v; saveSettings() });
+  segmented('pAssist', [[true, 'Assisted'], [false, 'Manual']], settings.assist, v => { settings.assist = v; saveSettings() });
 }
 
 function cycleCamera() {
