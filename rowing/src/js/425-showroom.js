@@ -29,8 +29,10 @@ function animateShowroom(dt, time) {
   showroom.angle += dt * 0.25;
   const a = Math.sin(showroom.angle) * 0.6, r = 12;
   cam.eye = [Math.sin(a) * r, 3.6, Math.cos(a) * r];
-  const shift = innerWidth > 760 ? 4.5 : 0, right = [Math.cos(a), 0, -Math.sin(a)];
-  cam.at = [right[0] * shift, 1.6, right[2] * shift - 1];
+  const wide = innerWidth > 760, shift = wide ? 4.5 : 0, right = [Math.cos(a), 0, -Math.sin(a)];
+  // Wide screens: the boat sits left of the panel. Phones: aim low so the boat sits above the bottom sheet.
+  cam.at = wide ? [right[0] * shift, 1.6, right[2] * shift - 1] : [0, -4.5, 1];
+  if (!wide) cam.eye = [cam.eye[0] * 1.3, 7, cam.eye[2] * 1.3];
   cam.fov = 0.85;
 }
 

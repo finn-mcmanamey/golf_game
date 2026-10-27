@@ -50,7 +50,7 @@ function updateHud(race) {
   e.style.width = (p.energy * 100).toFixed(1) + '%';
   e.style.background = p.energy < 0.22 ? 'var(--bad)' : p.energy < 0.45 ? 'var(--warn)' : 'var(--good)';
   $('swingB').style.width = (p.swing * 100).toFixed(1) + '%';
-  $('rateTarget').textContent = coxing() ? `target ${p.rate} · tens ${coxState.tens}` : `target ${p.rate}`;
+  $('rateTarget').textContent = p.finishTime != null ? 'paddling' : coxing() ? `target ${p.rate} · tens ${coxState.tens}` : `target ${p.rate}`;
 
   // Slide meter: handle position, glowing catch zone as the slide comes forward.
   const h = $('handle');

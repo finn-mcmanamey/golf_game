@@ -160,7 +160,13 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 /* The boathouse panel sits to the right so the showroom boat is visible on the left. */
 #boathouse { background: linear-gradient(90deg, transparent 30%, rgba(8, 18, 34, .6)); justify-content: flex-end }
 #boathouse .box { width: min(560px, 100%); margin: auto 0 auto auto }
-@media (max-width: 760px) { #boathouse { background: rgba(8, 18, 34, .5) } #boathouse .box { margin: auto } }
+/* Phones: the boathouse is a bottom sheet, so the showroom boat stays visible above it. */
+@media (max-width: 760px) {
+  #boathouse { background: none; align-items: flex-end; padding: 0 }
+  #boathouse .box { margin: 0; width: 100%; max-height: 58vh; overflow: auto; border-radius: 18px 18px 0 0; padding: 14px 14px 10px }
+  #boathouse h2 { display: none }
+  .sw { width: 24px; height: 24px }
+}
 #windT { display: flex; gap: 4px; align-items: center; color: var(--dim); font-size: 12px } #windT svg { width: 14px; height: 14px; color: #7dd3fc }
 #stats .force canvas { display: block; width: 90px; height: 26px; margin-top: 2px } @media (max-width: 640px) { #stats .force { display: none } }
 #ticker { position: absolute; top: 66px; left: 50%; transform: translateX(-50%); max-width: min(560px, 80vw); padding: 5px 14px;
@@ -196,3 +202,4 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 .totals { margin: 0 0 6px; color: var(--dim); font-size: 13px } .totals b { color: var(--ink) }
 /* Photo mode: everything but the picture and the way back out is hidden. */
 .photo #hud > *:not(#tools), .photo #tools > *:not(#btnPhoto) { visibility: hidden }
+#toast { z-index: 30 }
