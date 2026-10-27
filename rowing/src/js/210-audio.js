@@ -68,6 +68,7 @@ const AU = {
       case 'ui': this.tone(900, 1100, 0.04, 0.08); break;
       case 'cue': this.tone(1200, 1150, 0.035, 0.07, 'sine'); break;
       case 'cannon': this.tone(75, 28, 1.3, 0.55); this.tone(150, 40, 0.35, 0.3, 'sawtooth'); this.hiss(500, 0.4, 1.6, 0.7, 'lowpass'); break;
+      case 'heart': this.tone(62, 44, 0.13, 0.45 * v); this.tone(58, 40, 0.11, 0.3 * v, 'sine', 0.17); break;
       case 'whistle': this.tone(2900, 2700, 0.16, 0.09, 'sine'); this.tone(3100, 2950, 0.16, 0.05, 'triangle'); break;
       case 'tick': this.tone(1500, 1500, 0.025, 0.05, 'square'); break;
     }

@@ -39,6 +39,7 @@ function currentSplit(boat, t) {
 }
 
 function updateHud(race) {
+  updateStrain(race);
   const p = race.player, D = race.course.distance, t = Math.max(0, race.t);
   $('clockT').textContent = fmtTime(p.finishTime ?? p.out?.t ?? t).slice(0, -1);
   $('togoT').textContent = race.order && (p.out || p.finishTime != null) ? bumpOutcome(race, p)

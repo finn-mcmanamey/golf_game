@@ -224,3 +224,4 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 #liveStand { top: 136px }
 #paceT { font-size: 12px; font-weight: 700 } #paceT:empty { display: none }
 .bumpsChart { display: block; margin: 6px auto 2px; max-width: 100%; height: auto }
+#strain { position: absolute; inset: 0; opacity: 0; transition: opacity .6s; background: radial-gradient(ellipse at center, transparent 50%, rgba(60, 0, 10, .9) 100%) }
