@@ -28,6 +28,7 @@ function drawFx(mb, dt, time, course) {
   drawFireworks(mb, dt, course);
   if (['regatta', 'head', 'knockout', 'bumps'].includes(course.kind)) drawSwans(mb, dt, time, course);
   drawCrowd(mb, time, course);
+  drawBankParty(mb, dt, time, course);
   drawBirds(mb, time, course);
   if (R.wet > 0.05 && R.quality > 0) drawRain(mb, time, R.wet);
 }
@@ -118,7 +119,7 @@ function drawLamps(mb, course) {
 // The umpire's launch: a motorboat following the field down the middle, umpire standing with a white flag.
 const launch = { x: -60, v: 0 };
 function drawLaunch(mb, dt, time, course) {
-  if (!race) return;
+  if (!race || race.order) return;   // no umpire's launch on a bumps river
   const rowing = race.boats.filter(b => b.finishTime == null);
   const target = rowing.length ? rowing.reduce((n, b) => n + b.x, 0) / rowing.length - 32 : launch.x;
   launch.v += clamp((target - launch.x) * 0.6 - launch.v, -4, 4) * dt;

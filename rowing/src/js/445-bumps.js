@@ -59,3 +59,31 @@ function bumpEvent(b, e) {
   game.finishMsgUntil = game.time + 3;
   if (e.up && !game.replay) celebrate();
 }
+
+/* ----- the bank party: a coach on a bike for each crew, riding the towpath alongside (drawing only) ----- */
+const bikes = new WeakMap();   // boat -> { x, v, ph }
+
+function drawBankParty(mb, dt, time, course) {
+  if (!race?.order) return;
+  const dark = [0.12, 0.12, 0.14], skin = hex(0xe0b590), steel = [0.6, 0.62, 0.66];
+  for (const b of race.boats) {
+    let k = bikes.get(b);
+    if (!k || k.race !== race) bikes.set(b, k = { race, x: b.x - 4, v: 0, ph: b.lane });
+    // Ride level with the crew's stern; a bumped crew's coach brakes and stops with them.
+    const want = b.out ? 0 : clamp((b.x - 4 - k.x) * 0.8 + b.v, 0, 9);
+    k.v += (want - k.v) * Math.min(1, dt * 2);
+    k.x += k.v * dt;
+    k.ph += k.v * dt / 0.35;
+    if (Math.abs(k.x - cam.at[0]) > 160) continue;
+    const x = k.x, z = riverZ(course, x) - course.halfW - 2 - (b.lane % 3) * 0.8, y = 0.5;
+    const shirt = hex(coloursFor(b).shirt), c = Math.cos(k.ph) * 0.17, s = Math.sin(k.ph) * 0.17;
+    for (const wx of [x - 0.55, x + 0.55]) mb.box(wx, y + 0.35, z, 0.7, 0.7, 0.06, dark);
+    mb.beam([x - 0.55, y + 0.35, z], [x + 0.35, y + 1.05, z], 0.05, 0.05, steel);
+    mb.beam([x - 0.1, y + 0.95, z], [x + 0.55, y + 0.35, z], 0.05, 0.05, steel);
+    // Rider: legs on the pedals, body leaning to the bars, head turned to the water.
+    mb.beam([x - 0.15, y + 1.1, z], [x + c, y + 0.4 + s, z - 0.1], 0.1, 0.1, dark);
+    mb.beam([x - 0.15, y + 1.1, z], [x - c, y + 0.4 - s, z + 0.1], 0.1, 0.1, dark);
+    mb.beam([x - 0.15, y + 1.1, z], [x + 0.25, y + 1.7, z], 0.36, 0.26, shirt);
+    mb.box(x + 0.3, y + 1.95, z - 0.03, 0.26, 0.28, 0.26, skin);
+  }
+}
