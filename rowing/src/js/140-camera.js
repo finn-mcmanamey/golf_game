@@ -13,7 +13,11 @@ function cameraTarget(src, mode, raceT) {
     return { eye: [mid - 30 - k * 20, 6 + k * 6, boat.z + 26 + k * 14], at: [mid + 4, 0.5, boat.z - 4], fov: 0.8 };
   }
   switch (mode) {
-    case 'chase': return { eye: [mid - L / 2 - 6, 3, boat.z + 2.2], at: [mid + 6, 0.9, boat.z], fov: 0.95 };
+    case 'chase': {
+      // Behind the stern along the boat's heading, so bends swing into view.
+      const cy = Math.cos(boat.yaw), sy = Math.sin(boat.yaw), back = L / 2 + 6, ahead = 6, mz = boat.z - sy * L / 2;
+      return { eye: [mid - cy * back, 3, mz - sy * back + 2.2], at: [mid + cy * ahead, 0.9, mz + sy * ahead], fov: 0.95 };
+    }
     case 'aerial': return { eye: [mid - 22, 38, boat.z + 22], at: [mid + 8 + lead, 0, boat.z], fov: 0.9 };
     case 'rower': {
       // Just in front of the stroke's face, looking astern the way a rower sees the race.

@@ -50,7 +50,7 @@ function onKey(code) {
 // Steering assist nudges the boat back to the lane centre when the player isn't steering.
 // It only produces ordinary steering inputs, so recorded races replay exactly.
 function assistSteer(b) {
-  const err = (b.z - laneZ(b.lane)) + b.yaw * 10;
+  const err = steerError(race.course, b);
   return err > 0.8 ? IN.LEFT : err < -0.8 ? IN.RIGHT : 0;
 }
 

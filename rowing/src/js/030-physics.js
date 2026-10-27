@@ -12,7 +12,7 @@ const inputRate = v => (v >> 4) + RATE_MIN;
 function makeBoat(cls, lane, crewName, seed = 0, crewSd = 0.035) {
   const c = BOAT_CLASSES[cls];
   return {
-    rng: makeRng(hashSeed(seed, lane, 0xC2E)), crewSd, lag: new Array(c.crew).fill(0), sync: 1,
+    rng: makeRng(hashSeed(seed, lane, 0xC2E)), crewSd, startAt: 0, lag: new Array(c.crew).fill(0), sync: 1,
     cls, lane, crewName, crew: c.crew,
     x: 0, z: laneZ(lane), yaw: 0, v: 0,
     h: 0, phase: 'front', phaseT: 0, held: false,
@@ -100,7 +100,7 @@ function stepBoat(b, input, course, race) {
       if (b.h === 0) { b.phase = 'front'; b.phaseT = 0 }
     }
     const pressed = drive && !(b.lastBits & IN.DRIVE);
-    if (pressed && race.started) {
+    if (pressed && race.t >= b.startAt) {
       // Timing error: negative means the catch came before the slide reached the front.
       const err = b.phase === 'recover' ? -b.h / b.recSpeed : b.phaseT;
       gradeCatch(b, b.strokes === 0 ? 0 : err);
@@ -129,15 +129,26 @@ function stepBoat(b, input, course, race) {
   const grip = b.phase === 'drive' ? 1 : 0.25;
   b.steerOut = steer;
   b.yaw += (steer * TUNE.steerRate * grip * Math.min(1, b.v / 3) / Math.sqrt(n) + course.wind.cross * 0.0012 - b.yaw * TUNE.yawDamp * 0.05) * dt;
-  b.yaw = clamp(b.yaw, -0.25, 0.25);
+  b.yaw = clamp(b.yaw, course.bends ? -0.7 : -0.25, course.bends ? 0.7 : 0.25);
   const prevX = b.x;
   b.x += (b.v + course.current) * dt;
   b.z += (b.v * b.yaw + course.wind.cross * TUNE.crossDrift) * dt;
 
-  // Oars clipping the lane buoys slow the boat and nudge it back.
+  if (course.bends) hitBanks(b, course, dt);
+  else hitBuoys(b, dt);
+
+  if (b.finishTime == null && b.x >= course.distance) {
+    // Elapsed time from this crew's own start (head-race crews start at intervals).
+    b.finishTime = race.t - dt + (course.distance - prevX) / (b.x - prevX) * dt - b.startAt;
+    b.events.push({ type: 'finish', time: b.finishTime });
+  }
+  if (b.splash > 0) b.splash = Math.max(0, b.splash - dt * 3);
+}
+
+// Oars clipping the lane buoys: the blades bounce off, some speed is lost and the boat is pushed back into its lane.
+function hitBuoys(b, dt) {
   const off = b.z - laneZ(b.lane);
   if (Math.abs(off) > TUNE.buoyLimit) {
-    // The blades bounce off the buoy line: some speed lost, and the boat is pushed back into its lane.
     b.v *= 1 - 0.9 * dt;
     b.yaw -= Math.sign(off) * 0.4 * dt;
     b.z -= Math.sign(off) * 0.8 * dt;
@@ -145,10 +156,16 @@ function stepBoat(b, input, course, race) {
     if (!b.onBuoys) { b.stats.buoys++; b.events.push({ type: 'buoy' }) }
     b.onBuoys = true;
   } else b.onBuoys = false;
+}
 
-  if (b.finishTime == null && b.x >= course.distance) {
-    b.finishTime = race.t - dt + (course.distance - prevX) / (b.x - prevX) * dt;
-    b.events.push({ type: 'finish', time: b.finishTime });
-  }
-  if (b.splash > 0) b.splash = Math.max(0, b.splash - dt * 3);
+// On a river the blades can hit the bank: a heavier penalty than buoys, and the boat is turned back to the stream.
+function hitBanks(b, course, dt) {
+  const off = b.z - riverZ(course, b.x), limit = course.halfW - 3.2;
+  if (Math.abs(off) > limit) {
+    b.v *= 1 - 1.6 * dt;
+    b.yaw -= Math.sign(off) * 0.6 * dt;
+    b.z = riverZ(course, b.x) + Math.sign(off) * Math.min(Math.abs(off) - 1.0 * dt, limit + 0.8);
+    if (!b.onBuoys) { b.stats.buoys++; b.events.push({ type: 'bank' }) }
+    b.onBuoys = true;
+  } else b.onBuoys = false;
 }

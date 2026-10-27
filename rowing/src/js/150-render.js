@@ -134,7 +134,7 @@ function drawWater(race, vp, time, dtFrame, reflect) {
   setLightUniforms(u, L);
   gl.uniform3fv(u.uDeep, L.deep);
   gl.uniform3fv(u.uBank, L.bank);
-  gl.uniform1f(u.uBankZ, BANK_Z);
+  gl.uniform1f(u.uBankZ, race.course.bends ? 1e4 : BANK_Z);
   gl.uniform1f(u.uReflect, reflect ? 1 : 0);
   gl.uniform1f(u.uT, time);
   gl.uniform1f(u.uWind, Math.min(1.5, race.course.wind.speed / 3));

@@ -20,15 +20,15 @@ const STORE = (() => {
   };
 })();
 
-const settings = Object.assign({ distance: 500, cls: '1x', difficulty: 'club', sound: true, quality: 1, assist: true, voice: false, camera: 'tv', seed: 0 },
+const settings = Object.assign({ distance: 500, cls: '1x', difficulty: 'club', sound: true, quality: 1, assist: true, voice: false, kind: 'regatta', camera: 'tv', seed: 0 },
   STORE.get('settings', {}));
 const saveSettings = () => STORE.set('settings', settings);
 
 // Personal bests: one per distance and boat class, with the race code that rowed it (so it can be a ghost).
-const pbKey = (distance, cls) => `${distance}-${cls}`;
-const getPB = (distance, cls) => STORE.get('pbs', {})[pbKey(distance, cls)] || null;
-function savePB(distance, cls, record) {
+const pbKey = (distance, cls, kind) => (kind === 'head' ? 'head-' : '') + `${distance}-${cls}`;
+const getPB = (distance, cls, kind) => STORE.get('pbs', {})[pbKey(distance, cls, kind)] || null;
+function savePB(distance, cls, kind, record) {
   const all = STORE.get('pbs', {});
-  all[pbKey(distance, cls)] = record;
+  all[pbKey(distance, cls, kind)] = record;
   STORE.set('pbs', all);
 }

@@ -75,10 +75,13 @@ function liveRate(p, t) {
 let standingsTick = 0;
 function updateStandings(race) {
   if (standingsTick++ % 6) return;   // a few updates a second is plenty
-  const boats = [...race.boats].sort((a, b) => (a.finishTime ?? 1e9) - (b.finishTime ?? 1e9) || b.x - a.x);
-  const leader = boats[0];
+  const boats = [...race.boats].sort((a, b) => placeOf(race, a) - placeOf(race, b));
+  const leader = boats[0], D = race.course.distance;
   $('standings').innerHTML = boats.map((b, i) => {
-    const gap = b.finishTime != null ? fmtTime(b.finishTime) : i === 0 ? 'lead' : '+' + ((leader.x - b.x) / Math.max(1, leader.v)).toFixed(1) + 's';
+    // Head races are against the clock: show each crew's projected time, or when it starts.
+    const gap = b.finishTime != null ? fmtTime(b.finishTime)
+      : race.course.bends ? (race.t < b.startAt ? `starts ${Math.ceil(b.startAt - race.t)}s` : b.x > 20 ? '≈' + fmtTime((race.t - b.startAt) * D / b.x).slice(0, -3) : '…')
+      : i === 0 ? 'lead' : '+' + ((leader.x - b.x) / Math.max(1, leader.v)).toFixed(1) + 's';
     const sw = '#' + coloursFor(b).shirt.toString(16).padStart(6, '0');
     return `<div class="${b === race.player ? 'me' : ''}"><span>${i + 1}</span><i class="sw" style="background:${sw}"></i><span>${b.crewName}</span><span class="gap">${gap}</span></div>`;
   }).join('');
@@ -111,7 +114,7 @@ function recordSplits(race) {
     let list = splits.times.get(b);
     if (!list) splits.times.set(b, list = []);
     const next = (list.length + 1) * splits.every;
-    if (next <= D && b.x >= next) list.push(race.t);
+    if (next <= D && b.x >= next) list.push(race.t - b.startAt);
   }
 }
 

@@ -85,7 +85,7 @@ function handleEvents() {
         AU.play('release', 0.8);
         if (e.grade === 'crab') { showGrade('crab'); AU.play('crab'); cam.shake = 1 }
         else if (e.grade === 'short') showGrade('short');
-      } else if (e.type === 'buoy') { showGrade('buoy'); AU.play('buoy') }
+      } else if (e.type === 'buoy' || e.type === 'bank') { showGrade(e.type); AU.play('buoy'); if (e.type === 'bank') cam.shake = 0.6 }
       else if (e.type === 'finish') {
         AU.play('finish');
         game.finishShown = true;

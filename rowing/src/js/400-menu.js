@@ -14,10 +14,11 @@ function segmented(id, items, current, onPick) {
   }
 }
 
-const currentOpts = () => ({ seed: settings.seed, distance: settings.distance, cls: settings.cls, difficulty: settings.difficulty, lane: 2 });
+const currentOpts = () => ({ seed: settings.seed, distance: settings.distance, cls: settings.cls, difficulty: settings.difficulty, lane: 2, kind: settings.kind });
 
 function buildMenu() {
   if (!settings.seed) settings.seed = 1 + Math.floor(Math.random() * 99999);
+  segmented('segKind', [['regatta', 'Regatta'], ['head', 'Head race']], settings.kind, v => { settings.kind = v; menuChanged() });
   segmented('segDist', DISTANCES.map(d => [d, d + ' m']), settings.distance, v => { settings.distance = v; menuChanged() });
   segmented('segCls', Object.entries(BOAT_CLASSES).map(([k, c]) => [k, k]), settings.cls, v => { settings.cls = v; menuChanged() });
   segmented('segDiff', Object.entries(DIFFICULTY).map(([k, d]) => [k, d.label]), settings.difficulty, v => { settings.difficulty = v; menuChanged() });
@@ -29,7 +30,7 @@ function buildMenu() {
   $('btnRnd').onclick = () => { settings.seed = 1 + Math.floor(Math.random() * 99999); $('seedIn').value = settings.seed; menuChanged() };
   $('btnRace').onclick = () => startRace(currentOpts());
   $('btnGhost').onclick = () => {
-    const pb = getPB(settings.distance, settings.cls);
+    const pb = getPB(settings.distance, settings.cls, settings.kind);
     if (pb) { const d = decodeRace(pb.code); startRace(d.opts, d.inputs) }
   };
   $('btnDaily').onclick = () => startRace(dailyOpts(), null, 'daily');
@@ -45,10 +46,10 @@ const soundLabel = () => { $('btnSound').textContent = settings.sound ? '🔊 So
 
 function menuChanged() {
   saveSettings();
-  const c = makeCourse(settings.seed, settings.distance);
-  $('venue').textContent = `${c.name} · ${c.rain ? 'Rain · ' : ''}${windLabel(c.wind)}${c.current ? ` · ${c.current > 0 ? 'following' : 'opposing'} stream` : ''}`;
-  const pb = getPB(settings.distance, settings.cls);
-  $('pbLine').textContent = pb ? `Your best over ${settings.distance} m in the ${BOAT_CLASSES[settings.cls].name.toLowerCase()}: ${fmtTime(pb.time)} (${pb.venue})` : '';
+  const c = makeCourse(settings.seed, settings.distance, settings.kind);
+  $('venue').textContent = `${c.name}${c.bends ? ' · winding river, crews start 8 s apart' : ''} · ${c.rain ? 'Rain · ' : ''}${windLabel(c.wind)}${c.current ? ` · ${c.current > 0 ? 'following' : 'opposing'} stream` : ''}`;
+  const pb = getPB(settings.distance, settings.cls, settings.kind);
+  $('pbLine').textContent = pb ? `Your best over ${settings.distance} m in the ${BOAT_CLASSES[settings.cls].name.toLowerCase()}${settings.kind === 'head' ? ' (head race)' : ''}: ${fmtTime(pb.time)} (${pb.venue})` : '';
   $('btnGhost').classList.toggle('hide', !pb);
   renderCareer();
   showPreview(currentOpts());
@@ -75,17 +76,17 @@ function checkFriendLink() {
 
 function showResults(race) {
   const p = race.player, opts = race.opts;
-  const order = [...race.boats].sort((a, b) => (a.finishTime ?? 1e9) - (b.finishTime ?? 1e9));
+  const order = [...race.boats].sort((a, b) => placeOf(race, a) - placeOf(race, b));
   const win = order[0].finishTime, place = order.indexOf(p) + 1;
   $('resTitle').textContent = place === 1 ? 'Winner!' : `${ordinal(place)} place`;
   const code = encodeRace(opts, race.inputs);
   game.lastCode = code;
-  const pb = getPB(opts.distance, opts.cls);
+  const pb = getPB(opts.distance, opts.cls, opts.kind);
   let pbNote = '';
   if (tuneEdited()) pbNote = ' · tuned physics, not recorded';
   else if (game.mode === 'replay' || game.mode === 'learn') pbNote = game.mode === 'learn' ? ' · practice' : ' · replay';
   else if (!pb || p.finishTime < pb.time) {
-    savePB(opts.distance, opts.cls, { time: p.finishTime, code, venue: race.course.name, date: Date.now() });
+    savePB(opts.distance, opts.cls, opts.kind, { time: p.finishTime, code, venue: race.course.name, date: Date.now() });
     pbNote = pb ? ` · new personal best (was ${fmtTime(pb.time)})` : ' · first personal best';
   }
   if (game.mode === 'daily') {
@@ -93,7 +94,7 @@ function showResults(race) {
     if (!best || p.finishTime < best) STORE.set(key, p.finishTime);
   }
   $('resSub').textContent = `${fmtTime(p.finishTime)} · ${race.course.name}, ${opts.distance} m ${BOAT_CLASSES[opts.cls].name.toLowerCase()}${pbNote}`;
-  $('resTable').innerHTML = order.map((b, i) => `<tr class="${b === p ? 'me' : ''}"><td>${i + 1}</td><td>Lane ${b.lane + 1}</td><td>${b.crewName}</td>
+  $('resTable').innerHTML = order.map((b, i) => `<tr class="${b === p ? 'me' : ''}"><td>${i + 1}</td><td>${race.course.bends ? 'Start ' + (b.startAt / 8 + 1) : 'Lane ' + (b.lane + 1)}</td><td>${b.crewName}</td>
     <td class="t">${b.finishTime != null ? fmtTime(b.finishTime) : '–'}</td><td class="t">${i && b.finishTime != null ? '+' + (b.finishTime - win).toFixed(2) : ''}</td></tr>`).join('')
     + (race.ghost?.finishTime ? `<tr><td></td><td></td><td>Ghost</td><td class="t">${fmtTime(race.ghost.finishTime)}</td><td class="t">${(race.ghost.finishTime - p.finishTime >= 0 ? '+' : '') + (race.ghost.finishTime - p.finishTime).toFixed(2)}</td></tr>` : '');
   const s = p.stats, strokes = Math.max(1, s.perfect + s.good + s.off);

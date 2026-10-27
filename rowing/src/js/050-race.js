@@ -3,8 +3,8 @@
    rebuild the same race exactly (race codes and ghosts). */
 
 function makeRace(opts) {
-  const { seed, distance, cls, difficulty, lane = 2, ghostInputs = null, solo = false } = opts;
-  const course = makeCourse(seed, distance);
+  const { seed, distance, cls, difficulty, lane = 2, ghostInputs = null, solo = false, kind = 'regatta' } = opts;
+  const course = makeCourse(seed, distance, kind);
   const rng = makeRng(hashSeed(seed, 0x57A));
   const names = CREW_NAMES.slice();
   const boats = [], brains = [];
@@ -14,8 +14,13 @@ function makeRace(opts) {
     boats.push(makeBoat(cls, l, name, seed, l === lane ? 0.035 : DIFFICULTY[difficulty].crewSd));
     brains.push(l === lane ? null : makeBrain(seed, l, difficulty));
   }
+  if (course.bends) {
+    // Head race: you go first; the other crews follow at 8-second intervals, each on its own line.
+    let k = 1;
+    for (const b of boats) { b.z = targetZ(course, b); if (b.lane !== lane) b.startAt = 8 * k++ }
+  }
   let ghost = null;
-  if (ghostInputs) { ghost = makeBoat(cls, lane, 'Ghost', seed, 0.035); ghost.isGhost = true }
+  if (ghostInputs) { ghost = makeBoat(cls, lane, 'Ghost', seed, 0.035); ghost.isGhost = true; ghost.z = targetZ(course, ghost) }
   return {
     opts, course, boats, brains, ghost, ghostInputs,
     player: boats.find(b => b.lane === lane),
@@ -53,15 +58,18 @@ function stepRace(race, playerInput) {
   race.tick++;
   const p = race.player;
   const allIn = race.boats.every(b => b.finishTime != null);
-  if (p.finishTime != null && (allIn || race.t > p.finishTime + 25)) race.done = true;
+  if (p.finishTime != null && (allIn || race.t > p.finishTime + (race.course.bends ? 70 : 25))) race.done = true;
   if (race.t > 60 * 20) race.done = true;  // safety net
 }
 
-const placeOf = (race, boat) => {
-  const i = race.finishOrder.indexOf(boat);
-  if (i >= 0) return i + 1;
-  return race.finishOrder.length + 1 + race.boats.filter(b => b.finishTime == null && b !== boat && b.x > boat.x).length;
-};
+// Place: finished crews by time; the rest by distance (or, in a head race, by the time they're on course for).
+function placeOf(race, boat) {
+  const D = race.course.distance;
+  const score = b => b.finishTime != null ? b.finishTime : race.course.bends
+    ? 1e6 + (b.x > 20 ? (race.t - b.startAt) * D / b.x : 1e5 + b.startAt) : 1e6 - b.x;
+  const me = score(boat);
+  return 1 + race.boats.filter(b => b !== boat && score(b) < me).length;
+}
 
 // Re-rows a race from its recorded inputs without drawing anything: used to verify codes and build ghosts.
 function simulateRace(opts, inputs) {

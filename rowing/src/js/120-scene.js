@@ -1,6 +1,9 @@
 /* ===== the venue: banks, trees, buoys, start and finish, built once per course ===== */
 
-const BANK_Z = 3 * LANE_W + 14;   // where the water meets the grass on each side
+const BANK_Z = 3 * LANE_W + 14;   // where the water meets the grass on each side of a regatta lake
+
+// The scene being built: how wide the water is and where its centre line runs (it bends on a river).
+const SC = { bank: BANK_Z, rz: () => 0 };
 
 // Value noise for scenery shapes (drawing only, so ordinary Math is fine here).
 function makeNoise2(seed) {
@@ -55,51 +58,55 @@ function voxelText(mb, text, x, y, z, s, col, facing = 1) {
 
 function buildScene(course, cls) {
   const mb = new ChunkedMesh();
+  SC.bank = course.bends ? course.halfW + 1 : BANK_Z;
+  SC.rz = x => riverZ(course, x);
+  const BANK = SC.bank, rz = SC.rz;
   const L = lightingFor(course), rng = makeRng(course.sceneSeed), noise = makeNoise2(course.sceneSeed % 1000);
   const x0 = -260, x1 = course.distance + 380, bankDepth = 156;
 
   // Banks: voxel columns that rise gently away from the water into hills.
   const heightAt = (x, az) => {
-    const away = az - BANK_Z;
+    const away = az - BANK;
     if (away < 0) return -1;
     const hills = noise(x * 0.012, az * 0.012) * 26 * smooth(10, 120, away);
     return Math.round((0.5 + away * 0.03 + hills) * 2) / 2;
   };
   // Fine 6 m blocks near the water where the camera looks closely; 12 m blocks further back.
   const rows = [];
-  for (let az = BANK_Z; az < BANK_Z + bankDepth;) { const size = az < BANK_Z + 48 ? 6 : 12; rows.push({ az, size }); az += size }
+  for (let az = BANK; az < BANK + bankDepth;) { const size = az < BANK + 48 ? 6 : 12; rows.push({ az, size }); az += size }
   for (const side of [-1, 1]) rows.forEach(({ az, size }, i) => {
     for (let x = x0; x < x1; x += size) {
-      const z = side * (az + size / 2), hgt = heightAt(x, az);
+      const hgt = heightAt(x, az), ra = rz(x), rb = rz(x + size);   // the strip follows the river's bends
       const g = noise(x * 0.05 + 7, az * 0.05);
       const col = i === 0 ? shade(hex(0xc9b98a), 0.9 + g * 0.2) : shade(g > 0.5 ? L.grass[1] : L.grass[0], 0.85 + g * 0.3);
-      const xa = x, xb = x + size, za = z - size / 2, zb = z + size / 2;
-      mb.quad([xa, hgt, za], [xa, hgt, zb], [xb, hgt, zb], [xb, hgt, za], [0, 1, 0], col);
+      const xa = x, xb = x + size, near = side * az, far = side * (az + size);
+      const za = Math.min(near, far), zb = Math.max(near, far);
+      mb.quad([xa, hgt, za + ra], [xa, hgt, zb + ra], [xb, hgt, zb + rb], [xb, hgt, za + rb], [0, 1, 0], col);
       const sideCol = i === 0 ? shade(hex(0x7a6448), 0.9 + g * 0.2) : shade(col, 0.72);
       // Sides only where the neighbour is lower, so hidden faces are never drawn.
       const nx = heightAt(x + size, az), px = heightAt(x - size, az), outer = heightAt(x, az + size);
       const inner = i === 0 ? -1.2 : Math.min(heightAt(x, rows[i - 1].az), heightAt(x + size / 2, rows[i - 1].az));
-      if (nx < hgt) mb.quad([xb, nx, za], [xb, hgt, za], [xb, hgt, zb], [xb, nx, zb], [1, 0, 0], sideCol);
-      if (px < hgt) mb.quad([xa, px, zb], [xa, hgt, zb], [xa, hgt, za], [xa, px, za], [-1, 0, 0], sideCol);
+      if (nx < hgt) mb.quad([xb, nx, za + rb], [xb, hgt, za + rb], [xb, hgt, zb + rb], [xb, nx, zb + rb], [1, 0, 0], sideCol);
+      if (px < hgt) mb.quad([xa, px, zb + ra], [xa, hgt, zb + ra], [xa, hgt, za + ra], [xa, px, za + ra], [-1, 0, 0], sideCol);
       const zi = side > 0 ? za : zb, zo = side > 0 ? zb : za;
-      if (inner < hgt) mb.quad([xa, inner, zi], [xa, hgt, zi], [xb, hgt, zi], [xb, inner, zi], [0, 0, -side], sideCol);
-      if (outer < hgt) mb.quad([xb, outer, zo], [xb, hgt, zo], [xa, hgt, zo], [xa, outer, zo], [0, 0, side], sideCol);
+      if (inner < hgt) mb.quad([xa, inner, zi + ra], [xa, hgt, zi + ra], [xb, hgt, zi + rb], [xb, inner, zi + rb], [0, 0, -side], sideCol);
+      if (outer < hgt) mb.quad([xb, outer, zo + rb], [xb, hgt, zo + rb], [xa, hgt, zo + ra], [xa, outer, zo + ra], [0, 0, side], sideCol);
     }
   });
 
   // Trees, in clumps where the noise says woodland.
   for (let x = x0; x < x1; x += 7) for (const side of [-1, 1]) for (let k = 0; k < 3; k++) {
-    const az = BANK_Z + 8 + rng() * (bankDepth - 14);
+    const az = BANK + 8 + rng() * (bankDepth - 14);
     const wood = noise(x * 0.01 + 50, az * 0.01 + side * 9);
     if (rng() > wood * wood * 0.55) continue;
-    const tx = x + rng() * 7, tz = side * az, ty = heightAt(tx, az);
-    if (course.distance - 220 < tx && tx < course.distance + 40 && side < 0 && az < BANK_Z + 40) continue; // grandstand space
+    const tx = x + rng() * 7, tz = side * az + rz(tx), ty = heightAt(tx, az);
+    if (course.distance - 220 < tx && tx < course.distance + 40 && side < 0 && az < BANK + 40) continue; // grandstand space
     tree(mb, tx, ty, tz, rng, L);
   }
 
   // Far hills: stepped blocks that fade into the haze.
   for (let x = x0 - 400; x < x1 + 400; x += 48) for (const side of [-1, 1]) {
-    const peak = 8 + noise(x * 0.006, side * 3) * 34, z = side * (BANK_Z + bankDepth + 30 + rng() * 60);
+    const peak = 8 + noise(x * 0.006, side * 3) * 34, z = side * (BANK + bankDepth + 30 + rng() * 60) + rz(x);
     for (let k = 0; k < 3; k++) {
       const hgt = peak * (1 - k * 0.3), w = 52 - k * 14;
       mb.box(x, hgt / 2 - 1, z + side * k * -6, w, hgt, 40 - k * 10, shade(L.grass[0], 0.62 + k * 0.08));
@@ -126,6 +133,7 @@ function tree(mb, x, y, z, rng, L) {
 function buildCourseFurniture(mb, course, cls, L, rng) {
   const D = course.distance, white = [0.95, 0.95, 0.95], red = hex(0xff3b2a), yellow = hex(0xffc21a), buoyWhite = [1.2, 1.2, 1.2];
   // Lane buoys every 12.5 m; the last 250 m are red, the first 100 m white.
+  if (course.bends) return riverFurniture(mb, course, cls, L, rng);
   for (let l = 0; l <= LANES; l++) {
     const z = laneZ(l) - LANE_W / 2;
     for (let x = 0; x <= D; x += 12.5) {
@@ -147,7 +155,7 @@ function buildCourseFurniture(mb, course, cls, L, rng) {
   gantry(mb, D, span, 'FINISH', red);
   // Distance boards on both banks every 250 m.
   for (let x = 250; x < D; x += 250) for (const side of [-1, 1]) {
-    const z = side * (BANK_Z + 2);
+    const z = side * (SC.bank + 2) + SC.rz(x);
     mb.box(x, 2.6, z, 0.4, 5.2, 0.4, hex(0x444444));
     mb.box(x, 5.2, z, 7.5, 3, 0.4, D - x <= 500 ? red : hex(0x1f3d72));
     voxelText(mb, String(D - x), x, 4.25, z - side * 0.3, 0.35, white, -side);
@@ -156,12 +164,12 @@ function buildCourseFurniture(mb, course, cls, L, rng) {
   boathouses(mb, rng);
 }
 
-function gantry(mb, x, span, label, col) {
+function gantry(mb, x, span, label, col, zc = 0) {
   const h = 7.5, z = span / 2;
-  for (const s of [-1, 1]) mb.box(x, h / 2, s * z, 0.8, h, 0.8, [0.9, 0.9, 0.9]);
-  mb.box(x, h, 0, 1.2, 1.2, span + 1, col);
+  for (const s of [-1, 1]) mb.box(x, h / 2, zc + s * z, 0.8, h, 0.8, [0.9, 0.9, 0.9]);
+  mb.box(x, h, zc, 1.2, 1.2, span + 1, col);
   // Letters on the face that crews see as they come down the course.
-  voxelTextOnX(mb, label, x - 0.65, h - 0.85, 0, 0.34, [1, 1, 1], 1);
+  voxelTextOnX(mb, label, x - 0.65, h - 0.85, zc, 0.34, [1, 1, 1], 1);
 }
 
 // Letters laid out along z, for faces that look down the course.
@@ -176,7 +184,7 @@ function voxelTextOnX(mb, text, x, y, z0, s, col, facing) {
 }
 
 function grandstand(mb, D, rng) {
-  const z0 = -(BANK_Z + 6), shirts = [0xd8352a, 0x2a5db0, 0xf2c230, 0xffffff, 0x3aa35a, 0xe07ab0, 0x222222, 0xff8a2a];
+  const z0 = -(SC.bank + 6) + SC.rz(D), shirts = [0xd8352a, 0x2a5db0, 0xf2c230, 0xffffff, 0x3aa35a, 0xe07ab0, 0x222222, 0xff8a2a];
   for (let row = 0; row < 6; row++) {
     const y = 0.8 + row * 0.9, z = z0 - row * 1.4;
     mb.box(D - 90, y - 0.4, z, 150, 0.8, 1.4, hex(0x9a9a9a));
@@ -195,7 +203,7 @@ function grandstand(mb, D, rng) {
 }
 
 function boathouses(mb, rng) {
-  const z0 = BANK_Z + 10, walls = [0xe8e2d0, 0xc9d6e8, 0xe8cfc0, 0xd6e8c9];
+  const z0 = SC.bank + 10 + SC.rz(-200), walls = [0xe8e2d0, 0xc9d6e8, 0xe8cfc0, 0xd6e8c9];
   for (let i = 0; i < 4; i++) {
     const x = -220 + i * 26, w = 18 + rng() * 5, d = 14, h = 6 + rng() * 2;
     mb.box(x, h / 2, z0 + d / 2, w, h, d, hex(walls[i]));
@@ -203,4 +211,24 @@ function boathouses(mb, rng) {
     mb.box(x, 1.6, z0 - 0.05, w * 0.7, 3.2, 0.2, hex(0x3a2a20));
     mb.box(x, 0.15, z0 - 6, w * 0.8, 0.3, 12, hex(0x8a7a62));
   }
+}
+
+// A head-race river: marker buoys along both edges of the stream, start and finish across the water.
+function riverFurniture(mb, course, cls, L, rng) {
+  const D = course.distance, w = course.halfW - 2.6, red = hex(0xff3b2a), white = [1.2, 1.2, 1.2];
+  for (let x = 0; x <= D; x += 20) for (const side of [-1, 1]) {
+    const z = riverZ(course, x) + side * w;
+    mb.box(x, 0.15, z, 0.45, 0.45, 0.45, (x / 20) % 2 ? shade(red, 1.4) : white);
+  }
+  const span = course.halfW * 2 + 4;
+  gantry(mb, -BOAT_CLASSES[cls].length - 8, span, 'START', hex(0x2a5db0), riverZ(course, 0));
+  gantry(mb, D, span, 'FINISH', red, riverZ(course, D));
+  for (let x = 500; x < D; x += 500) for (const side of [-1, 1]) {
+    const z = side * (SC.bank + 2) + SC.rz(x);
+    mb.box(x, 2.6, z, 0.4, 5.2, 0.4, hex(0x444444));
+    mb.box(x, 5.2, z, 7.5, 3, 0.4, hex(0x1f3d72));
+    voxelText(mb, String(D - x), x, 4.25, z - side * 0.3, 0.35, white, -side);
+  }
+  grandstand(mb, D, rng);
+  boathouses(mb, rng);
 }

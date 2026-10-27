@@ -44,7 +44,7 @@ function botRate(br, b, course) {
 
 function botInput(br, b, race) {
   const rate = botRate(br, b, race.course);
-  if (!race.started) return packInput(0, rate);
+  if (race.t < b.startAt) return packInput(0, rate);
   let bits = 0;
   // Choose this stroke's timing error and release point once per stroke.
   if (br.lastStrokes !== b.strokes) {
@@ -61,7 +61,7 @@ function botInput(br, b, race) {
     if (!(b.lastBits & IN.DRIVE) && (b.strokes === 0 || -toFront >= br.plannedErr)) bits |= IN.DRIVE;
   }
   // Steer back towards the lane centre, looking a little ahead.
-  const err = (b.z - laneZ(b.lane)) + b.yaw * 10;
+  const err = steerError(race.course, b);
   if (err > 0.5) bits |= IN.LEFT; else if (err < -0.5) bits |= IN.RIGHT;
   const left = 1 - b.x / race.course.distance;
   if (left < br.plan.sprintAt * 0.6 && b.energy > 0.12 && br.rng() < br.d.push) bits |= IN.PUSH;
