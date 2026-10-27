@@ -16,7 +16,7 @@ function recordHistory(race, place) {
   const p = race.player, o = race.opts, s = p.stats, strokes = Math.max(1, s.perfect + s.good + s.off);
   const h = STORE.get('history', []);
   h.unshift({ date: Date.now(), kind: o.kind || 'regatta', distance: o.distance, cls: o.cls, diff: o.difficulty, time: p.finishTime,
-    place, venue: race.course.name, perfect: Math.round(s.perfect / strokes * 100), mode: game.mode });
+    place, venue: race.course.name, perfect: Math.round(s.perfect / strokes * 100), mode: game.mode, code: game.lastCode });
   STORE.set('history', h.slice(0, 50));
 }
 
@@ -69,12 +69,23 @@ function renderBoathouse(tab) {
     if (!h.length) { el.innerHTML = '<p class="sub">No races yet. Your last 50 races will be listed here.</p>'; return }
     el.innerHTML = historySpark(h) + `<table class="hist">${h.slice(0, 20).map(r => `<tr><td>${new Date(r.date).toLocaleDateString()}</td>
       <td>${r.kind === 'head' ? 'Head ' : ''}${r.distance} m ${r.cls}</td><td>${DIFFICULTY[r.diff]?.label || ''}</td><td>${r.venue}</td>
-      <td class="t">${fmtTime(r.time)}</td><td class="t">${ordinal(r.place)}</td><td class="t">${r.perfect}%</td></tr>`).join('')}</table>`;
+      <td class="t">${fmtTime(r.time)}</td><td class="t">${ordinal(r.place)}</td><td class="t">${r.perfect}%</td>
+      <td>${r.code ? `<button class="sec mini" data-code="${r.code}" title="Race against this run">Race it</button>` : ''}</td></tr>`).join('')}</table>`;
+    el.querySelectorAll('[data-code]').forEach(b => b.onclick = () => raceHistoryGhost(b.dataset.code));
   } else {
     const got = STORE.get('badges', {});
     el.innerHTML = `<div class="badges">${BADGES.map(b => `<div class="badge${got[b.id] ? ' got' : ''}"><b>${b.name}</b><span>${b.how}</span></div>`).join('')}</div>
       <p class="sub small">${Object.keys(got).length} of ${BADGES.length} earned</p>`;
   }
+}
+
+// Any past run with a code can be raced as a ghost, on the same course and against the same field.
+function raceHistoryGhost(code) {
+  try {
+    const { opts, inputs } = decodeRace(code);
+    $('boathouse').classList.add('hide');
+    startRace(opts, inputs);
+  } catch (e) { toast('That run could not be loaded.') }
 }
 
 // Pace per 500 m over recent races of the most-rowed event, oldest to newest.
