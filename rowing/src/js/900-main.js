@@ -27,6 +27,7 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   game.replay = null;
   game.tuned = false;
   game.oneButtonUsed = false;
+  game.slowed = false;
   game.lastAtHalf = false;
   game.halfSeen = false;
   resetCalls();
@@ -55,6 +56,8 @@ const backToLiveLobby = () => { live.state = 'lobby'; sendPresence(true); toMenu
 // How each mode starts again from the results screen; anything else re-rows the same race.
 const RESTARTS = { live: () => backToLiveLobby(), career: () => startCareerRace(), cup: () => startCupRace(), week: () => startWeekRace(), boatrace: () => startBoatRace(),
   replay: () => watchReplay(), learn: () => startLearning(), training: () => startTraining() };
+// Game speed (F-106): real time per simulated second. Live races and replays always run at full speed.
+const gameSpeed = () => game.mode === 'live' || game.replay ? 1 : settings.speed || 1;
 const restartRace = () => (RESTARTS[game.mode] || (() => startRace(game.opts, game.ghostInputs, game.mode)))();
 
 function toMenu() {
@@ -189,7 +192,7 @@ function frame(now) {
 
   if (game.state === 'race' && race) {
     const slow = game.replay && photoFinishSlowdown(race);
-    simulate(dt * (game.fastForward ? 8 : slow || 1), () => game.replay ? (game.replay[race.tick] ?? packInput(0, 18)) : readInput(), false, readInput2);
+    simulate(dt * (game.fastForward ? 8 : slow || gameSpeed()), () => game.replay ? (game.replay[race.tick] ?? packInput(0, 18)) : readInput(), false, readInput2);
     frameBlend.alpha = clamp(game.acc / TUNE.dt, 0, 1);
     if (game.mode === 'live') updateLiveBoats(dt);
     if (cam.mode !== 'rower') introduceCrews(race);
@@ -232,7 +235,8 @@ function simulate(dt, inputFor, quiet = false, input2For = () => 0) {
     rememberPoses([...race.boats, race.ghost]);
     stepRace(race, inputFor(), input2For());
     if (!quiet && tuneEdited()) game.tuned = true;
-    if (!quiet && settings.oneButton && race.started) game.oneButtonUsed = true;   // used at any point: not a record   // tuned at any moment means this race isn't a record
+    if (!quiet && settings.oneButton && race.started) game.oneButtonUsed = true;
+    if (!quiet && gameSpeed() < 1 && race.started) game.slowed = true;   // a slowed race is practice, not a record   // used at any point: not a record   // tuned at any moment means this race isn't a record
     recordSplits(race);
     if (!quiet) sampleForce(race.player);
     if (quiet) { for (const b of race.boats) b.events.length = 0; if (race.ghost) race.ghost.events.length = 0 }

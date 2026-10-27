@@ -5,7 +5,8 @@
 const CAL = { beat: 0.6, clicks: 10, warmup: 2, accept: 0.3, minTaps: 6, max: 0.3, leadIn: 1 };
 let cal = null;
 
-const latencyLead = () => (settings.latencyMs || 0) / 1000;   // seconds the cues move earlier
+// Seconds of race time the cues move earlier: the measured delay is real time, so a slowed race needs less.
+const latencyLead = () => (settings.latencyMs || 0) / 1000 * gameSpeed();
 
 function openCalibration() {
   AU.init();
