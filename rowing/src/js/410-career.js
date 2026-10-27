@@ -20,7 +20,8 @@ function careerOpts() {
 function renderCareer() {
   if (!career) { $('careerT').innerHTML = 'Row a season of four regattas. Make the final, win medals, move up from club to olympic.'; $('btnCareer').textContent = 'Start a season'; renderMedals(); return }
   const o = careerOpts(), venue = makeCourse(o.seed, o.distance).name;
-  $('careerT').innerHTML = `<b>${DIFFICULTY[TIERS[career.tier]].label} season ${career.seasons + 1}</b> · Regatta ${career.regatta + 1} of 4: ${venue} · ${BOAT_CLASSES[o.cls].name}, ${o.distance} m`;
+  const vs = career.vsRival || [0, 0];
+  $('careerT').innerHTML = `<b>${DIFFICULTY[TIERS[career.tier]].label} season ${career.seasons + 1}</b> · Regatta ${career.regatta + 1} of 4: ${venue} · ${BOAT_CLASSES[o.cls].name}, ${o.distance} m<br>Rival: <b>${rivalName()}</b> · you ${vs[0]}–${vs[1]} them`;
   $('btnCareer').textContent = career.stage === 'heat' ? 'Row the heat' : 'Row the final';
   renderMedals();
 }
@@ -30,14 +31,26 @@ function renderMedals() {
   $('medals').innerHTML = m.length ? m.slice(-12).map(x => `<i class="medal ${MEDAL[x.place]}" title="${x.tier} · ${x.venue} · ${x.cls}">${x.place}</i>`).join('') : '';
 }
 
+// Your rival for the season: the same crew turns up at every regatta, in the lane beside yours.
+const rivalName = () => CREW_NAMES[hashSeed(career.seed, career.seasons, 0x41) % CREW_NAMES.length];
+const rivalBoat = race => race.boats.find(b => b.lane === race.player.lane - 1);
+
 function startCareerRace() {
   if (!career) { career = careerDefault(); STORE.set('career', career) }
   startRace(careerOpts(), null, 'career');
+  // A name only: the rival rows with the field's own skill, so race codes still re-row exactly.
+  const r = rivalBoat(race);
+  if (r) { r.crewName = rivalName(); r.isRival = true }
 }
 
 // Called from the results screen: moves the season on and says what happened.
 function careerResult(race, place) {
   let note;
+  const r = rivalBoat(race);
+  if (r?.isRival) {
+    career.vsRival = career.vsRival || [0, 0];
+    career.vsRival[placeOf(race, race.player) < placeOf(race, r) ? 0 : 1]++;
+  }
   if (career.stage === 'heat') {
     if (place <= 3) { career.stage = 'final'; note = `${ordinal(place)} in the heat: through to the final!` }
     else { note = `${ordinal(place)} in the heat: out of this regatta.`; nextRegatta() }
@@ -58,6 +71,7 @@ function nextRegatta() {
   career.medals.forEach(m => { if (m.tier === tier) m.season = career.seasons });
   career.regatta = 0;
   career.seasons++;
+  career.vsRival = [0, 0];   // a new season brings a new rival
   if (won >= 2 && career.tier < TIERS.length - 1) { career.tier++; return `Season over: promoted to ${DIFFICULTY[TIERS[career.tier]].label}!` }
   return won >= 2 ? 'Season over: champions of the top tier!' : 'Season over. Two medals next season earns promotion.';
 }

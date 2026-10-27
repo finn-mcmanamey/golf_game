@@ -28,7 +28,11 @@ function updateCommentary(race) {
   const D = race.course.distance, order = [...race.boats].sort((a, b) => placeOf(race, a) - placeOf(race, b));
   const lead = order[0], second = order[1];
   comm.excite = Math.max(0, comm.excite - 0.01);
-  if (race.t > 3 && !comm.said.has('start')) { comm.said.add('start'); comment(`They're away cleanly at ${race.course.name}!`, true) }
+  if (race.t > 3 && !comm.said.has('start')) {
+    comm.said.add('start');
+    const r = race.boats.find(b => b.isRival);
+    comment(r ? `They're away! All eyes on the rivalry: ${displayName(race.player)} against ${r.crewName}.` : `They're away cleanly at ${race.course.name}!`, true);
+  }
   if (!lead || !second) return;
   if (lead.finishTime != null) {
     if (!comm.said.has('result')) {

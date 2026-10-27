@@ -25,6 +25,9 @@ function buildMenu() {
   segmented('segQuality', QUALITY_LABELS.map((l, i) => [i, l]), settings.quality, v => { settings.quality = v; R.quality = v; saveSettings() });
   segmented('segAssist', [[true, 'Assisted'], [false, 'Manual']], settings.assist, v => { settings.assist = v; saveSettings() });
   segmented('segCue', [[true, 'On'], [false, 'Off']], settings.cue, v => { settings.cue = v; saveSettings() });
+  segmented('segCalm', [[false, 'Full'], [true, 'Reduced']], settings.calm, v => { settings.calm = v; saveSettings(); applyAccess() });
+  segmented('segText', [[false, 'Normal'], [true, 'Large']], settings.bigText, v => { settings.bigText = v; saveSettings(); applyAccess() });
+  applyAccess();
   segmented('segVoice', [[false, 'Text'], [true, 'Spoken']], settings.voice, v => { settings.voice = v; saveSettings() });
   $('seedIn').value = settings.seed;
   $('seedIn').onchange = () => { settings.seed = clamp(parseInt($('seedIn').value) || 1, 1, 999999); menuChanged() };
@@ -44,6 +47,12 @@ function buildMenu() {
   soundLabel();
   checkFriendLink();
   menuChanged();
+}
+
+// Reduced motion stills animations and camera shake; large text scales the whole interface.
+function applyAccess() {
+  document.body.classList.toggle('calm', !!settings.calm || matchMedia('(prefers-reduced-motion: reduce)').matches);
+  document.body.classList.toggle('bigText', !!settings.bigText);
 }
 
 const soundLabel = () => { $('btnSound').textContent = settings.sound ? '🔊 Sound on' : '🔇 Sound off' };

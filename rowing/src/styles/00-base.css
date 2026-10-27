@@ -165,3 +165,8 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 #ticker.roll { animation: ticker 4.5s ease-out }
 @keyframes ticker { 0% { opacity: 0; clip-path: inset(0 100% 0 0) } 8% { opacity: 1; clip-path: inset(0 0 0 0) } 85% { opacity: 1 } 100% { opacity: 0 } }
 .touchy #ticker { top: calc(max(12px, env(safe-area-inset-top)) + 128px); white-space: normal; text-align: center }
+/* Accessibility: reduced motion keeps messages but only fades them, never slides or pulses; large text scales the panels. */
+@keyframes fadeonly { 0% { opacity: 1 } 75% { opacity: 1 } 100% { opacity: 0 } }
+.calm #grade.pop { animation: fadeonly .9s linear } .calm #call.pop { animation: fadeonly 3.2s linear } .calm #ticker.roll { animation: fadeonly 4.5s linear }
+.calm #catchZone.ready { animation: none; background: rgba(74, 222, 128, 1) } .calm #replayTag { animation: none }
+.bigText .box, .bigText #hud .panel, .bigText #touch, .bigText #call, .bigText #ticker, .bigText #grade { zoom: 1.18 }

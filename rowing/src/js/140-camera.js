@@ -63,6 +63,7 @@ function updateCamera(boat, raceT, dt) {
   const k = cam.mode === 'rower' || cutNow ? 1 : 1 - Math.exp(-dt * 4);
   for (let i = 0; i < 3; i++) { cam.eye[i] += (t.eye[i] - cam.eye[i]) * k; cam.at[i] += (t.at[i] - cam.at[i]) * k }
   cam.fov += (t.fov - cam.fov) * k;
+  if (cam.shake > 0 && settings.calm) cam.shake = 0;   // reduced motion: no shaking
   if (cam.shake > 0) {
     cam.shake = Math.max(0, cam.shake - dt * 2);
     cam.eye[1] += (Math.random() - 0.5) * cam.shake * 0.4;
