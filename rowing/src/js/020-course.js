@@ -10,6 +10,10 @@ const BOAT_CLASSES = {
   '2x': { name: 'Double scull', crew: 2, length: 10.2, sculls: true, dragK: 1.729 },
   '4x': { name: 'Quad scull', crew: 4, length: 13.4, sculls: true, dragK: 2.99 },
   '8+': { name: 'Eight', crew: 8, length: 17.6, sculls: false, cox: true, dragK: 5.6 },
+  // Added later, so they come after the first four: race codes store a boat by its position in this list.
+  // Sweep boats are a little slower than sculls of the same size (one oar each, so less power per rower).
+  '2-': { name: 'Pair', crew: 2, length: 10, sculls: false, dragK: 1.83 },
+  '4-': { name: 'Coxless four', crew: 4, length: 13.2, sculls: false, dragK: 3.12 },
 };
 
 const VENUE_A = ['Mill', 'Heron', 'Willow', 'Kingfisher', 'Silver', 'Otter', 'Alder', 'Swan', 'Cedar', 'Brook', 'Lantern', 'Copper'];
