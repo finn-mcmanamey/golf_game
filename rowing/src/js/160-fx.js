@@ -26,6 +26,7 @@ function drawFx(mb, dt, time, course) {
   drawStartLights(mb, course);
   drawLaunch(mb, dt, time, course);
   drawFireworks(mb, dt, course);
+  if (course.kind === 'regatta' || course.kind === 'head' || course.kind === 'knockout') drawSwans(mb, dt, time, course);
   drawCrowd(mb, time, course);
   drawBirds(mb, time, course);
   if (course.rain && R.quality > 0) drawRain(mb, time);
@@ -163,5 +164,32 @@ function drawFireworks(mb, dt, course) {
     for (let k = 0; k < 3; k++) { s.v[k] *= 1 - 1.2 * dt; s.p[k] += s.v[k] * dt }
     const size = 0.25 + s.life * 0.2, fade = Math.min(1, s.life);
     mb.box(s.p[0], s.p[1], s.p[2], size, size, size, s.col.map(c => c * fade));
+  }
+}
+
+// Swans by the banks: they paddle gently, and hurry towards the bank when a crew comes close.
+const swans = [];
+function drawSwans(mb, dt, time, course) {
+  if (!swans.length || swans.course !== course) {
+    swans.length = 0; swans.course = course;
+    const rng = makeRng(course.sceneSeed ^ 0x5A4);
+    for (let i = 0; i < 10; i++) {
+      const x = rng() * course.distance, side = rng() < 0.5 ? -1 : 1;
+      swans.push({ x, off: side * (course.bends ? course.halfW - 6 : BANK_Z - 6 - rng() * 4), dir: rng() < 0.5 ? 1 : -1 });
+    }
+  }
+  const white = [1.25, 1.25, 1.2], orange = hex(0xff8a2a), black = [0.1, 0.1, 0.1];
+  for (const s of swans) {
+    if (Math.abs(s.x - cam.at[0]) > 220) continue;
+    const near = race.boats.some(b => Math.abs(b.x - s.x) < 25 && Math.abs(b.z - riverZ(course, s.x) - s.off) < 12);
+    const edge = (course.bends ? course.halfW : BANK_Z) - 2;
+    s.off += Math.sign(s.off) * (near ? 1.2 : 0) * dt;
+    s.off = Math.sign(s.off) * Math.min(Math.abs(s.off), edge);
+    s.x += s.dir * 0.25 * dt;
+    const x = s.x, z = riverZ(course, x) + s.off, bob = Math.sin(time * 1.5 + x) * 0.03;
+    mb.box(x, 0.2 + bob, z, 0.9, 0.35, 0.5, white);
+    mb.beam([x + s.dir * 0.35, 0.3 + bob, z], [x + s.dir * 0.45, 0.9 + bob, z], 0.12, 0.12, white);
+    mb.box(x + s.dir * 0.58, 0.88 + bob, z, 0.22, 0.12, 0.12, orange);
+    mb.box(x + s.dir * 0.46, 0.94 + bob, z, 0.08, 0.08, 0.14, black);
   }
 }
