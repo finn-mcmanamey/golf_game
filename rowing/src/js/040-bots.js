@@ -4,10 +4,10 @@
 const DIFFICULTY = {
   club:     { label: 'Club',     sd: 0.10, cruise: 28, start: 38, sprint: 34, push: 0.4, slack: 0.05, crewSd: 0.05 },
   national: { label: 'National', sd: 0.065, cruise: 31, start: 41, sprint: 37, push: 0.6, slack: 0.03, crewSd: 0.035 },
-  olympic:  { label: 'Olympic',  sd: 0.04, cruise: 33, start: 43, sprint: 40, push: 0.85, slack: 0.015, crewSd: 0.022 },
+  olympic:  { label: 'Olympic',  sd: 0.04, cruise: 33, start: 43, sprint: 40, push: 0.85, slack: 0.015, crewSd: 0.022, readsRiver: true },
   // Added later, so they come after the first three: race codes store a field by its position in this list.
   novice:   { label: 'Novice',   sd: 0.14, cruise: 25, start: 32, sprint: 29, push: 0.2, slack: 0.08, crewSd: 0.07 },
-  elite:    { label: 'Elite',    sd: 0.052, cruise: 32, start: 42, sprint: 38, push: 0.7, slack: 0.022, crewSd: 0.028 },
+  elite:    { label: 'Elite',    sd: 0.052, cruise: 32, start: 42, sprint: 38, push: 0.7, slack: 0.022, crewSd: 0.028, readsRiver: true },
 };
 const FIELD_ORDER = ['novice', 'club', 'national', 'elite', 'olympic'];   // easiest to hardest, for menus
 
@@ -46,6 +46,15 @@ function botRate(br, b, course) {
   return rate;
 }
 
+// Rules 6 (F-114): Elite and Olympic crews read a head-race river. Against a strong stream they take the slacker
+// water on their own side, 18 m off the centre line; otherwise they keep their line. Returns metres beyond that line.
+const STREAM_READ = 0.08;   // m/s of opposing stream before the bank is worth its risk
+function riverLine(race, b, br) {
+  const c = race.course;
+  if (c.kind !== 'head' || !(race.opts.rules >= 6) || !br.d.readsRiver || c.current > -STREAM_READ) return 0;
+  return (b.lane < 2.5 ? -1 : 1) * c.halfW * 0.6 - (b.lane - 2.5) * 3.5;
+}
+
 function botInput(br, b, race) {
   const rate = botRate(br, b, race.course);
   if (race.t < b.startAt) return packInput(0, rate);
@@ -64,8 +73,8 @@ function botInput(br, b, race) {
     // A catch needs a fresh press, so only press once the last drive has been let go.
     if (!(b.lastBits & IN.DRIVE) && (b.strokes === 0 || -toFront >= br.plannedErr)) bits |= IN.DRIVE;
   }
-  // Steer back towards the lane centre, looking a little ahead.
-  const err = steerError(race.course, b);
+  // Steer back towards the lane centre (or the river line this crew has chosen), looking a little ahead.
+  const err = steerError(race.course, b) - riverLine(race, b, br);
   if (err > 0.5) bits |= IN.LEFT; else if (err < -0.5) bits |= IN.RIGHT;
   const left = 1 - b.x / race.course.distance;
   if (left < br.plan.sprintAt * 0.6 && b.energy > 0.12 && br.rng() < br.d.push) bits |= IN.PUSH;

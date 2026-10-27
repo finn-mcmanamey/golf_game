@@ -127,4 +127,12 @@ assert.ok(bankAgainst < laneAgainst, 'against the stream, the bank line is faste
 assert.ok(midWith < bankWith, 'with the stream, mid-river is faster');
 assert.equal(rowLine({ ...against, rules: 4 }, 0), rowLine({ ...against, rules: 4 }, 0), 'rules 4 head races re-row the same');
 console.log(`rules 5 head: against the stream bank ${fmtTime(bankAgainst)} vs mid ${fmtTime(laneAgainst)}; with it mid ${fmtTime(midWith)} vs bank ${fmtTime(bankWith)}`);
+
+// Rules 6 (F-114): Olympic head-race crews take the slack water against a strong stream, so they get faster there.
+const field = rules => { const r = row({ ...against, difficulty: 'olympic', rules }, 32); const bots = r.boats.filter(b => b !== r.player);
+  return { mean: bots.reduce((n, b) => n + b.finishTime, 0) / bots.length, banks: bots.reduce((n, b) => n + b.stats.buoys, 0) } };
+const f5 = field(5), f6 = field(6);
+assert.ok(f6.mean < f5.mean, 'olympic crews reading the river are faster against a strong stream');
+console.log(`rules 6 head: olympic field mean ${fmtTime(f6.mean)} (rules 5 ${fmtTime(f5.mean)}), bank hits ${f6.banks} (rules 5 ${f5.banks})`);
 console.log('ok');
+
