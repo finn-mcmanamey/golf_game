@@ -37,6 +37,17 @@ function startCupRace() {
   if (opp) opp.crewName = cupOpponent(cup.round);
 }
 
+// Henley verdicts: a side-by-side margin called in boat lengths, as the umpire would, with the seconds after it.
+// `speed` is the race's average speed (m/s) and `len` the boat's length (m).
+function byVerdict(secs, speed, len) {
+  const lengths = secs * speed / len, feet = Math.round(secs * speed * 3.28);
+  if (secs < 0.01) return 'in a dead heat';
+  const call = lengths > 5 ? 'easily' : lengths < 0.05 ? 'by a canvas' : lengths < 0.2 ? `by ${feet} feet`
+    : lengths < 0.875 ? `by ${['¼', '⅓', '½', '⅔', '¾'][[0.25, 1 / 3, 0.5, 2 / 3, 0.75].reduce((k, f, i, a) => Math.abs(f - lengths) < Math.abs(a[k] - lengths) ? i : k, 0)]} length`
+    : (() => { const q = Math.round(lengths * 4) / 4, whole = Math.floor(q), frac = ['', '¼', '½', '¾'][Math.round((q - whole) * 4)]; return `by ${whole}${frac} length${q > 1 ? 's' : ''}` })();
+  return `${call} (${secs.toFixed(2)} s)`;
+}
+
 function cupResult(race) {
   const opp = race.boats.find(b => b !== race.player), won = placeOf(race, race.player) === 1;
   // If the loser was still rowing when the race was called, estimate the gap from where they were.
@@ -44,9 +55,10 @@ function cupResult(race) {
   const round = CUP_ROUNDS[cup.round].name, margin = opp.finishTime != null ? Math.abs(opp.finishTime - race.player.finishTime) : behind;
   cup.history.push({ round, opp: opp.crewName, won, margin });
   let note;
-  if (!won) { cup.out = true; note = `Beaten by ${opp.crewName} in the ${round.toLowerCase()} by ${margin.toFixed(2)} s. Out of the cup.` }
-  else if (cup.round === CUP_ROUNDS.length - 1) { cup.won = true; note = `You win the Voxel Cup! Beat ${opp.crewName} by ${margin.toFixed(2)} s.`; STORE.set('cupWins', STORE.get('cupWins', 0) + 1) }
-  else { cup.round++; note = `Won the ${round.toLowerCase()} by ${margin.toFixed(2)} s. Next: the ${CUP_ROUNDS[cup.round].name.toLowerCase()} against ${cupOpponent(cup.round)}.` }
+  const winner = won ? race.player : opp, by = byVerdict(margin, race.course.distance / Math.max(1, winner.finishTime ?? race.t), BOAT_CLASSES[race.opts.cls].length);
+  if (!won) { cup.out = true; note = `Beaten by ${opp.crewName} in the ${round.toLowerCase()}, ${by}. Out of the cup.` }
+  else if (cup.round === CUP_ROUNDS.length - 1) { cup.won = true; note = `You win the Voxel Cup! Beat ${opp.crewName} ${by}.`; STORE.set('cupWins', STORE.get('cupWins', 0) + 1) }
+  else { cup.round++; note = `Won the ${round.toLowerCase()} ${by}. Next: the ${CUP_ROUNDS[cup.round].name.toLowerCase()} against ${cupOpponent(cup.round)}.` }
   STORE.set('cup', cup);
   return note;
 }

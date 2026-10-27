@@ -10,10 +10,12 @@ function startBoatRace(distance = 2000) {   // shorter only for tests
 
 function boatRaceResult(race, place) {
   const rival = race.boats.find(b => b !== race.player), p = race.player;
-  const margin = rival.finishTime != null ? Math.abs(rival.finishTime - p.finishTime).toFixed(1) + ' s' : 'a distance';
-  if (place !== 1) return `The Dark Blues win by ${margin}. There's always next year.`;
+  const winner = place === 1 ? p : rival, speed = race.course.distance / Math.max(1, winner.finishTime ?? race.t);
+  // 'By a distance' is the Boat Race's own verdict for a crew still far from the line when the winner finishes.
+  const margin = rival.finishTime != null && p.finishTime != null ? byVerdict(Math.abs(rival.finishTime - p.finishTime), speed, BOAT_CLASSES['8+'].length) : 'by a distance';
+  if (place !== 1) return `The Dark Blues win ${margin}. There's always next year.`;
   STORE.set('boatRaceWins', STORE.get('boatRaceWins', 0) + 1);
-  return `You win the Boat Race by ${margin}!`;
+  return `You win the Boat Race ${margin}!`;
 }
 
 function renderBoatRace() {
