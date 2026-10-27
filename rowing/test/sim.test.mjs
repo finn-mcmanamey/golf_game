@@ -13,6 +13,7 @@ const SAFE_MATH = new Set(['abs', 'sign', 'sqrt', 'min', 'max', 'floor', 'ceil',
 const simCode = src.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
 const unsafe = [...simCode.matchAll(/Math\.(\w+)/g)].map(m => m[1]).filter(n => !SAFE_MATH.has(n));
 assert.deepEqual(unsafe, [], `engine-dependent Math in the simulation: ${unsafe.join(', ')}`);
+assert.ok(!simCode.includes('**'), 'the ** operator is Math.pow by another name: precompute instead');
 
 const ctx = vm.createContext({ console });
 vm.runInContext(src + '\n;globalThis.api={makeRace,stepRace,simulateRace,encodeRace,decodeRace,packInput,IN,TUNE,placeOf,fmtTime,steerError,laneZ};', ctx);

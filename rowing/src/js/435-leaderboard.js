@@ -2,6 +2,7 @@
    Each player writes only their own row (the db rules enforce it). Every row carries its race code, and the
    page re-rows each code before showing it: a time that the code doesn't reproduce never appears. */
 
+const BOARD_ROWS = 30;   // today's fastest rows loaded for the board
 const board = { db: null, uid: null, rows: [], verified: new Map(), unsub: null };
 
 async function connectBoard() {
@@ -23,7 +24,7 @@ function watchDailyBoard() {
   board.unsub?.();
   board.seed = seed;
   board.rows = [];
-  board.unsub = board.db.collection('scores').where('dailySeed', '==', seed).orderBy('dailyTime').limit(30)
+  board.unsub = board.db.collection('scores').where('dailySeed', '==', seed).orderBy('dailyTime').limit(BOARD_ROWS)
     .onSnapshot(snap => { board.rows = snap.docs.map(d => ({ id: d.id, ...d.data() })); verifyRows(seed) }, () => { board.unsub = null });
 }
 

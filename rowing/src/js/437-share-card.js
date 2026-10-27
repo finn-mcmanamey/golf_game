@@ -6,7 +6,9 @@ function dailyCard(race, place) {
   const pct = Math.round(s.perfect / strokes * 100), filled = Math.round(pct / 20);
   // Rank against today's verified board, counting this run even before its own row has posted.
   const others = verifiedRows().filter(r => r.id !== board.uid);
-  const rank = others.length ? `${1 + others.filter(r => r.dailyTime < p.finishTime).length}/${others.length + 1} today` : `${ordinal(place)} of ${race.boats.length}`;
+  // The board only loads the fastest BOARD_ROWS; slower than all of a full board, the exact rank isn't known.
+  const ahead = others.filter(r => r.dailyTime < p.finishTime).length, beyond = board.rows.length >= BOARD_ROWS && ahead === others.length;
+  const rank = !others.length ? `${ordinal(place)} of ${race.boats.length}` : beyond ? `${BOARD_ROWS}+ today` : `${1 + ahead}/${others.length + 1} today`;
   const streak = STORE.get('dailyStreak', { n: 0, day: 0 }), fire = streak.day === localDay() && streak.n > 1 ? ` · 🔥${streak.n}` : '';
   const date = new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   // A link only when this page is one people can open (not inside a sandboxed frame or the app).

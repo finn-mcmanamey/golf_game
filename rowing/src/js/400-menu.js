@@ -200,10 +200,13 @@ function showResults(race) {
   $('resStats').textContent = `${p.strokes} strokes · average rate ${(p.strokes / (p.finishTime ?? p.out?.t ?? race.t) * 60).toFixed(1)} · ${Math.round(s.perfect / strokes * 100)}% perfect catches`
     + (s.crabs ? ` · ${s.crabs} crab${s.crabs > 1 ? 's' : ''}` : '') + (s.buoys ? ` · hit the buoys ${s.buoys}×` : '');
   if (race.course.kind === 'head' && place === 1 && counts) celebrate();
-  const careerNote = game.mode === 'career' ? (counts ? careerResult(race, place) : 'Not counted for the season: tuned physics or unfinished.')
-    : game.mode === 'cup' ? (counts ? cupResult(race) : 'Not counted for the cup: tuned physics or unfinished.')
+  // Say which rule kept a race out of a campaign, so a player on 75% speed knows why progress didn't move.
+  const why = !finished ? 'unfinished' : game.slowed ? 'rowed at 75% speed' : game.oneButtonUsed ? 'one-button rowing' : 'tuned physics';
+  const notCounted = what => `Not counted for the ${what}: ${why}.`;
+  const careerNote = game.mode === 'career' ? (counts ? careerResult(race, place) : notCounted('season'))
+    : game.mode === 'cup' ? (counts ? cupResult(race) : notCounted('cup'))
     : game.mode === 'boatrace' ? (counts ? boatRaceResult(race, place) : '')
-    : game.mode === 'week' ? (counts ? weekResult(race) : 'Not counted for the week: tuned physics or unfinished.') : '';
+    : game.mode === 'week' ? (counts ? weekResult(race) : notCounted('week')) : '';
   if (counts && !bumps) recordHistory(race, place);
   const badges = counts ? checkBadges(race, place) : [];
   if (badges.length) setTimeout(() => toast('Badge earned: ' + badges.map(b => b.name).join(', '), 3200), 600);
@@ -213,7 +216,7 @@ function showResults(race) {
   $('btnAgain').textContent = game.mode === 'live' ? 'Back to the lobby' : game.mode === 'career' || game.mode === 'cup' && !cup.out && !cup.won ? 'Next race' : game.mode === 'week' ? (weekOver() ? 'Start a new week' : `Row day ${week.day + 1}`) : game.mode === 'cup' ? 'Enter a new cup' : 'Race again';
   // A duel's code only holds player 1's strokes, so it can't be replayed or shared.
   // Duel and practice codes can't be re-rowed (a code holds one crew in a full field), so no replay or link.
-  $('btnCard').classList.toggle('hide', game.mode !== 'daily' || p.finishTime == null);
+  $('btnCard').classList.toggle('hide', !counts || game.mode !== 'daily' || p.finishTime == null);   // only results that count get a card
   for (const id of ['btnReplay', 'btnShare']) $(id).classList.toggle('hide', !!race.player2 || practiceMode() || game.mode === 'live');
   $('results').classList.remove('hide');
   $('hud').classList.add('hide');

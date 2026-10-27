@@ -18,10 +18,10 @@ function openCalibration() {
 
 function startCalibration() {
   const ctx = AU.ctx;
-  if (!ctx || ctx.state !== 'running') { toast('Sound has to be on for the timing test.'); return }
+  // The test measures the sound's delay too, so it needs sound actually playing.
+  if (!ctx || ctx.state !== 'running' || !settings.sound) { toast('Turn sound on for the timing test.'); return }
   const t0 = ctx.currentTime + CAL.leadIn;
-  cal = { clicks: Array.from({ length: CAL.clicks }, (_, i) => t0 + i * CAL.beat), paired: new Map() };
-  cal.clicks.forEach(t => AU.tone(1200, 1200, 0.04, 0.25, 'square', t - ctx.currentTime));
+  cal = { clicks: Array.from({ length: CAL.clicks }, (_, i) => t0 + i * CAL.beat), paired: new Map(), scheduled: 0 };
   // Taps are timed by their own event timestamps, so the clicks are mapped onto that clock once, here:
   // the audio clock only moves in blocks, which would add a bias to every tap.
   const anchor = performance.now() / 1000 - ctx.currentTime;
@@ -36,7 +36,10 @@ function startCalibration() {
 // The ring pulses on each click, read from the audio clock, so the eye and the ear agree on the beat.
 function pulseCalibration() {
   if (!cal) return;
-  const now = AU.ctx.currentTime, since = Math.min(...cal.clicks.map(t => now >= t ? now - t : 9));
+  const now = AU.ctx.currentTime;
+  // Each click is scheduled just before it's due, so closing the test stops the rest.
+  while (cal.scheduled < cal.clicks.length && cal.clicks[cal.scheduled] - now < 0.2) AU.tone(1200, 1200, 0.04, 0.25, 'square', Math.max(0, cal.clicks[cal.scheduled++] - now));
+  const since = Math.min(...cal.clicks.map(t => now >= t ? now - t : 9));
   $('calRing').style.transform = `scale(${1 + 0.25 * Math.max(0, 1 - since / 0.15)})`;
   requestAnimationFrame(pulseCalibration);
 }
