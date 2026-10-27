@@ -183,7 +183,7 @@ function frame(now) {
     AU.ambient(p.v, Math.min(1, smooth(d - 400, d, p.x) * (p.finishTime != null ? 0.6 : 1) + comm.excite * 0.5), race.course.rain ? 1 : 0, p.phase === 'recover' && race.started ? 1 : 0);
     if (race.done) { if (game.mode === 'live') endLiveRace(); game.state = 'results'; game.resultsAt = game.time; game.replay ? showReplayEnd() : showResults(race) }
     if (!game.halfSeen && race.player.x > race.course.distance / 2) { game.halfSeen = true; game.lastAtHalf = placeOf(race, race.player) === race.boats.length && race.boats.length > 1 }
-    if (game.state === 'race') { updateHud(race); updateHud2(race); drawForceCurve(); updateCommentary(race); if (!game.replay && !practiceMode()) updateCalls(race); updateLearning(race); updateTraining(race) }
+    if (game.state === 'race') { updateHud(race); updateHud2(race); drawForceCurve(); updateCommentary(race); updatePaceHud(race); if (!game.replay && !practiceMode()) updateCalls(race); updateLearning(race); updateTraining(race) }
   } else if ((game.state === 'menu' || game.state === 'results') && race) {
     // Behind the menu a demo race rows itself; after a race the field rows on past the line.
     simulate(dt, () => packInput(race.started ? autoRow(race.player) : 0, 35), true);

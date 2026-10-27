@@ -90,7 +90,10 @@ function renderFrame(race, time, dtFrame) {
     if (!showroom.on) for (const b of live.remote.values()) drawBoat(mb, b, dtFrame, time);   // friends in a live race
   }
   if (race.course.kind === 'showroom') drawMedalWall(mb, time);
-  else if (!indoors) drawFx(mb, dtFrame, time, race.course);
+  else {
+    drawPaceLine(mb, race);
+    if (!indoors) drawFx(mb, dtFrame, time, race.course);
+  }
   const n = mb.upload(R.boatBuf, gl.DYNAMIC_DRAW);
   bindLitAttribs(R.boatBuf);
   gl.drawArrays(gl.TRIANGLES, 0, n);

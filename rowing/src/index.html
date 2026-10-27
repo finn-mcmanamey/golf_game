@@ -14,7 +14,7 @@
 <canvas id="gl"></canvas>
 
 <div id="hud" class="hide">
-  <div id="topL" class="panel"><b id="clockT">0:00.0</b><span id="togoT">500 m to go</span><span id="windT"></span></div>
+  <div id="topL" class="panel"><b id="clockT">0:00.0</b><span id="togoT">500 m to go</span><span id="paceT"></span><span id="windT"></span></div>
   <div id="course" class="panel"><div id="courseBar"></div></div>
   <div id="standings" class="panel"></div>
   <div id="startMsg"></div>
@@ -59,6 +59,7 @@
         <div class="row"><label>Boat</label><div class="seg" id="segCls"></div></div>
         <div class="row"><label>Field</label><div class="seg" id="segDiff"></div></div>
         <div class="row"><label>Rate plan</label><div class="seg" id="segPlan" title="Sets your stroke rate down the course; W/S or − + take over"></div></div>
+        <div class="row"><label>Pace line</label><div class="seg" id="segPace" title="A line moving at your best pace, or a set split"></div></div>
         <div class="row"><label>In crews</label><div class="seg" id="segRole" title="In a double, quad or eight you can cox instead of row"></div></div>
         <div class="row"><label>Course #</label><input id="seedIn" type="number" min="1" max="999999"><button id="btnRnd" class="sec">Random</button></div>
         <div id="venue" class="sub small"></div>

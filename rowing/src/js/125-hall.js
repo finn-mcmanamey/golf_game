@@ -59,6 +59,8 @@ function drawErgScreen(mb, race) {
     mb.box(-w / 2 + 0.2 + p * (w - 0.4), y, -13.5, 0.5, 0.65, 0.04, shade(c, 1.6));
   });
   mb.box(w / 2 - 0.1, 6.2, -13.5, 0.06, 6.2, 0.04, [2, 2, 2]);   // finish line on the screen
+  const px = paceX(race);
+  if (px != null) mb.box(-w / 2 + 0.2 + clamp(px / D, 0, 1) * (w - 0.4), 6.2, -13.45, 0.08, 6.2, 0.04, [0.4, 2.2, 2.6]);   // the pace line
 }
 
 function ergCamera(boat, mode) {
