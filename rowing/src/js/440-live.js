@@ -24,6 +24,7 @@ async function joinLive(code) {
   live.code = code;
   live.state = 'lobby';
   live.unsubs.push(live.lobby.on('start', msg => startLiveRace(msg.data)));
+  live.unsubs.push(live.lobby.on('cheer', showCheer));
   live.unsubs.push(live.lobby.onPeers(() => renderLiveLobby()));
   sendPresence(true);
   renderLiveLobby();
@@ -128,3 +129,26 @@ $('liveJoinBtn').onclick = () => joinLive($('liveCodeIn').value);
 $('liveStart').onclick = pressLiveStart;
 $('liveLeave').onclick = async () => { await leaveLive(); renderLiveLobby() };
 connectLive();
+
+/* ----- cheers: tiny reactions between crews during a live race ----- */
+const CHEERS = ['💪', '👏', '😅', '🔥'];
+let lastCheer = 0;
+
+function sendCheer(i) {
+  if (!live.lobby || live.state !== 'racing' || game.time - lastCheer < 1) return;   // one a second is plenty
+  lastCheer = game.time;
+  live.lobby.emit('cheer', { i }).catch(() => {});
+}
+
+function showCheer(msg) {
+  const i = msg.data?.i, who = msg.sameTab ? 'You' : String(live.lobby?.peers().find(p => p.peer === msg.peer)?.presence.name || 'Rower').slice(0, 14);
+  if (!(i >= 0 && i < CHEERS.length)) return;   // untrusted: only our own four reactions are ever shown
+  const el = document.createElement('div');
+  el.className = 'cheer';
+  el.textContent = `${who} ${CHEERS[i]}`;
+  $('cheers').appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+}
+
+addEventListener('keydown', e => { const i = ['Digit1', 'Digit2', 'Digit3', 'Digit4'].indexOf(e.code); if (i >= 0 && game.mode === 'live') sendCheer(i) });
+document.querySelectorAll('#cheerBar button').forEach((b, i) => b.onclick = e => { e.stopPropagation(); sendCheer(i) });

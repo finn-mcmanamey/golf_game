@@ -36,7 +36,10 @@ const fakeRoom = () => {
 
   console.log('A sees:', await a.evaluate(() => [...live.remote.values()].map(r => r.crewName + ' lane ' + r.lane + ' x ' + r.x.toFixed(1)).join(', ')), '| A at', await a.evaluate(() => race.player.x.toFixed(1)));
   console.log('C sees:', await c.evaluate(() => [...live.remote.values()].map(r => r.crewName + ' x ' + r.x.toFixed(1)).join(', ')), '| C at', await c.evaluate(() => race.player.x.toFixed(1)));
-  const ok = await a.evaluate(() => [...live.remote.values()].some(r => r.crewName === 'Finn' && r.x > 1)) && await c.evaluate(() => [...live.remote.values()].some(r => r.crewName === 'Dad' && r.x > 1));
+  await c.keyboard.press('Digit4'); await a.waitForTimeout(600);
+  const cheered = await a.evaluate(() => $('cheers').innerText.includes('Finn 🔥'));
+  console.log('cheer arrived:', cheered);
+  const ok = cheered && await a.evaluate(() => [...live.remote.values()].some(r => r.crewName === 'Finn' && r.x > 1)) && await c.evaluate(() => [...live.remote.values()].some(r => r.crewName === 'Dad' && r.x > 1));
   console.log(ok && !errs.length ? 'ok: both crews see each other racing' : 'FAIL'); if (!ok || errs.length) process.exitCode = 1;
   console.log(errs.join('\n') || 'no errors');
   await b.close();

@@ -216,3 +216,9 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 #liveCodeIn { font: inherit; text-transform: uppercase; letter-spacing: 3px; width: 120px; text-align: center; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.07); color: var(--ink) }
 .code { font: 800 22px ui-monospace, Menlo, monospace; letter-spacing: 4px; color: var(--acc) }
 #liveStand { position: absolute; left: 12px; top: 130px; width: 200px; padding: 8px 12px }
+#cheers { position: absolute; left: 12px; top: 250px; display: flex; flex-direction: column; gap: 6px; pointer-events: none }
+.cheer { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 4px 12px; font-weight: 700; animation: cheer 2.6s ease-out forwards }
+@keyframes cheer { 0% { opacity: 0; transform: translateX(-10px) } 10% { opacity: 1; transform: none } 80% { opacity: 1 } 100% { opacity: 0 } }
+#cheerBar { position: absolute; left: 12px; top: 92px; display: flex; gap: 4px; pointer-events: auto }
+#cheerBar button { background: var(--panel); border: 1px solid var(--line); border-radius: 50%; width: 34px; height: 34px; font-size: 16px }
+#liveStand { top: 136px }

@@ -37,7 +37,8 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   $('replayTag').classList.toggle('hide', mode !== 'replay');
   $('lesson').classList.add('hide');
   $('liveStand').classList.toggle('hide', mode !== 'live');
-  $('standings').classList.toggle('hide', mode === 'live');   // the live panel replaces it
+  $('standings').classList.toggle('hide', mode === 'live');
+  $('cheerBar').classList.toggle('hide', mode !== 'live');   // the live panel replaces it
   tuneChanged();
   cam.mode = settings.camera;
   $('btnCam').textContent = CAMERA_LABEL[cam.mode];
