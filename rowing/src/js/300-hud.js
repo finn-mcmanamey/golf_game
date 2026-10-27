@@ -42,7 +42,7 @@ function updateHud(race) {
   const p = race.player, D = race.course.distance, t = Math.max(0, race.t);
   $('clockT').textContent = fmtTime(p.finishTime ?? p.out?.t ?? t).slice(0, -1);
   $('togoT').textContent = race.order && (p.out || p.finishTime != null) ? bumpOutcome(race, p)
-    : p.finishTime != null ? `Finished · ${ordinal(placeOf(race, p))}` : `${Math.max(0, Math.ceil(D - p.x))} m to go`;
+    : p.finishTime != null ? `Finished · ${ordinal(placeOf(race, p))}` : `${Math.max(0, Math.ceil(D - p.x))} m to go${race.order ? whistleMarks() : ''}`;
   $('rateT').textContent = p.strokes ? Math.round(liveRate(p, race.t)) : p.rate;
   $('rateTarget').textContent = `target ${p.rate}`;
   $('splitT').textContent = race.started ? fmtSplit(currentSplit(p, race.t)) : '–:––';

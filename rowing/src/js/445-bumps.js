@@ -107,3 +107,9 @@ function bumpsTip() {
   const push = matchMedia('(pointer: coarse)').matches ? 'the push button' : 'Shift';
   setTimeout(() => toast(`Bumps: touch the stern of the crew ahead before the crew behind touches yours. Whistles call the gap; ${push} is a power ten.`, 6000), 300);
 }
+
+// The whistles on screen too, for anyone playing without sound: dots for the gap ahead (↑) and behind (↓).
+function whistleMarks() {
+  const dots = n => '●'.repeat(n);
+  return (bumpCall.ahead ? ` · ↑${dots(bumpCall.ahead)}` : '') + (bumpCall.behind ? ` · ↓${dots(bumpCall.behind)}` : '');
+}
