@@ -93,7 +93,7 @@ function menuChanged() {
   const shields = streak.shields ? ` · ${'🛡'.repeat(streak.shields)}` : '';
   // Before today's row: the streak at stake is the reason to row; after it, today's best.
   $('dailySub').textContent = best ? `Today's best ${fmtTime(best)}` + (streak.n > 1 ? ` · ${streak.n}-day streak` : '') + shields
-    : streak.n > 1 ? `🔥 ${streak.n}-day streak: row today to keep it${shields}` : 'Same race for everyone today';
+    : streak.n > 1 ? `🔥 ${streak.n}-day streak: row today to keep it${shields}` : `Today: ${dailyLabel(dailyOpts())}, same for everyone`;
   $('welcome').classList.toggle('hide', STORE.get('history', []).length > 0 || STORE.get('learned', false));
   showPreview(currentOpts());
 }
@@ -128,11 +128,20 @@ function extendStreak() {
   return kept ? missed : 0;
 }
 
-function dailyOpts() {
-  const day = localDay();
-  // Rules pinned, so every row on the board was rowed under the same physics (rules 4 only changes bumps).
-  return { seed: hashSeed(day, 0xDA1) % 999999 + 1, distance: 1000, cls: CLASS_KEYS[day % 4], difficulty: 'national', lane: 2, rules: 3 };
+// The daily race (F-115): a regatta most days, indoors on Wednesdays, the river at weekends. Rules are pinned per
+// format, so every row on a day's board was rowed under the same physics. Formats began the day after they shipped,
+// so no day's board changed mid-day.
+const DAILY_FORMATS_FROM = 20754;   // 28 Oct 2026, as a day number
+function dailyOptsFor(day) {
+  const base = { seed: hashSeed(day, 0xDA1) % 999999 + 1, distance: 1000, cls: CLASS_KEYS[day % 4], difficulty: 'national', lane: 2, rules: 3, kind: 'regatta' };
+  if (day < DAILY_FORMATS_FROM) return base;
+  const weekday = (day + 4) % 7;   // day 0 was a Thursday; 0 = Sunday
+  if (weekday === 3) return { ...base, kind: 'erg', cls: '1x', distance: 500 };
+  if (weekday === 0 || weekday === 6) return { ...base, kind: 'head', rules: 6 };   // streams and all
+  return base;
 }
+const dailyOpts = () => dailyOptsFor(localDay());
+const dailyLabel = o => `${{ regatta: 'Regatta', erg: 'Indoor erg', head: 'Head race' }[o.kind]} · ${o.distance >= 1000 ? o.distance / 1000 + ' km' : o.distance + ' m'} ${o.cls}`;
 
 function checkFriendLink() {
   const m = location.hash.match(/r=([A-Za-z0-9_-]+)/);

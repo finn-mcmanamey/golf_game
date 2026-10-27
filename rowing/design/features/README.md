@@ -24,3 +24,4 @@ Build order follows `Depends on`. Status: idea → spec'd → approved → build
 | F-112 | Learn to Row names this device's controls (keys or on-screen buttons) | shipped | P1 | Feel | F-001 | Phone players were told to press W, A, D and Shift |
 | F-113 | Idle frame cap: menus and results draw at most 30 fps | shipped | P3 | Feel | — | Battery and heat on phones; races still draw every frame |
 | F-114 | Rivals read the river: Elite/Olympic head crews take the slack water against a strong stream (rules 6) | shipped | P2 | Truth | F-109 | 040-bots.js riverLine; olympic field −0.5 s/km against a −0.125 stream, no bank hits |
+| F-115 | Daily formats by weekday: erg Wednesdays, head race weekends (rules 6), regatta otherwise | shipped | P1 | Fair | F-004, F-109 | From day 20754 (28 Oct 2026) so no board changed mid-day; rules pinned per format |
