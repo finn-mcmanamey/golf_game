@@ -192,7 +192,9 @@ function frame(now) {
 
   if (game.state === 'race' && race) {
     const slow = game.replay && photoFinishSlowdown(race);
-    simulate(dt * (game.fastForward ? 8 : slow || gameSpeed()), () => game.replay ? (game.replay[race.tick] ?? packInput(0, 18)) : readInput(), false, readInput2);
+    const rate = game.fastForward ? 8 : slow || gameSpeed();
+    simulate(dt * rate, () => game.replay ? (game.replay[race.tick] ?? packInput(0, 18)) : readInput(), false, readInput2, now, rate);
+    inputClock = null;
     frameBlend.alpha = clamp(game.acc / TUNE.dt, 0, 1);
     if (game.mode === 'live') updateLiveBoats(dt);
     if (cam.mode !== 'rower') introduceCrews(race);
@@ -227,16 +229,18 @@ function frame(now) {
 }
 
 // Steps the race at 60 Hz for the time that has passed. `quiet` skips sound and on-screen feedback.
-function simulate(dt, inputFor, quiet = false, input2For = () => 0) {
+// `now` and `rate` (race seconds per real second) place each step in real time, for timestamped presses (F-108).
+function simulate(dt, inputFor, quiet = false, input2For = () => 0, now = null, rate = 1) {
   game.acc += dt;
   let steps = 0;
   while (game.acc >= TUNE.dt && steps++ < 400) {
     game.acc -= TUNE.dt;
+    inputClock = now == null ? null : now - game.acc / rate * 1000;   // this step ends where the sim still trails real time
     rememberPoses([...race.boats, race.ghost]);
     stepRace(race, inputFor(), input2For());
-    if (!quiet && tuneEdited()) game.tuned = true;
-    if (!quiet && settings.oneButton && race.started) game.oneButtonUsed = true;
-    if (!quiet && gameSpeed() < 1 && race.started) game.slowed = true;   // a slowed race is practice, not a record   // used at any point: not a record   // tuned at any moment means this race isn't a record
+    if (!quiet && tuneEdited()) game.tuned = true;   // tuned at any moment means this race isn't a record
+    if (!quiet && settings.oneButton && race.started) game.oneButtonUsed = true;   // used at any point: not a record
+    if (!quiet && gameSpeed() < 1 && race.started) game.slowed = true;   // a slowed race is practice, not a record
     recordSplits(race);
     if (!quiet) sampleForce(race.player);
     if (quiet) { for (const b of race.boats) b.events.length = 0; if (race.ghost) race.ghost.events.length = 0 }

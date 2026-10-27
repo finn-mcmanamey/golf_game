@@ -30,11 +30,30 @@ function oneButtonRow(b) {
 }
 
 // In a duel the arrow keys, Enter and right Shift belong to player 2; otherwise they're spare keys for player 1.
+/* Drive presses keep their own timestamps (F-108), so each 60 Hz step reads the drive as it was at that step's moment
+   rather than when the next frame noticed it: at 30 fps (iOS Low Power Mode) a press could otherwise land 33 ms late. */
+const driveHist = { base: false, ev: [] };
+let inputClock = null;   // real time (ms) of the step being simulated; null means "now"
+
+function driveChanged(t) {
+  const held = keys.has('Space') || keys.has('Mouse') || touchState.drive, ev = driveHist.ev;
+  if (held === (ev.length ? ev[ev.length - 1].down : driveHist.base)) return;
+  ev.push({ t, down: held });
+  while (ev.length > 32) driveHist.base = ev.shift().down;
+}
+
+function driveAt(t) {
+  let held = driveHist.base;
+  for (const e of driveHist.ev) { if (e.t > t) break; held = e.down }
+  return held;
+}
+
 function readInput() {
   applyPlan();
   const duel = !!race.player2;
   let bits = game.autopilot && race.started ? autoRow(race.player) : 0;
-  if (keys.has('Space') || keys.has('Mouse') || touchState.drive || padState.drive) bits |= IN.DRIVE;
+  const held = inputClock == null ? keys.has('Space') || keys.has('Mouse') || touchState.drive : driveAt(inputClock);
+  if (held || padState.drive) bits |= IN.DRIVE;
   if (keys.has('KeyA') || (!duel && keys.has('ArrowLeft')) || touchState.left || padState.left) bits |= IN.LEFT;
   if (keys.has('KeyD') || (!duel && keys.has('ArrowRight')) || touchState.right || padState.right) bits |= IN.RIGHT;
   if (settings.oneButton && race?.started && !race.player2 && !coxing()) bits = (bits & ~IN.DRIVE) | (bits & IN.DRIVE ? oneButtonRow(race.player) : 0);
@@ -61,12 +80,13 @@ addEventListener('keydown', e => {
   AU.init();
   if (!e.repeat) onKey(e.code);
   keys.add(e.code);
+  driveChanged(e.timeStamp);
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   // In a race Enter is a game key (player 2's drive), never a press of whichever button last had focus.
   if ((e.code === 'Enter' || e.code === 'NumpadEnter') && game.state === 'race') e.preventDefault();
 });
-addEventListener('keyup', e => keys.delete(e.code));
-addEventListener('blur', () => { keys.clear(); Object.keys(touchState).forEach(k => touchState[k] = false) });
+addEventListener('keyup', e => { keys.delete(e.code); driveChanged(e.timeStamp) });
+addEventListener('blur', () => { keys.clear(); Object.keys(touchState).forEach(k => touchState[k] = false); driveChanged(performance.now()) });
 
 function onKey(code) {
   if (code === 'Space' && game.state === 'race' && coxing()) return callPowerTen();
@@ -104,10 +124,12 @@ const driveDown = e => {
   if (coxing()) return callPowerTen();   // when coxing, a tap on the water calls a power ten
   AU.init();
   if (e.pointerType === 'mouse') keys.add('Mouse'); else { touchState.drive = true; driveFinger = e.pointerId }
+  driveChanged(e.timeStamp);
 };
 const driveUp = e => {
   if (e.pointerType === 'mouse') keys.delete('Mouse');
   else if (e.pointerId === driveFinger) { touchState.drive = false; driveFinger = null }
+  driveChanged(e.timeStamp);
 };
 canvas.addEventListener('pointerdown', driveDown);
 $('hud').addEventListener('pointerdown', driveDown);
