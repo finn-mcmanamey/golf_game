@@ -46,3 +46,8 @@ name is visible to every file. The three-digit prefix is the load order.
 | 400–510 | tuning panel, course version 7, ghosts, moments, options, front page |
 | 520–580 | the island, validated flight, hidden holes, links, highlights, leaders |
 | 590–640 | particles, round flow, swing input, input handlers |
+
+## Also in this repo: Voxel Regatta
+
+`rowing/` holds a voxel rowing game built the same way (numbered slices of one script, seeded deterministic
+simulation, hand-written WebGL). See [rowing/README.md](rowing/README.md). `npm run build:rowing`, `npm run dev:rowing`, `npm run test:rowing`.
