@@ -74,7 +74,7 @@ function renderBoathouse(tab) {
     const h = STORE.get('history', []);
     if (!h.length) { el.innerHTML = '<p class="sub">No races yet. Your last 50 races will be listed here.</p>'; return }
     el.innerHTML = totalsLine(h) + historySpark(h) + `<table class="hist">${h.slice(0, 20).map(r => `<tr><td>${new Date(r.date).toLocaleDateString()}</td>
-      <td>${{ head: 'Head ', erg: 'Erg ', knockout: 'Match ' }[r.kind] || ''}${r.distance} m ${r.cls}</td><td>${DIFFICULTY[r.diff]?.label || ''}</td><td>${r.venue}</td>
+      <td>${{ head: 'Head ', erg: 'Erg ', knockout: 'Match ', boatrace: 'Boat Race ', bumps: 'Bumps ' }[r.kind] || ''}${r.distance} m ${r.cls}</td><td>${DIFFICULTY[r.diff]?.label || ''}</td><td>${r.venue}</td>
       <td class="t">${fmtTime(r.time)}</td><td class="t">${ordinal(r.place)}</td><td class="t">${r.perfect}%</td>
       <td>${r.code ? `<button class="sec mini" data-code="${r.code}" title="Race against this run">Race it</button>` : ''}</td></tr>`).join('')}</table>`;
     el.querySelectorAll('[data-code]').forEach(b => b.onclick = () => raceHistoryGhost(b.dataset.code));

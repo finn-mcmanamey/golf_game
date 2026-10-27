@@ -14,7 +14,7 @@ function segmented(id, items, current, onPick) {
   }
 }
 
-const KIND_LABEL = { bumps: ' (bumps)', head: ' (head race)', erg: ' (indoor erg)', knockout: ' (match race)' };
+const KIND_LABEL = { boatrace: ' (Boat Race)', bumps: ' (bumps)', head: ' (head race)', erg: ' (indoor erg)', knockout: ' (match race)' };
 // Head races also come in a long, 4 km version: a procession down the river, like the real thing.
 function distanceChoices() {
   const list = settings.kind === 'head' ? [...DISTANCES, 4000] : settings.kind === 'bumps' ? DISTANCES.slice(1) : DISTANCES;
@@ -86,6 +86,7 @@ function menuChanged() {
   renderCareer();
   renderCup();
   renderWeek();
+  renderBoatRace();
   const streak = STORE.get('dailyStreak', { n: 0, day: 0 }), today = localDay();
   const best = STORE.get('daily-' + dailyOpts().seed, null);
   $('dailySub').textContent = best ? `Today's best ${fmtTime(best)}` + (streak.n > 1 && streak.day >= today - 1 ? ` · ${streak.n}-day streak` : '') : 'Same race for everyone today';
@@ -162,7 +163,7 @@ function showResults(race) {
     if (s.day !== today) STORE.set('dailyStreak', { n: s.day === today - 1 ? s.n + 1 : 1, day: today });
   }
   $('resSub').textContent = bumps ? `Started ${ordinal(p.lane + 1)} on the river, finished ${ordinal(place)} · ${race.course.name}` : `${fmtTime(p.finishTime)} · ${race.course.name}, ${opts.distance} m ${BOAT_CLASSES[opts.cls].name.toLowerCase()}${pbNote}`;
-  $('resTable').innerHTML = order.map((b, i) => `<tr class="${b === p ? 'me' : ''}"><td>${i + 1}</td><td>${bumps ? 'Station ' + (b.lane + 1) : race.course.bends ? 'Start ' + (b.startAt / 8 + 1) : 'Lane ' + (b.lane + 1)}</td><td>${displayName(b)}</td>
+  $('resTable').innerHTML = order.map((b, i) => `<tr class="${b === p ? 'me' : ''}"><td>${i + 1}</td><td>${bumps ? 'Station ' + (b.lane + 1) : race.course.kind === 'boatrace' ? (b.lane === 2 ? 'Surrey' : 'Middlesex') : race.course.bends ? 'Start ' + (b.startAt / 8 + 1) : 'Lane ' + (b.lane + 1)}</td><td>${displayName(b)}</td>
     <td class="t">${bumps ? bumpStatus(race, b) : b.finishTime != null ? fmtTime(b.finishTime) : '–'}</td><td class="t">${bumps ? '' : i && b.finishTime != null ? '+' + (b.finishTime - win).toFixed(2) : ''}</td></tr>`).join('')
     + (race.ghost?.finishTime ? `<tr><td></td><td></td><td>Ghost</td><td class="t">${fmtTime(race.ghost.finishTime)}</td><td class="t">${(race.ghost.finishTime - p.finishTime >= 0 ? '+' : '') + (race.ghost.finishTime - p.finishTime).toFixed(2)}</td></tr>` : '');
   const s = p.stats, strokes = Math.max(1, s.perfect + s.good + s.off);
@@ -175,6 +176,7 @@ function showResults(race) {
   if (race.course.kind === 'head' && place === 1 && counts) celebrate();
   const careerNote = game.mode === 'career' ? (counts ? careerResult(race, place) : 'Not counted for the season: tuned physics or unfinished.')
     : game.mode === 'cup' ? (counts ? cupResult(race) : 'Not counted for the cup: tuned physics or unfinished.')
+    : game.mode === 'boatrace' ? (counts ? boatRaceResult(race, place) : '')
     : game.mode === 'week' ? (counts ? weekResult(race) : 'Not counted for the week: tuned physics or unfinished.') : '';
   if (counts && !bumps) recordHistory(race, place);
   const badges = counts ? checkBadges(race, place) : [];

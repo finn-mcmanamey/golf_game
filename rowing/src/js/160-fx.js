@@ -26,7 +26,7 @@ function drawFx(mb, dt, time, course) {
   drawStartLights(mb, course);
   drawLaunch(mb, dt, time, course);
   drawFireworks(mb, dt, course);
-  if (['regatta', 'head', 'knockout', 'bumps'].includes(course.kind)) drawSwans(mb, dt, time, course);
+  if (['regatta', 'head', 'knockout', 'bumps', 'boatrace'].includes(course.kind)) drawSwans(mb, dt, time, course);
   drawCrowd(mb, time, course);
   drawBankParty(mb, dt, time, course);
   drawBirds(mb, time, course);

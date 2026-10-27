@@ -10,7 +10,7 @@ function makeRace(opts) {
   const boats = [], brains = [];
   for (let l = 0; l < LANES; l++) {
     if (solo && l !== lane) continue;   // practice: just you on the water
-    if (kind === 'knockout' && l !== lane && l !== lane + 1) continue;   // a match race: two crews side by side
+    if ((kind === 'knockout' || kind === 'boatrace') && l !== lane && l !== lane + 1) continue;   // a match race: two crews side by side
     const name = l === lane ? (duel ? 'Player 1' : 'You') : names.splice((rng() * names.length) | 0, 1)[0];
     const human = l === lane || (duel && l === lane + 1);   // a duel puts a second human crew in the next lane
     boats.push(makeBoat(cls, l, duel && l === lane + 1 ? 'Player 2' : name, seed, human ? 0.035 : DIFFICULTY[difficulty].crewSd));
@@ -21,6 +21,7 @@ function makeRace(opts) {
     let k = 1;
     for (const b of boats) { b.z = targetZ(course, b); if (b.lane !== lane) b.startAt = 8 * k++ }
   }
+  if (kind === 'boatrace') for (const b of boats) b.z = targetZ(course, b);   // side by side, a wide gap for the eights' oars
   // Bumps: one line of crews with clear water between them; the crew at the head of the river starts furthest on.
   if (kind === 'bumps') {
     const form = makeRng(hashSeed(seed, 0xB0B));   // crews on form or off it, so bumps happen all down the river
@@ -117,7 +118,7 @@ function stepRace(race, playerInput, player2Input = 0) {
 function placeOf(race, boat) {
   if (race.order) return 1 + race.order.indexOf(boat.lane);
   const D = race.course.distance;
-  const score = b => b.finishTime != null ? b.finishTime : race.course.bends
+  const score = b => b.finishTime != null ? b.finishTime : race.course.kind === 'head'
     ? 1e6 + (b.x > 20 ? (race.t - b.startAt) * D / b.x : 1e5 + b.startAt) : 1e6 - b.x;
   const me = score(boat);
   return 1 + race.boats.filter(b => b !== boat && score(b) < me).length;

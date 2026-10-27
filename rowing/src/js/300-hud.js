@@ -87,7 +87,7 @@ function updateStandings(race) {
   $('standings').innerHTML = boats.map((b, i) => {
     // Head races are against the clock: show each crew's projected time, or when it starts.
     const gap = race.order ? bumpStatus(race, b) : b.finishTime != null ? fmtTime(b.finishTime)
-      : race.course.bends ? (race.t < b.startAt ? `starts ${Math.ceil(b.startAt - race.t)}s` : b.x > 20 ? '≈' + fmtTime((race.t - b.startAt) * D / b.x).slice(0, -3) : '…')
+      : race.course.kind === 'head' ? (race.t < b.startAt ? `starts ${Math.ceil(b.startAt - race.t)}s` : b.x > 20 ? '≈' + fmtTime((race.t - b.startAt) * D / b.x).slice(0, -3) : '…')
       : i === 0 ? 'lead' : '+' + ((leader.x - b.x) / Math.max(1, leader.v)).toFixed(1) + 's';
     const sw = '#' + coloursFor(b).shirt.toString(16).padStart(6, '0');
     return `<div class="${b === race.player ? 'me' : ''}"><span>${i + 1}</span><i class="sw" style="background:${sw}"></i><span>${displayName(b)}${b.isRival ? ' ⚔' : ''}</span><span class="gap">${gap}</span></div>`;

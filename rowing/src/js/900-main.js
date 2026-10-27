@@ -53,7 +53,7 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
 // A live race goes back to its lobby; everything else restarts its own way.
 const backToLiveLobby = () => { live.state = 'lobby'; sendPresence(true); toMenu(); $('live').classList.remove('hide'); renderLiveLobby() };
 // How each mode starts again from the results screen; anything else re-rows the same race.
-const RESTARTS = { live: () => backToLiveLobby(), career: () => startCareerRace(), cup: () => startCupRace(), week: () => startWeekRace(),
+const RESTARTS = { live: () => backToLiveLobby(), career: () => startCareerRace(), cup: () => startCupRace(), week: () => startWeekRace(), boatrace: () => startBoatRace(),
   replay: () => watchReplay(), learn: () => startLearning(), training: () => startTraining() };
 const restartRace = () => (RESTARTS[game.mode] || (() => startRace(game.opts, game.ghostInputs, game.mode)))();
 
@@ -152,7 +152,7 @@ function handleEvents() {
       else if (e.type === 'finish') {
         AU.play(placeOf(race, b) === 1 ? 'cheer' : 'finish');
         // Fireworks for beating a field on a regatta course (a head race isn't decided until everyone's home).
-        if (placeOf(race, b) === 1 && !game.replay && race.boats.length > 1 && !race.course.bends && !practiceMode()) celebrate();
+        if (placeOf(race, b) === 1 && !game.replay && race.boats.length > 1 && !['head', 'bumps'].includes(race.course.kind) && !practiceMode()) celebrate();
         buzz('finish');
         game.finishShown = true;
         game.finishMsgUntil = game.time + 3;
@@ -214,7 +214,7 @@ function frame(now) {
     else if (photo.on) photoCamera();
     else {
       // Wide shots frame both crews in a duel or match race; on-board shots stay with your boat.
-      const pair = (race.player2 || race.course.kind === 'knockout') && !['rower', 'chase'].includes(cam.mode);
+      const pair = (race.player2 || race.course.kind === 'knockout' || race.course.kind === 'boatrace') && !['rower', 'chase'].includes(cam.mode);
       updateCamera(pair ? duelCameraBoat(race) : race.player, race.t, dt);
     }
     renderFrame(race, game.time, dt);
