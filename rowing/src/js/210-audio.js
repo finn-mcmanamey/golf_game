@@ -16,6 +16,7 @@ const AU = {
       this.master.connect(this.ctx.destination);
       this.water = this.loop(500, 0.6, 'lowpass');
       this.crowd = this.loop(1100, 0.8, 'bandpass');
+      this.rain = this.loop(5000, 0.3, 'highpass');
     } catch (e) { this.ctx = null }
   },
 
@@ -68,12 +69,13 @@ const AU = {
   },
 
   // Ambient beds follow the race: water rush with boat speed, crowd swelling near the finish.
-  ambient(speed, crowd) {
+  ambient(speed, crowd, rain = 0) {
     if (!this.ready()) return;
     const t = this.ctx.currentTime;
     this.water.g.gain.setTargetAtTime(0.03 + Math.min(1, speed / 6) * 0.12, t, 0.2);
     this.water.f.frequency.setTargetAtTime(300 + speed * 90, t, 0.2);
     this.crowd.g.gain.setTargetAtTime(crowd * 0.18, t, 0.4);
+    this.rain.g.gain.setTargetAtTime(rain * 0.05, t, 0.5);
   },
 
   setOn(on) { if (this.master) this.master.gain.value = on ? 0.8 : 0 },

@@ -55,11 +55,13 @@ function drawBoat(mb, boat, dtFrame, time) {
     mb.cuboid(centre, scale3(F, (u1 - u0) / 2), scale3(UP, 0.1), scale3(S, w / 2), [...shade(hullCol, 0.82), ...hullCol]);
   }
   mb.box(...P(0.05, 0.16, 0), 0.12, 0.12, 0.12, [1, 1, 1]);   // bow ball
+  // A dark patch on the water under the hull grounds the boat (its shadow and reflection).
+  mb.cuboid(P(-c.length / 2, 0.012, 0), scale3(F, c.length * 0.5), scale3(UP, 0.004), scale3(S, hullW * 1.1), [0.03, 0.07, 0.1]);
 
   // Blade height follows the stroke: buried on the drive, lifted and feathered on the recovery.
   const target = boat.phase === 'drive' && q.h < 0.995 ? -0.16 : boat.phase === 'front' ? 0.1 : boat.phase === 'crab' ? -0.3 : 0.32;
   vs.bladeY += (target - vs.bladeY) * Math.min(1, dtFrame * 16);
-  const released = vs.phase === 'drive' && boat.phase !== 'drive';
+  const released = vs.phase === 'drive' && boat.phase !== 'drive', caught = vs.phase !== 'drive' && boat.phase === 'drive';
   vs.phase = boat.phase;
 
   const sculls = c.sculls, Li = sculls ? 0.88 : 1.15, Lo = sculls ? 2.0 : 2.55, pinW = sculls ? 0.8 : 0.86, pinY = 0.42;
@@ -85,6 +87,7 @@ function drawBoat(mb, boat, dtFrame, time) {
       mb.beam(P(...add3(bladeStart, scale3(bDir, 0.18))), P(...add3(bladeStart, scale3(bDir, 0.3))), feather ? 0.23 : 0.06, feather ? 0.06 : 0.23, bladeCols[1]);
       handles.push(handle);
       if (released && (si === 0 || boat === race?.player)) addPuddle(P(...blade));
+      if (caught && Math.abs(q.x - cam.at[0]) < 80) addSpray(P(...blade), boat === race?.player ? 1 : 0.5);
     }
     drawRower(mb, P, piece, st.u, legT, backT, handles, sculls, shirt, skin, shorts);
   }

@@ -31,6 +31,7 @@ function makeCourse(seed, distance) {
     timeOfDay: rng(),            // 0 dawn … 1 dusk, drawing only
     season: (rng() * 4) | 0,     // drawing only
     sceneSeed: hashSeed(seed, 0x5CE),
+    rain: makeRng(hashSeed(seed, 0x2A1))() < 0.18,   // drawing only; its own stream so older values are unchanged
   };
 }
 

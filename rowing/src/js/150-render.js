@@ -13,7 +13,12 @@ function setScene(course, cls) {
   const { mb, L } = buildScene(course, cls);
   R.sceneRanges = mb.upload(R.sceneBuf, gl.STATIC_DRAW);
   R.L = L;
-  R.fogK = 0.0019 + (course.timeOfDay < 0.15 ? 0.0025 : 0);
+  R.fogK = 0.0019 + (course.timeOfDay < 0.15 ? 0.0025 : 0) + (course.rain ? 0.003 : 0);
+  if (course.rain) {
+    // Rain: a grey, flatter sky and light.
+    const grey = (c, k) => c.map(v => lerp(v, 0.55, k));
+    Object.assign(L, { sky: grey(L.sky, 0.6), horizon: grey(L.horizon, 0.5), sunCol: grey(L.sunCol, 0.55), cloud: 0.95 });
+  }
   // Water: one big quad under everything; the banks cover its edges.
   const x0 = -2000, x1 = course.distance + 2000, z = 2000;
   gl.bindBuffer(gl.ARRAY_BUFFER, R.waterBuf);
@@ -78,6 +83,7 @@ function renderFrame(race, time, dtFrame) {
   const mb = R.boatMb;
   mb.reset();
   for (const b of race.boats) if (Math.abs(b.x - cam.at[0]) < 700) drawBoat(mb, b, dtFrame, time);
+  drawFx(mb, dtFrame, time, race.course);
   const n = mb.upload(R.boatBuf, gl.DYNAMIC_DRAW);
   bindLitAttribs(R.boatBuf);
   gl.drawArrays(gl.TRIANGLES, 0, n);

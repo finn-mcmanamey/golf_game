@@ -125,7 +125,7 @@ function frame(now) {
     frameBlend.alpha = clamp(game.acc / TUNE.dt, 0, 1);
     startSequence();
     const p = race.player, d = race.course.distance;
-    AU.ambient(p.v, smooth(d - 400, d, p.x) * (p.finishTime != null ? 0.6 : 1));
+    AU.ambient(p.v, smooth(d - 400, d, p.x) * (p.finishTime != null ? 0.6 : 1), race.course.rain ? 1 : 0);
     if (race.done) { game.state = 'results'; game.replay ? showReplayEnd() : showResults(race) }
     if (game.state === 'race') { updateHud(race); if (!game.replay && game.mode !== 'learn') updateCalls(race); updateLearning(race) }
   } else if ((game.state === 'menu' || game.state === 'results') && race) {

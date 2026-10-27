@@ -46,7 +46,7 @@ const soundLabel = () => { $('btnSound').textContent = settings.sound ? '🔊 So
 function menuChanged() {
   saveSettings();
   const c = makeCourse(settings.seed, settings.distance);
-  $('venue').textContent = `${c.name} · ${windLabel(c.wind)}${c.current ? ` · ${c.current > 0 ? 'following' : 'opposing'} stream` : ''}`;
+  $('venue').textContent = `${c.name} · ${c.rain ? 'Rain · ' : ''}${windLabel(c.wind)}${c.current ? ` · ${c.current > 0 ? 'following' : 'opposing'} stream` : ''}`;
   const pb = getPB(settings.distance, settings.cls);
   $('pbLine').textContent = pb ? `Your best over ${settings.distance} m in the ${BOAT_CLASSES[settings.cls].name.toLowerCase()}: ${fmtTime(pb.time)} (${pb.venue})` : '';
   $('btnGhost').classList.toggle('hide', !pb);
