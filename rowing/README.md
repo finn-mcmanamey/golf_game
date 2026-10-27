@@ -28,6 +28,8 @@ and **press again** just as the slide reaches the front. That's a perfect catch.
 | F | 📷 | photo mode: freeze, drag to orbit, scroll to zoom |
 | G, F8, Esc | | graphics, tuning panel, pause |
 
+Gamepads work too: A drives, the stick or d-pad steers, bumpers set the rate, RT pushes, Y changes camera, Start pauses.
+
 The **rate plan** (menu) sets your stroke rate down the course for you: Classic (fast start, settle, sprint), Even,
 or Manual. Pressing W/S takes over. Five fields, from Novice to Olympic; `test/balance.mjs` checks the steps between them.
 

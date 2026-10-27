@@ -149,6 +149,7 @@ function frame(now) {
   const dt = Math.min(0.1, (now - (game.last || now)) / 1000);
   game.last = now;
   game.time += dt;
+  pollGamepad();   // every frame, so Start and A work on pause and results screens too
 
   if (game.state === 'race' && race) {
     const slow = game.replay && photoFinishSlowdown(race);
