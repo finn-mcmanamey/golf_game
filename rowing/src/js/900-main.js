@@ -28,6 +28,7 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   resetCalls();
   resetSplits();
   resetCoaching();
+  resetCommentary();
   $('replayTag').classList.toggle('hide', mode !== 'replay');
   $('lesson').classList.add('hide');
   tuneChanged();
@@ -76,7 +77,7 @@ function updateFps(dt) {
 // Turns what just happened on the water into sound and on-screen feedback.
 function handleEvents() {
   for (const b of race.boats) {
-    if (b !== race.player) { b.events.length = 0; continue }
+    if (b !== race.player) { for (const e of b.events) commentEvent(b, e); b.events.length = 0; continue }
     for (const e of b.events) {
       learnEvent(e);
       if (e.type === 'catch' && b.strokes > 0) coachCatch(e);
@@ -129,10 +130,10 @@ function frame(now) {
     frameBlend.alpha = clamp(game.acc / TUNE.dt, 0, 1);
     startSequence();
     const p = race.player, d = race.course.distance;
-    AU.ambient(p.v, smooth(d - 400, d, p.x) * (p.finishTime != null ? 0.6 : 1), race.course.rain ? 1 : 0);
+    AU.ambient(p.v, Math.min(1, smooth(d - 400, d, p.x) * (p.finishTime != null ? 0.6 : 1) + comm.excite * 0.5), race.course.rain ? 1 : 0);
     if (race.done) { game.state = 'results'; game.replay ? showReplayEnd() : showResults(race) }
     if (!game.halfSeen && race.player.x > race.course.distance / 2) { game.halfSeen = true; game.lastAtHalf = placeOf(race, race.player) === race.boats.length && race.boats.length > 1 }
-    if (game.state === 'race') { updateHud(race); updateHud2(race); drawForceCurve(); if (!game.replay && game.mode !== 'learn') updateCalls(race); updateLearning(race) }
+    if (game.state === 'race') { updateHud(race); updateHud2(race); drawForceCurve(); updateCommentary(race); if (!game.replay && game.mode !== 'learn') updateCalls(race); updateLearning(race) }
   } else if ((game.state === 'menu' || game.state === 'results') && race) {
     // Behind the menu a demo race rows itself; after a race the field rows on past the line.
     simulate(dt, () => packInput(race.started ? autoRow(race.player) : 0, 35), true);
