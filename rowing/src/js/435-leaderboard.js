@@ -53,7 +53,7 @@ function verifyRows(seed) {
 // Today's daily with the fastest verified run as a ghost. Still counts as a daily for your own time.
 function raceLeader(e) {
   e?.stopPropagation();
-  const top = verifiedRows()[0];
+  const top = board.target;
   if (!top) return;
   const { opts, inputs } = decodeRace(top.dailyCode);
   $('results').classList.add('hide');
@@ -72,12 +72,29 @@ function renderBoard() {
   const rows = verifiedRows(), el = $('dailyBoard');
   if (!el) return;
   el.classList.toggle('hide', !rows.length);
-  el.innerHTML = `<b>Today's leaderboard</b>` + rows.slice(0, 10).map((r, i) =>
-    `<div class="${r.id === board.uid ? 'me' : ''}"><span>${i + 1}</span><span>${escapeHtml(r.name || 'Rower')}</span><span class="t">${fmtTime(r.dailyTime)}</span></div>`).join('')
-    + (rows.length && rows[0].id !== board.uid ? `<button class="sec mini raceLeader">Race ${escapeHtml(rows[0].name || 'the leader')}'s ghost</button>` : '');
+  const target = board.target = ghostTarget(rows), name = r => escapeHtml(r.name || 'Rower');
+  el.innerHTML = `<b>Today's leaderboard</b>` + boardWindow(rows).map(e => !e ? '<div class="gap"><span></span><span>⋯</span></div>' :
+    `<div class="${e[1].id === board.uid ? 'me' : ''}"><span>${e[0] + 1}</span><span>${name(e[1])}</span><span class="t">${fmtTime(e[1].dailyTime)}</span></div>`).join('')
+    + (target ? `<button class="sec mini raceLeader">${target === rows[0] ? `Race ${name(target)}'s ghost (leader)` : `Race ${name(target)}: the time just above yours`}</button>` : '');
   const rb = $('resBoard');
   if (rb && game.mode === 'daily') rb.innerHTML = rows.length ? el.innerHTML : '';
   document.querySelectorAll('.raceLeader').forEach(b => b.onclick = raceLeader);
+}
+
+// The top ten, or once you're further down, the top three and the rows around yours (F-103): a near target beats a far one.
+function boardWindow(rows) {
+  const me = rows.findIndex(r => r.id === board.uid), around = me - 2;
+  if (me < 5) return rows.slice(0, 10).map((r, i) => [i, r]);
+  return [...rows.slice(0, 3).map((r, i) => [i, r]), ...(around > 3 ? [null] : []), ...rows.slice(Math.max(3, around), me + 3).map((r, k) => [Math.max(3, around) + k, r])];
+}
+
+// Whose ghost to offer: the row just above yours (or above today's local best if you haven't posted), never yourself.
+function ghostTarget(rows) {
+  const me = rows.findIndex(r => r.id === board.uid);
+  if (me === 0 || !rows.length) return null;
+  if (me > 0) return rows[me - 1];
+  const best = STORE.get('daily-' + dailyOpts().seed, null);
+  return (best != null ? rows.filter(r => r.dailyTime < best).pop() : rows[rows.length - 1]) || rows[0];
 }
 
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

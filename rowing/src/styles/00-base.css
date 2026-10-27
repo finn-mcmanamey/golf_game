@@ -240,3 +240,4 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 #calTaps i.good { background: #4ade80 } #calTaps i.off { background: #fbbf24 } #calTaps i.warm { background: rgba(255, 255, 255, .45) }
 #calMsg { min-height: 2.6em }
 #codeIn { flex: 1 1 180px; min-width: 0; font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.07); color: var(--ink) }
+.board div.gap { opacity: .5 }
