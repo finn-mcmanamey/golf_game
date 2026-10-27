@@ -1,6 +1,12 @@
 /* ===== mesh builder: boxes and beams become triangles =====
    Vertices are interleaved: position (3), normal (3), colour (3). */
 
+// Box corners are numbered by sign: bit 4 = +x side, bit 2 = +y side, bit 1 = +z side.
+// Faces in order +x, −x, +y (top), −y (bottom), +z, −z, each listed counter-clockwise from outside.
+const CORNERS = new Float64Array(24), UP_Y = [0, 1, 0], QUAD_ORDER = [0, 1, 2, 0, 2, 3];
+const FACE_AXIS = [0, 0, 1, 1, 2, 2], FACE_SIGN = [1, -1, 1, -1, 1, -1];
+const FACE_CORNERS = [4, 6, 7, 5,  1, 3, 2, 0,  2, 3, 7, 6,  1, 0, 4, 5,  1, 5, 7, 3,  4, 0, 2, 6];
+
 class MeshBuilder {
   constructor(capacity = 4096) { this.data = new Float32Array(capacity * 9); this.n = 0 }
 
@@ -26,30 +32,56 @@ class MeshBuilder {
 
   // A box centred on c with half-extent vectors ax, ay, az (they need not line up with the world axes).
   cuboid(c, ax, ay, az, col, skipBottom = false) {
-    const P = (sx, sy, sz) => [c[0] + ax[0] * sx + ay[0] * sy + az[0] * sz, c[1] + ax[1] * sx + ay[1] * sy + az[1] * sz, c[2] + ax[2] * sx + ay[2] * sy + az[2] * sz];
-    const nx = norm3(ax), ny = norm3(ay), nz = norm3(az), neg = v => [-v[0], -v[1], -v[2]];
-    const top = col.length === 6 ? [col[3], col[4], col[5]] : col;
-    this.quad(P(1, -1, -1), P(1, 1, -1), P(1, 1, 1), P(1, -1, 1), nx, col);
-    this.quad(P(-1, -1, 1), P(-1, 1, 1), P(-1, 1, -1), P(-1, -1, -1), neg(nx), col);
-    this.quad(P(-1, 1, -1), P(-1, 1, 1), P(1, 1, 1), P(1, 1, -1), ny, top);
-    if (!skipBottom) this.quad(P(-1, -1, 1), P(-1, -1, -1), P(1, -1, -1), P(1, -1, 1), neg(ny), col);
-    this.quad(P(-1, -1, 1), P(1, -1, 1), P(1, 1, 1), P(-1, 1, 1), nz, col);
-    this.quad(P(1, -1, -1), P(-1, -1, -1), P(-1, 1, -1), P(1, 1, -1), neg(nz), col);
+    this.solid(c[0], c[1], c[2], ax[0], ax[1], ax[2], ay[0], ay[1], ay[2], az[0], az[1], az[2], col, skipBottom);
   }
 
   // An upright box from its centre and full sizes.
-  box(x, y, z, sx, sy, sz, col) { this.cuboid([x, y, z], [sx / 2, 0, 0], [0, sy / 2, 0], [0, 0, sz / 2], col) }
+  box(x, y, z, sx, sy, sz, col) { this.solid(x, y, z, sx / 2, 0, 0, 0, sy / 2, 0, 0, 0, sz / 2, col) }
 
   // A box stretched between two points, w wide and h tall; `up` sets which way is "tall".
-  beam(a, b, w, h, col, up = [0, 1, 0]) {
-    const d = sub3(b, a), len = Math.hypot(d[0], d[1], d[2]);
+  beam(a, b, w, h, col, up = UP_Y) {
+    let fx = b[0] - a[0], fy = b[1] - a[1], fz = b[2] - a[2];
+    const len = Math.sqrt(fx * fx + fy * fy + fz * fz);
     if (len < 1e-5) return;
-    const f = scale3(d, 1 / len);
-    let side = cross3(f, up);
-    if (Math.hypot(side[0], side[1], side[2]) < 1e-4) side = cross3(f, [1, 0, 0]);
-    side = norm3(side);
-    const u = cross3(side, f);
-    this.cuboid(scale3(add3(a, b), 0.5), scale3(f, len / 2), scale3(u, h / 2), scale3(side, w / 2), col);
+    fx /= len; fy /= len; fz /= len;
+    // side = f × up (or f × x when f points straight up), then u = side × f
+    let sx = fy * up[2] - fz * up[1], sy = fz * up[0] - fx * up[2], sz = fx * up[1] - fy * up[0];
+    let sl = Math.sqrt(sx * sx + sy * sy + sz * sz);
+    if (sl < 1e-4) { sx = 0; sy = fz; sz = -fy; sl = Math.sqrt(sy * sy + sz * sz) }
+    sx /= sl; sy /= sl; sz /= sl;
+    const ux = sy * fz - sz * fy, uy = sz * fx - sx * fz, uz = sx * fy - sy * fx, hl = len / 2, hh = h / 2, hw = w / 2;
+    this.solid((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, fx * hl, fy * hl, fz * hl, ux * hh, uy * hh, uz * hh, sx * hw, sy * hw, sz * hw, col);
+  }
+
+  // The workhorse: writes a box's 36 vertices straight into the buffer with no temporary arrays,
+  // since boats and crews are rebuilt every frame. `col` may carry a sixth-to-ninth value: a separate top colour.
+  solid(cx, cy, cz, ax, ay, az, bx, by, bz, qx, qy, qz, col, skipBottom = false) {
+    if ((this.n + 36) * 9 > this.data.length) {
+      const bigger = new Float32Array(Math.max(this.data.length * 2, (this.n + 36) * 9));
+      bigger.set(this.data);
+      this.data = bigger;
+    }
+    const C = CORNERS;
+    for (let k = 0; k < 8; k++) {
+      const sx = k & 4 ? 1 : -1, sy = k & 2 ? 1 : -1, sz = k & 1 ? 1 : -1;
+      C[k * 3] = cx + ax * sx + bx * sy + qx * sz;
+      C[k * 3 + 1] = cy + ay * sx + by * sy + qy * sz;
+      C[k * 3 + 2] = cz + az * sx + bz * sy + qz * sz;
+    }
+    const la = Math.sqrt(ax * ax + ay * ay + az * az) || 1, lb = Math.sqrt(bx * bx + by * by + bz * bz) || 1, lq = Math.sqrt(qx * qx + qy * qy + qz * qz) || 1;
+    const N = [ax / la, ay / la, az / la, bx / lb, by / lb, bz / lb, qx / lq, qy / lq, qz / lq];
+    const top = col.length === 6 ? 3 : 0, d = this.data;
+    for (let f = 0; f < 6; f++) {
+      if (skipBottom && f === 3) continue;
+      const axis = FACE_AXIS[f], sign = FACE_SIGN[f], ci = f === 2 ? top : 0;
+      const nx = N[axis * 3] * sign, ny = N[axis * 3 + 1] * sign, nz = N[axis * 3 + 2] * sign;
+      for (let v = 0; v < 6; v++) {
+        const k = FACE_CORNERS[f * 4 + QUAD_ORDER[v]] * 3, i = this.n++ * 9;
+        d[i] = C[k]; d[i + 1] = C[k + 1]; d[i + 2] = C[k + 2];
+        d[i + 3] = nx; d[i + 4] = ny; d[i + 5] = nz;
+        d[i + 6] = col[ci]; d[i + 7] = col[ci + 1]; d[i + 8] = col[ci + 2];
+      }
+    }
   }
 
   upload(buffer, usage) {
@@ -65,12 +97,17 @@ const CHUNK = 150;
 class ChunkedMesh extends MeshBuilder {
   constructor() { super(16); this.chunks = new Map() }
 
-  quad(a, b, c, d, nrm, col) {
-    const key = Math.floor(a[0] / CHUNK);
+  chunkAt(x) {
+    const key = Math.floor(x / CHUNK);
     let m = this.chunks.get(key);
     if (!m) this.chunks.set(key, m = new MeshBuilder(8192));
-    m.quad(a, b, c, d, nrm, col);
+    return m;
   }
+
+  quad(a, b, c, d, nrm, col) { this.chunkAt(a[0]).quad(a, b, c, d, nrm, col) }
+
+  // Whole boxes go to the slice holding their centre.
+  solid(cx, ...rest) { this.chunkAt(cx).solid(cx, ...rest) }
 
   // One buffer for all slices, with each slice's range so it can be drawn on its own.
   upload(buffer, usage) {
