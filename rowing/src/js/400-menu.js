@@ -87,9 +87,11 @@ function menuChanged() {
   renderCup();
   renderWeek();
   renderBoatRace();
-  const streak = STORE.get('dailyStreak', { n: 0, day: 0 }), today = localDay();
-  const best = STORE.get('daily-' + dailyOpts().seed, null);
-  $('dailySub').textContent = best ? `Today's best ${fmtTime(best)}` + (streak.n > 1 && streak.day >= today - 1 ? ` · ${streak.n}-day streak` : '') : 'Same race for everyone today';
+  const streak = streakNow(), best = STORE.get('daily-' + dailyOpts().seed, null);
+  const shields = streak.shields ? ` · ${'🛡'.repeat(streak.shields)}` : '';
+  // Before today's row: the streak at stake is the reason to row; after it, today's best.
+  $('dailySub').textContent = best ? `Today's best ${fmtTime(best)}` + (streak.n > 1 ? ` · ${streak.n}-day streak` : '') + shields
+    : streak.n > 1 ? `🔥 ${streak.n}-day streak: row today to keep it${shields}` : 'Same race for everyone today';
   $('welcome').classList.toggle('hide', STORE.get('history', []).length > 0 || STORE.get('learned', false));
   showPreview(currentOpts());
 }
@@ -106,6 +108,23 @@ function nextChallenge(race, place) {
 // The daily regatta: same course, boat and field for everyone today.
 // Today's date as a day number, in the player's own time zone (the daily race and the streak both use it).
 const localDay = () => { const d = new Date(); return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5) };
+
+// The daily streak, with shields (F-104): one per 7 days in a row, at most 2, each covering one missed day.
+const STREAK_SHIELD_EVERY = 7, STREAK_SHIELDS_MAX = 2;
+function streakNow() {
+  const s = STORE.get('dailyStreak', { n: 0, day: 0 }), shields = s.shields || 0, missed = localDay() - s.day - 1;
+  return { n: missed <= shields ? s.n : 0, shields, doneToday: s.day === localDay() };
+}
+
+// After a daily: extend the streak, spending shields on missed days if there are enough; returns shields spent.
+function extendStreak() {
+  const s = STORE.get('dailyStreak', { n: 0, day: 0 }), today = localDay();
+  if (s.day === today) return 0;
+  const missed = Math.max(0, today - s.day - 1), kept = s.n > 0 && missed <= (s.shields || 0);
+  const n = kept ? s.n + 1 : 1, shields = Math.min(STREAK_SHIELDS_MAX, (kept ? (s.shields || 0) - missed : 0) + (n % STREAK_SHIELD_EVERY === 0 ? 1 : 0));
+  STORE.set('dailyStreak', { n, day: today, shields });
+  return kept ? missed : 0;
+}
 
 function dailyOpts() {
   const day = localDay();
@@ -163,9 +182,9 @@ function showResults(race) {
     postDaily(race, code);
     const key = 'daily-' + opts.seed, best = STORE.get(key, null);
     if (!best || p.finishTime < best) STORE.set(key, p.finishTime);
-    // A streak counts days in a row with a daily regatta finished.
-    const today = localDay(), s = STORE.get('dailyStreak', { n: 0, day: 0 });
-    if (s.day !== today) STORE.set('dailyStreak', { n: s.day === today - 1 ? s.n + 1 : 1, day: today });
+    // A streak counts days in a row with a daily regatta finished; shields cover missed days.
+    const spent = extendStreak();
+    if (spent) setTimeout(() => toast(`Streak shield used: your ${streakNow().n}-day streak lives on 🛡`, 3500), 900);
   }
   $('resSub').textContent = bumps ? `Started ${ordinal(p.lane + 1)} on the river, finished ${ordinal(place)} · ${race.course.name}` : `${fmtTime(p.finishTime)} · ${race.course.name}, ${opts.distance} m ${BOAT_CLASSES[opts.cls].name.toLowerCase()}${pbNote}`;
   $('resTable').innerHTML = order.map((b, i) => `<tr class="${b === p ? 'me' : ''}"><td>${i + 1}</td><td>${bumps ? 'Station ' + (b.lane + 1) : race.course.kind === 'boatrace' ? (b.lane === 2 ? 'Surrey' : 'Middlesex') : race.course.bends ? 'Start ' + (b.startAt / 8 + 1) : 'Lane ' + (b.lane + 1)}</td><td>${displayName(b)}</td>
