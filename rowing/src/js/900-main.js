@@ -166,12 +166,12 @@ function handleEvents() {
 function startSequence() {
   const t = race.t;
   let msg = '';
-  if (t < race.attentionAt) msg = t < race.attentionAt - 1.2 ? race.course.name : 'Sit ready';
-  else if (t < 0) msg = 'Attention';
+  if (t < race.attentionAt) msg = t < race.attentionAt - 1.2 ? race.course.name : race.order ? 'Hold the bank' : 'Sit ready';
+  else if (t < 0) msg = race.order ? 'Stand by the gun' : 'Attention';
   else if (t < 1.1) msg = 'GO!';
   if (game.cue !== msg) {
     if (msg === 'Attention') AU.play('attention');
-    if (msg === 'GO!') AU.play('go');
+    if (msg === 'GO!') AU.play(race.order ? 'cannon' : 'go');
     game.cue = msg;
   }
   const p = race.player;

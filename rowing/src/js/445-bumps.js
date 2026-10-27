@@ -58,6 +58,7 @@ const bikes = new WeakMap();   // boat -> { x, v, ph }
 
 function drawBankParty(mb, dt, time, course) {
   if (!race?.order) return;
+  drawCannon(mb, course);
   const dark = [0.12, 0.12, 0.14], skin = hex(0xe0b590), steel = [0.6, 0.62, 0.66];
   for (const b of race.boats) {
     let k = bikes.get(b);
@@ -78,5 +79,19 @@ function drawBankParty(mb, dt, time, course) {
     mb.beam([x - 0.15, y + 1.1, z], [x - c, y + 0.4 - s, z + 0.1], 0.1, 0.1, dark);
     mb.beam([x - 0.15, y + 1.1, z], [x + 0.25, y + 1.7, z], 0.36, 0.26, shirt);
     mb.box(x + 0.3, y + 1.95, z - 0.03, 0.26, 0.28, 0.26, skin);
+  }
+}
+
+// The starting gun on the towpath beside the line of crews, and its smoke drifting off after the start.
+function drawCannon(mb, course) {
+  const x = (race.boats.find(b => b.lane === 0)?.x ?? 0) * 0.5, z = riverZ(course, x) - course.halfW - 3, iron = [0.15, 0.15, 0.17];
+  if (Math.abs(x - cam.at[0]) > 200) return;
+  mb.box(x, 0.8, z, 1.4, 0.35, 0.35, iron);
+  for (const dx of [-0.35, 0.35]) mb.box(x + dx, 0.65, z, 0.5, 0.5, 0.08, [0.35, 0.22, 0.12]);
+  const age = race.t;
+  if (age < 0 || age > 5) return;
+  for (let i = 0; i < 9; i++) {
+    const s = 0.6 + age * (0.6 + (i % 3) * 0.25), g = 1.1 * (1 - age / 5);
+    mb.box(x + 0.9 + age * (0.8 + (i % 4) * 0.5), 1 + age * 0.5 + (i % 3) * 0.6, z + ((i * 7) % 5 - 2) * 0.3 * (1 + age), s, s, s, [g, g, g * 1.02]);
   }
 }
