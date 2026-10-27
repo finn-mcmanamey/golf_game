@@ -111,7 +111,7 @@ function checkFriendLink() {
   if (!m) return;
   try {
     const { opts, inputs } = decodeRace(m[1]);
-    const check = simulateRace(opts, inputs);
+    const check = withDefaultTune(() => simulateRace(opts, inputs));
     const c = check.course;
     $('friendT').textContent = `A friend rowed ${fmtTime(check.player.finishTime)} over ${opts.distance} m (${opts.cls}) on ${c.name}.`;
     $('friend').classList.remove('hide');

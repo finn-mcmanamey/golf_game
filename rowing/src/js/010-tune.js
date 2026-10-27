@@ -25,4 +25,10 @@ const TUNE_DEFAULTS = Object.freeze({
   buoyLimit: 3.3,          // lateral distance from lane centre where the oars hit the buoys (m)
 });
 const TUNE = { ...TUNE_DEFAULTS };
+// Re-rows races (verifying codes, friends' links) with the real physics, even while the F8 panel has changes.
+function withDefaultTune(fn) {
+  const saved = { ...TUNE };
+  Object.assign(TUNE, TUNE_DEFAULTS);
+  try { return fn() } finally { Object.assign(TUNE, saved) }
+}
 const tuneEdited = () => Object.keys(TUNE).some(k => TUNE[k] !== TUNE_DEFAULTS[k]);

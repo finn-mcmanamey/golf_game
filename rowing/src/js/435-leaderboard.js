@@ -32,7 +32,7 @@ function verifyRows(seed) {
     if (!r) return renderBoard();
     let ok = false;
     try {
-      const { opts, inputs } = decodeRace(r.dailyCode), race = simulateRace(opts, inputs);
+      const { opts, inputs } = decodeRace(r.dailyCode), race = withDefaultTune(() => simulateRace(opts, inputs));
       ok = opts.seed === seed && race.player.finishTime != null && Math.abs(race.player.finishTime - r.dailyTime) < 0.005;
     } catch (e) { ok = false }
     board.verified.set(rowKey(r), ok);
