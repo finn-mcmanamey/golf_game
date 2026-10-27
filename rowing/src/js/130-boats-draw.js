@@ -92,12 +92,13 @@ function drawBoat(mb, boat, dtFrame, time) {
       if (released && (si === 0 || boat === race?.player)) addPuddle(P(...blade));
       if (caught && Math.abs(q.x - cam.at[0]) < 80) addSpray(P(...blade), boat === race?.player ? 1 : 0.5);
     }
-    drawRower(mb, P, piece, st.u, legT, backT, handles, sculls, shirt, skin, shorts);
+    drawRower(mb, P, piece, st.u, legT, backT, handles, sculls, shirt, skin, shorts, bladeCols, Math.abs(q.x - cam.eye[0]) < 40);
   }
   if (c.cox) drawCox(mb, P, piece, -c.length + 1.1, shirt, skin, time, boat);
 }
 
-function drawRower(mb, P, piece, pinU, legT, backT, handles, sculls, shirt, skin, shorts) {
+// `close`: within 40 m of the camera, where small details (cap, stripe, seat, stretcher) are worth drawing.
+function drawRower(mb, P, piece, pinU, legT, backT, handles, sculls, shirt, skin, shorts, kit, close) {
   const seatU = pinU + lerp(0.08, 0.78, legT);
   const hip = [seatU, 0.36, 0], foot = [pinU - 0.62, 0.2, 0];
   // Knee: two equal leg bones, bent upwards when the hip is close to the feet.
@@ -112,6 +113,16 @@ function drawRower(mb, P, piece, pinU, legT, backT, handles, sculls, shirt, skin
   piece(hip, shoulder, 0.36, 0.24, shirt);
   const headC = [shoulder[0] + Math.sin(lean) * 0.2, shoulder[1] + Math.cos(lean) * 0.2, 0];
   piece(add3(headC, [0, -0.1, 0]), add3(headC, [0, 0.12, 0]), 0.2, 0.22, skin);
+  piece(shoulder, add3(headC, [0, -0.08, 0]), 0.1, 0.1, skin);   // neck: keeps the head attached however far the rower leans
+  if (close) {
+    // Club cap with its brim facing the stern (the way the rower looks), and a stripe across the vest.
+    const up = [Math.sin(lean), Math.cos(lean), 0];
+    piece(add3(headC, [0, 0.06, 0]), add3(headC, [0, 0.15, 0]), 0.22, 0.23, kit[0]);
+    piece(add3(headC, [-0.1, 0.07, 0]), add3(headC, [-0.24, 0.05, 0]), 0.2, 0.03, kit[0]);
+    piece(add3(hip, scale3(up, 0.32)), add3(hip, scale3(up, 0.4)), 0.37, 0.25, kit[1]);
+    piece([hip[0] - 0.12, 0.27, 0], [hip[0] + 0.12, 0.27, 0], 0.3, 0.05, [0.15, 0.15, 0.17]);           // sliding seat
+    piece([foot[0] - 0.02, 0.12, 0], [foot[0] + 0.06, 0.38, 0], 0.4, 0.04, [0.25, 0.25, 0.28]);        // foot stretcher
+  }
   // Arms reach from each shoulder to a handle (both hands on one handle when sweeping).
   for (const [k, w] of [[0, -0.2], [1, 0.2]].values()) {
     const hand = sculls ? handles[k] : add3(handles[0], [0, 0, (k ? 0.1 : -0.1)]);
