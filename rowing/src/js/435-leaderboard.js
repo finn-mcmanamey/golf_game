@@ -43,7 +43,8 @@ function verifyRows(seed) {
       const { opts, inputs } = decodeRace(r.dailyCode), want = dailyOpts();
       const same = ['seed', 'distance', 'cls', 'difficulty', 'lane', 'kind', 'rules'].every(k => opts[k] === want[k]);
       const race = same && withDefaultTune(() => simulateRace(opts, inputs));
-      ok = same && race.player.finishTime != null && Math.abs(race.player.finishTime - r.dailyTime) < 0.005;
+      const score = same && dailyScore(race);   // a time, or a bumps place-and-time score
+      ok = same && score != null && Math.abs(score - r.dailyTime) < 0.005;
     } catch (e) { ok = false }
     board.verified.set(rowKey(r), ok);
     requestAnimationFrame(step);
@@ -75,7 +76,7 @@ function renderBoard() {
   el.classList.toggle('hide', !rows.length);
   const target = board.target = ghostTarget(rows), name = r => escapeHtml(r.name || 'Rower');
   el.innerHTML = `<b>Today's leaderboard</b>` + boardWindow(rows).map(e => !e ? '<div class="gap"><span></span><span>⋯</span></div>' :
-    `<div class="${e[1].id === board.uid ? 'me' : ''}"><span>${e[0] + 1}</span><span>${name(e[1])}</span><span class="t">${fmtTime(e[1].dailyTime)}</span></div>`).join('')
+    `<div class="${e[1].id === board.uid ? 'me' : ''}"><span>${e[0] + 1}</span><span>${name(e[1])}</span><span class="t">${fmtDailyScore(e[1].dailyTime)}</span></div>`).join('')
     + (target ? `<button class="sec mini raceLeader">${target === rows[0] ? `Race ${name(target)}'s ghost (leader)` : `Race ${name(target)}: the time just above yours`}</button>` : '');
   const rb = $('resBoard');
   if (rb && game.mode === 'daily') rb.innerHTML = rows.length ? el.innerHTML : '';
@@ -108,9 +109,10 @@ async function postDaily(race, code) {
   // Read this player's own row directly (it may not be in the top 30) so a slower time never replaces a faster one.
   let mine = null;
   try { const d = await board.db.doc('scores/' + board.uid).get(); mine = d.exists ? d.data() : null } catch (e) { return }
-  if (mine && mine.dailySeed === seed && mine.dailyTime <= race.player.finishTime) return;
+  const score = dailyScore(race);
+  if (score == null || mine && mine.dailySeed === seed && mine.dailyTime <= score) return;
   try {
-    await board.db.doc('scores/' + board.uid).set({ name: crew.club.slice(0, 14), dailySeed: seed, dailyTime: race.player.finishTime, dailyCode: code, at: Date.now() });
+    await board.db.doc('scores/' + board.uid).set({ name: crew.club.slice(0, 14), dailySeed: seed, dailyTime: score, dailyCode: code, at: Date.now() });
     toast("Posted to today's leaderboard", 1800);
   } catch (e) { /* a viewer who can't write simply isn't on the board */ }
 }

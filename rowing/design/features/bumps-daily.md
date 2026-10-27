@@ -1,5 +1,5 @@
 # Bumps daily
-id: F-117 · status: spec'd · priority: P2 depth · pillars: Fair, Truth · depends on: F-005, F-115 · version: 1
+id: F-117 · status: shipped · priority: P2 depth · pillars: Fair, Truth · depends on: F-005, F-115 · version: 1
 
 ## Summary
 Fridays become a bumps day. Everyone starts third on the same river, and the board ranks where you finished on the river, then how early you made your bump.

@@ -92,7 +92,7 @@ function menuChanged() {
   const streak = streakNow(), best = STORE.get('daily-' + dailyOpts().seed, null);
   const shields = streak.shields ? ` · ${'🛡'.repeat(streak.shields)}` : '';
   // Before today's row: the streak at stake is the reason to row; after it, today's best.
-  $('dailySub').textContent = best ? `Today's best ${fmtTime(best)}` + (streak.n > 1 ? ` · ${streak.n}-day streak` : '') + shields
+  $('dailySub').textContent = best ? `Today's best ${fmtDailyScore(best)}` + (streak.n > 1 ? ` · ${streak.n}-day streak` : '') + shields
     : streak.n > 1 ? `🔥 ${streak.n}-day streak: row today to keep it${shields}` : `Today: ${dailyLabel(dailyOpts())}, same for everyone`;
   // Tomorrow's format, when it differs from today's: something to come back for.
   const next = dailyOptsFor(localDay() + 1);
@@ -140,11 +140,31 @@ function dailyOptsFor(day) {
   if (day < DAILY_FORMATS_FROM) return base;
   const weekday = (day + 4) % 7;   // day 0 was a Thursday; 0 = Sunday
   if (weekday === 3) return { ...base, kind: 'erg', cls: '1x', distance: 500 };
+  if (weekday === 5) return { ...base, kind: 'bumps', rules: 6 };   // Fridays: bumps from station 3 (F-117)
   if (weekday === 0 || weekday === 6) return { ...base, kind: 'head', rules: 6 };   // streams and all
   return base;
 }
 const dailyOpts = () => dailyOptsFor(localDay());
-const dailyLabel = o => `${{ regatta: 'Regatta', erg: 'Indoor erg', head: 'Head race' }[o.kind]} · ${o.distance >= 1000 ? o.distance / 1000 + ' km' : o.distance + ' m'} ${o.cls}`;
+
+// A daily's score, lower is better (F-117): the time, or for bumps the river place first, then the kind of result
+// (bump, row-over, caught) and its time. Every tie-break stays below BUMP_SCORE_PLACE, so place always decides.
+const BUMP_SCORE_PLACE = 10000, BUMP_SCORE_ROWED_OVER = 2000, BUMP_SCORE_BUMPED = 5000, BUMP_TIME_CAP = 1000;
+function dailyScore(race) {
+  const p = race.player;
+  if (!race.order) return p.finishTime;
+  const base = placeOf(race, p) * BUMP_SCORE_PLACE;
+  if (p.out?.up) return base + p.out.t;
+  if (p.finishTime != null) return base + BUMP_SCORE_ROWED_OVER + p.finishTime;
+  return p.out ? base + BUMP_SCORE_BUMPED + (BUMP_TIME_CAP - p.out.t) : null;
+}
+
+// The score as people read it: a time, or "2nd · bump at 1:12".
+function fmtDailyScore(score) {
+  if (score < BUMP_SCORE_PLACE) return fmtTime(score);
+  const place = Math.floor(score / BUMP_SCORE_PLACE), rest = score - place * BUMP_SCORE_PLACE;
+  return `${ordinal(place)} · ${rest < BUMP_SCORE_ROWED_OVER ? 'bump at ' + fmtTime(rest) : rest < BUMP_SCORE_BUMPED ? 'rowed over' : 'caught at ' + fmtTime(BUMP_TIME_CAP - (rest - BUMP_SCORE_BUMPED))}`;
+}
+const dailyLabel = o => `${{ regatta: 'Regatta', erg: 'Indoor erg', head: 'Head race', bumps: 'Bumps' }[o.kind]} · ${o.distance >= 1000 ? o.distance / 1000 + ' km' : o.distance + ' m'} ${o.cls}`;
 
 function checkFriendLink() {
   const m = location.hash.match(/r=([A-Za-z0-9_-]+)/);
@@ -195,8 +215,8 @@ function showResults(race) {
   }
   if (counts && game.mode === 'daily') {
     postDaily(race, code);
-    const key = 'daily-' + opts.seed, best = STORE.get(key, null);
-    if (!best || p.finishTime < best) STORE.set(key, p.finishTime);
+    const key = 'daily-' + opts.seed, best = STORE.get(key, null), score = dailyScore(race);
+    if (score != null && (!best || score < best)) STORE.set(key, score);
     // A streak counts days in a row with a daily regatta finished; shields cover missed days.
     const spent = extendStreak();
     if (spent) setTimeout(() => toast(`Streak shield used: your ${streakNow().n}-day streak lives on 🛡`, 3500), 900);
@@ -230,7 +250,7 @@ function showResults(race) {
   // A duel's code only holds player 1's strokes, so it can't be replayed or shared.
   // Duel and practice codes can't be re-rowed (a code holds one crew in a full field), so no replay or link.
   // Only results that count get a card: a daily that finished, the last day of a bumps week, or the end of a cup run.
-  $('btnCard').classList.toggle('hide', !counts || !(game.mode === 'daily' && p.finishTime != null || game.mode === 'week' && weekOver() || game.mode === 'cup' && (cup.won || cup.out)));
+  $('btnCard').classList.toggle('hide', !counts || !(game.mode === 'daily' && dailyScore(race) != null || game.mode === 'week' && weekOver() || game.mode === 'cup' && (cup.won || cup.out)));
   for (const id of ['btnReplay', 'btnShare']) $(id).classList.toggle('hide', !!race.player2 || practiceMode() || game.mode === 'live');
   $('results').classList.remove('hide');
   $('hud').classList.add('hide');

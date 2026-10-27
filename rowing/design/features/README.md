@@ -26,7 +26,7 @@ Build order follows `Depends on`. Status: idea → spec'd → approved → build
 | F-114 | Rivals read the river: Elite/Olympic head crews take the slack water against a strong stream (rules 6) | shipped | P2 | Truth | F-109 | 040-bots.js riverLine; olympic field −0.5 s/km against a −0.125 stream, no bank hits |
 | F-115 | Daily formats by weekday: erg Wednesdays, head race weekends (rules 6), regatta otherwise | shipped | P1 | Fair | F-004, F-109 | From day 20754 (28 Oct 2026) so no board changed mid-day; rules pinned per format |
 | F-116 | Cross-browser replay test in CI (Firefox, WebKit) | idea | P1 | Fair | F-002 | Only Chromium is installed here; V8 vs QuickJS already match. Needs browsers or a CI runner |
-| F-117 | Bumps daily with a place-based board | spec'd | P2 | Fair | F-005, F-115 | features/bumps-daily.md |
+| F-117 | Bumps daily with a place-based board | shipped | P2 | Fair | F-005, F-115 | features/bumps-daily.md |
 | F-118 | Crew selection: pick seats with trade-offs (power vs timing spread) | idea | P2 | Truth | F-001 | Must stay a choice, not an upgrade (brief: no stat progression); behind a rules version |
 | F-119 | Second research pass once fetch works | idea | P1 | — | — | Re-run the five questions; the source hosts were blocked by the network policy this time |
 | F-120 | Bumps week share card: each day's move, final place, blades or spoons | shipped | P2 | Fair | F-005, F-102 | 418-bumps-week.js weekCard |

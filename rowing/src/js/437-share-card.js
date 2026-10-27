@@ -7,13 +7,13 @@ function dailyCard(race, place) {
   // Rank against today's verified board, counting this run even before its own row has posted.
   const others = verifiedRows().filter(r => r.id !== board.uid);
   // The board only loads the fastest BOARD_ROWS; slower than all of a full board, the exact rank isn't known.
-  const ahead = others.filter(r => r.dailyTime < p.finishTime).length, beyond = board.rows.length >= BOARD_ROWS && ahead === others.length;
+  const score = dailyScore(race), ahead = others.filter(r => r.dailyTime < score).length, beyond = board.rows.length >= BOARD_ROWS && ahead === others.length;
   const rank = !others.length ? `${ordinal(place)} of ${race.boats.length}` : beyond ? `${BOARD_ROWS}+ today` : `${1 + ahead}/${others.length + 1} today`;
   const streak = STORE.get('dailyStreak', { n: 0, day: 0 }), fire = streak.day === localDay() && streak.n > 1 ? ` · 🔥${streak.n}` : '';
   const date = new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   // A link only when this page is one people can open (not inside a sandboxed frame or the app).
   const link = location.protocol === 'https:' && window.top === window ? '\n' + location.href.split('#')[0] : '';
-  return `Voxel Regatta daily, ${date} · ${fmtTime(p.finishTime)} · ${rank} · ${'●'.repeat(filled)}${'○'.repeat(5 - filled)} ${pct}% perfect${fire}${link}`;
+  return `Voxel Regatta daily, ${date} · ${fmtDailyScore(score)} · ${rank} · ${'●'.repeat(filled)}${'○'.repeat(5 - filled)} ${pct}% perfect${fire}${link}`;
 }
 
 async function shareCard() {
