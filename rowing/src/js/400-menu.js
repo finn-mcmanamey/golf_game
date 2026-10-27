@@ -115,16 +115,21 @@ function dailyOpts() {
 
 function checkFriendLink() {
   const m = location.hash.match(/r=([A-Za-z0-9_-]+)/);
-  if (!m) return;
+  if (m) loadFriendCode(m[1]);
+}
+
+// A friend's race from a link or a pasted code (F-107): checked by re-rowing it, then offered as a ghost.
+function loadFriendCode(code) {
   try {
-    const { opts, inputs } = decodeRace(m[1]);
+    const { opts, inputs } = decodeRace(code);
     const check = withDefaultTune(() => simulateRace(opts, inputs));
     const c = check.course;
     $('friendT').textContent = check.order ? `A friend ${bumpOutcome(check, check.player).replace('!', '').toLowerCase()} in a ${opts.distance} m bumps race (${opts.cls}) on ${c.name}.`
       : `A friend rowed ${fmtTime(check.player.finishTime)} over ${opts.distance} m (${opts.cls}) on ${c.name}.`;
     $('friend').classList.remove('hide');
     $('btnFriend').onclick = () => startRace(opts, inputs, 'friend');
-  } catch (e) { toast('That race link could not be read.') }
+    return true;
+  } catch (e) { toast('That race code could not be read.'); return false }
 }
 
 function showResults(race) {
@@ -194,8 +199,13 @@ function showResults(race) {
   AU.play(place === 1 ? 'win' : 'finish');
 }
 
+// A link when this page is one a friend can open; otherwise the bare code, which they paste into the menu (F-107).
 async function shareRace() {
-  const url = location.href.split('#')[0] + '#r=' + game.lastCode;
-  try { await navigator.clipboard.writeText(url); toast('Race link copied: a friend can race your ghost') }
-  catch (e) { prompt('Copy this race link', url) }
+  const linkable = location.protocol === 'https:' && window.top === window;
+  const text = linkable ? location.href.split('#')[0] + '#r=' + game.lastCode : game.lastCode;
+  try { await navigator.clipboard.writeText(text); toast(linkable ? 'Race link copied: a friend can race your ghost' : "Race code copied: a friend pastes it into \"Race a friend's code\" on the menu", 3500) }
+  catch (e) { prompt(linkable ? 'Copy this race link' : 'Copy this race code', text) }
 }
+
+$('btnCode').onclick = () => { if (loadFriendCode($('codeIn').value)) $('codeIn').value = '' };
+$('codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnCode').click() });

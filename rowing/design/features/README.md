@@ -16,3 +16,4 @@ Build order follows `Depends on`. Status: idea → spec'd → approved → build
 | F-104 | Streak shield: 1 per 7 days in a row, max 2, used automatically | idea | P2 | Fair | F-004 | Lead: Duolingo streak freeze; cut first |
 | F-105 | Sim maths guard: test fails on any engine-dependent Math call in sim files | shipped | P1 | Fair | F-002 | Verified finding (trigfills, ECMAScript) |
 | F-106 | Game speed 75% (accessibility) | idea | P2 | Feel | F-101 | Lead: GAG "adjust game speed"; runs the sim slower in real time, codes unchanged; not counted for records |
+| F-107 | Codes that travel: bare code when the link can't be opened; paste box on the menu | shipped | P1 | Fair | F-002 | Artifact pages run in a sandboxed frame whose URL friends can't open |
