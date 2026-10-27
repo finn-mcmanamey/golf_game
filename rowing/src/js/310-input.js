@@ -18,6 +18,17 @@ function autoRow(b) {
   return bits | assistSteer(b);
 }
 
+// One-button rowing: while the drive key is held, strokes happen by themselves with human-like timing.
+// It only makes ordinary inputs, so the race still replays exactly; it isn't recorded as a best.
+const oneButton = { planned: 0, lastStroke: -1 };
+function oneButtonRow(b) {
+  if (b.strokes !== oneButton.lastStroke) { oneButton.lastStroke = b.strokes; oneButton.planned = (Math.random() + Math.random() - 1) * 0.12 }
+  if (b.phase === 'drive') return b.h < 0.93 ? IN.DRIVE : 0;
+  if (b.lastBits & IN.DRIVE) return 0;
+  const err = b.phase === 'recover' ? -b.h / b.recSpeed : b.phaseT;
+  return b.strokes === 0 || err >= oneButton.planned ? IN.DRIVE : 0;
+}
+
 // In a duel the arrow keys, Enter and right Shift belong to player 2; otherwise they're spare keys for player 1.
 function readInput() {
   applyPlan();
@@ -26,6 +37,7 @@ function readInput() {
   if (keys.has('Space') || keys.has('Mouse') || touchState.drive || padState.drive) bits |= IN.DRIVE;
   if (keys.has('KeyA') || (!duel && keys.has('ArrowLeft')) || touchState.left || padState.left) bits |= IN.LEFT;
   if (keys.has('KeyD') || (!duel && keys.has('ArrowRight')) || touchState.right || padState.right) bits |= IN.RIGHT;
+  if (settings.oneButton && race?.started && !race.player2 && !coxing()) bits = (bits & ~IN.DRIVE) | (bits & IN.DRIVE ? oneButtonRow(race.player) : 0);
   if (assistOn() && !(bits & (IN.LEFT | IN.RIGHT)) && race) bits |= assistSteer(race.player);
   if (keys.has('ShiftLeft') || (!duel && keys.has('ShiftRight')) || touchState.push || padState.push) bits |= IN.PUSH;
   if (race.course.kind === 'erg') bits &= ~(IN.LEFT | IN.RIGHT);   // nothing to steer indoors, so no cost for trying

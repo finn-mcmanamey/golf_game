@@ -37,6 +37,7 @@ function buildMenu() {
   segmented('segPlan', Object.entries(PLANS_UI).map(([k, p]) => [k, p.label]), settings.plan, v => { settings.plan = v; saveSettings() });
   segmented('segRole', [['row', 'Row'], ['cox', 'Cox']], settings.role, v => { settings.role = v; saveSettings() });
   segmented('segMusic', [[true, 'On'], [false, 'Off']], settings.music, v => { settings.music = v; saveSettings(); v ? MUSIC.start() : MUSIC.stop() });
+  segmented('segOneBtn', [[false, 'Full timing'], [true, 'One button']], settings.oneButton, v => { settings.oneButton = v; saveSettings() });
   segmented('segCalm', [[false, 'Full'], [true, 'Reduced']], settings.calm, v => { settings.calm = v; saveSettings(); applyAccess() });
   segmented('segText', [[false, 'Normal'], [true, 'Large']], settings.bigText, v => { settings.bigText = v; saveSettings(); applyAccess() });
   applyAccess();
@@ -135,8 +136,10 @@ function showResults(race) {
   game.lastCode = code;
   const pb = getPB(opts.distance, opts.cls, opts.kind);
   let pbNote = '';
-  const finished = p.finishTime != null, counts = finished && !game.tuned && !tuneEdited() && !['duel', 'replay', 'learn', 'training', 'live'].includes(game.mode);
+  if (settings.oneButton) game.oneButtonUsed = true;
+  const finished = p.finishTime != null, counts = finished && !game.oneButtonUsed && !game.tuned && !tuneEdited() && !['duel', 'replay', 'learn', 'training', 'live'].includes(game.mode);
   if (!finished) pbNote = ' · did not finish';
+  else if (game.oneButtonUsed) pbNote = ' · one-button rowing';
   else if (game.tuned || tuneEdited()) pbNote = ' · tuned physics, not recorded';
   else if (game.mode === 'duel') pbNote = ' · duel';
   else if (game.mode === 'replay' || practiceMode()) pbNote = practiceMode() ? ' · practice' : ' · replay';

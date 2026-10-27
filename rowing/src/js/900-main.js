@@ -25,6 +25,7 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   game.cue = null;
   game.replay = null;
   game.tuned = false;
+  game.oneButtonUsed = false;
   game.lastAtHalf = false;
   game.halfSeen = false;
   resetCalls();
@@ -216,7 +217,8 @@ function simulate(dt, inputFor, quiet = false, input2For = () => 0) {
     game.acc -= TUNE.dt;
     rememberPoses([...race.boats, race.ghost]);
     stepRace(race, inputFor(), input2For());
-    if (!quiet && tuneEdited()) game.tuned = true;   // tuned at any moment means this race isn't a record
+    if (!quiet && tuneEdited()) game.tuned = true;
+    if (!quiet && settings.oneButton && race.started) game.oneButtonUsed = true;   // used at any point: not a record   // tuned at any moment means this race isn't a record
     recordSplits(race);
     if (!quiet) sampleForce(race.player);
     if (quiet) { for (const b of race.boats) b.events.length = 0; if (race.ghost) race.ghost.events.length = 0 }
