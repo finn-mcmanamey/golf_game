@@ -20,7 +20,7 @@ const STORE = (() => {
   };
 })();
 
-const settings = Object.assign({ distance: 500, cls: '1x', difficulty: 'club', sound: true, quality: 1, assist: true, voice: false, cue: true, calm: false, bigText: false, role: 'row', kind: 'regatta', camera: 'tv', seed: 0 },
+const settings = Object.assign({ distance: 500, cls: '1x', difficulty: 'club', sound: true, quality: 1, assist: true, voice: false, cue: true, calm: false, bigText: false, role: 'row', plan: 'classic', kind: 'regatta', camera: 'tv', seed: 0 },
   STORE.get('settings', {}));
 const saveSettings = () => STORE.set('settings', settings);
 

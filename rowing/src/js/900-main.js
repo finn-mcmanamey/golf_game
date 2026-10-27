@@ -31,6 +31,7 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   resetCoaching();
   resetCommentary();
   resetCox();
+  resetPlan();
   if (coxing()) toast('You are the cox: steer, set the rate, and press Space (or tap) for a power ten. Three to call.', 4200);
   $('replayTag').classList.toggle('hide', mode !== 'replay');
   $('lesson').classList.add('hide');

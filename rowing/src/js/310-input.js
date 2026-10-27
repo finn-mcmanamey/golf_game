@@ -5,6 +5,7 @@ const touchState = { drive: false, left: false, right: false, push: false };
 let targetRate = 34, targetRate2 = 36;
 
 function changeRate(d) {
+  plan.overridden = true;   // the rower has taken the rate into their own hands
   targetRate = clamp(targetRate + d, RATE_MIN + 2, RATE_MAX - 2);
   AU.play('tick');
 }
@@ -19,6 +20,7 @@ function autoRow(b) {
 
 // In a duel the arrow keys, Enter and right Shift belong to player 2; otherwise they're spare keys for player 1.
 function readInput() {
+  applyPlan();
   const duel = !!race.player2;
   let bits = game.autopilot && race.started ? autoRow(race.player) : 0;
   if (keys.has('Space') || keys.has('Mouse') || touchState.drive) bits |= IN.DRIVE;
