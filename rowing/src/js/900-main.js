@@ -171,6 +171,7 @@ function frame(now) {
     renderFrame(showroom.race, game.time, dt);
   } else if (gl && race) {
     if (game.state === 'menu') menuCamera(dt);
+    else if (photo.on) photoCamera();
     else {
       // Wide shots frame both crews in a duel or match race; on-board shots stay with your boat.
       const pair = (race.player2 || race.course.kind === 'knockout') && !['rower', 'chase'].includes(cam.mode);
@@ -258,6 +259,7 @@ $('btnRestart').onclick = () => { $('pause').classList.add('hide'); restartRace(
 $('btnQuit').onclick = toMenu;
 $('btnCam').onclick = e => { e.stopPropagation(); cycleCamera() };
 $('btnPause').onclick = e => { e.stopPropagation(); togglePause() };
+$('btnPhoto').onclick = e => { e.stopPropagation(); togglePhoto() };
 document.addEventListener('visibilitychange', () => { if (document.hidden && game.state === 'race') togglePause() });
 
 if (gl) {
