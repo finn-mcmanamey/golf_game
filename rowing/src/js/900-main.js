@@ -38,6 +38,7 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   tuneChanged();
   cam.mode = settings.camera;
   $('btnCam').textContent = CAMERA_LABEL[cam.mode];
+  MUSIC.stop();
   game.state = 'race';
   for (const id of ['menu', 'results', 'pause']) $(id).classList.add('hide');
   $('hud').classList.remove('hide');
@@ -50,6 +51,7 @@ function toMenu() {
   for (const id of ['results', 'pause', 'hud']) $(id).classList.add('hide');
   $('menu').classList.remove('hide');
   menuChanged();
+  MUSIC.start();
 }
 
 function togglePause() {

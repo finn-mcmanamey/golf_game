@@ -9,7 +9,7 @@ function segmented(id, items, current, onPick) {
     const b = document.createElement('button');
     b.textContent = label;
     b.classList.toggle('on', value === current);
-    b.onclick = () => { AU.init(); AU.play('ui'); onPick(value); [...el.children].forEach(c => c.classList.toggle('on', c === b)) };
+    b.onclick = () => { AU.init(); AU.play('ui'); if (game.state === 'menu') setTimeout(() => MUSIC.start(), 50); onPick(value); [...el.children].forEach(c => c.classList.toggle('on', c === b)) };
     el.appendChild(b);
   }
 }
@@ -28,6 +28,7 @@ function buildMenu() {
   segmented('segCue', [[true, 'On'], [false, 'Off']], settings.cue, v => { settings.cue = v; saveSettings() });
   segmented('segPlan', Object.entries(PLANS_UI).map(([k, p]) => [k, p.label]), settings.plan, v => { settings.plan = v; saveSettings() });
   segmented('segRole', [['row', 'Row'], ['cox', 'Cox']], settings.role, v => { settings.role = v; saveSettings() });
+  segmented('segMusic', [[true, 'On'], [false, 'Off']], settings.music, v => { settings.music = v; saveSettings(); v ? MUSIC.start() : MUSIC.stop() });
   segmented('segCalm', [[false, 'Full'], [true, 'Reduced']], settings.calm, v => { settings.calm = v; saveSettings(); applyAccess() });
   segmented('segText', [[false, 'Normal'], [true, 'Large']], settings.bigText, v => { settings.bigText = v; saveSettings(); applyAccess() });
   applyAccess();
