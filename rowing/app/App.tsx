@@ -1,6 +1,7 @@
 // Voxel Regatta on iPhone: the whole game is one HTML file, shown full screen in a WebView.
 // The game calls window.ReactNativeWebView.postMessage(...) for moments worth a haptic tap.
 import * as Haptics from 'expo-haptics';
+import { useKeepAwake } from 'expo-keep-awake';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
@@ -15,6 +16,7 @@ const haptics: Record<string, () => Promise<void>> = {
 const onMessage = ({ nativeEvent }: WebViewMessageEvent) => haptics[nativeEvent.data]?.();
 
 export default function App() {
+  useKeepAwake();   // a 2 km race is long enough for the screen to dim otherwise
   return (
     <View style={styles.root}>
       <StatusBar hidden />
