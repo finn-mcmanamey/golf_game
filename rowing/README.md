@@ -47,7 +47,7 @@ Fairness and feel:
 - Head races from rules 5: the stream runs fastest mid-river and slackest by the banks (foam shows it), and the
   results say what your line gained or lost.
 
-The daily regatta has a **share card** (one spoiler-free line), a board that shows the rows **around you** and offers
+The daily changes format by weekday (an indoor erg on Wednesdays, a head race at weekends, a regatta otherwise) and has a **share card** (one spoiler-free line), a board that shows the rows **around you** and offers
 the ghost just above your time, and **streak shields** (one per 7 days, up to 2). Where a link can't be opened (inside
 the artifact viewer), **Copy race link** copies the bare code; paste it into "Race a friend's code" on the menu.
 

@@ -94,6 +94,9 @@ function menuChanged() {
   // Before today's row: the streak at stake is the reason to row; after it, today's best.
   $('dailySub').textContent = best ? `Today's best ${fmtTime(best)}` + (streak.n > 1 ? ` · ${streak.n}-day streak` : '') + shields
     : streak.n > 1 ? `🔥 ${streak.n}-day streak: row today to keep it${shields}` : `Today: ${dailyLabel(dailyOpts())}, same for everyone`;
+  // Tomorrow's format, when it differs from today's: something to come back for.
+  const next = dailyOptsFor(localDay() + 1);
+  if (next.kind !== dailyOpts().kind) $('dailySub').textContent += ` · Tomorrow: ${dailyLabel(next)}`;
   $('welcome').classList.toggle('hide', STORE.get('history', []).length > 0 || STORE.get('learned', false));
   showPreview(currentOpts());
 }
