@@ -13,7 +13,7 @@ function resetPlan() { plan.overridden = false }
 // Called each tick before inputs are read: nudges the target rate to the plan.
 function applyPlan() {
   const p = PLANS_UI[settings.plan];
-  if (!p?.rate || plan.overridden || !race.started || race.player2 || game.mode === 'learn') return;
+  if (!p?.rate || plan.overridden || !race.started || race.player2 || practiceMode()) return;
   const r = p.rate(race.player.x / race.course.distance, race.course.distance);
   if (r !== targetRate) { targetRate = r; $('rateTarget').classList.add('flash'); setTimeout(() => $('rateTarget').classList.remove('flash'), 400) }
 }

@@ -50,6 +50,7 @@ function buildMenu() {
   };
   $('btnDaily').onclick = () => startRace(dailyOpts(), null, 'daily');
   $('btnLearn').onclick = startLearning;
+  $('btnTraining').onclick = startTraining;
   $('btnWelcome').onclick = startLearning;
   $('btnBoathouse').onclick = () => openBoathouse();
   $('bhClose').onclick = () => { $('boathouse').classList.add('hide'); $('menu').classList.remove('hide'); closeShowroom() };
@@ -129,11 +130,11 @@ function showResults(race) {
   game.lastCode = code;
   const pb = getPB(opts.distance, opts.cls, opts.kind);
   let pbNote = '';
-  const finished = p.finishTime != null, counts = finished && !game.tuned && !tuneEdited() && !['duel', 'replay', 'learn'].includes(game.mode);
+  const finished = p.finishTime != null, counts = finished && !game.tuned && !tuneEdited() && !['duel', 'replay', 'learn', 'training'].includes(game.mode);
   if (!finished) pbNote = ' · did not finish';
   else if (game.tuned || tuneEdited()) pbNote = ' · tuned physics, not recorded';
   else if (game.mode === 'duel') pbNote = ' · duel';
-  else if (game.mode === 'replay' || game.mode === 'learn') pbNote = game.mode === 'learn' ? ' · practice' : ' · replay';
+  else if (game.mode === 'replay' || practiceMode()) pbNote = practiceMode() ? ' · practice' : ' · replay';
   else if (!pb || p.finishTime < pb.time) {
     savePB(opts.distance, opts.cls, opts.kind, { time: p.finishTime, code, venue: race.course.name, date: Date.now() });
     pbNote = pb ? ` · new personal best (was ${fmtTime(pb.time)})` : ' · first personal best';
@@ -151,7 +152,7 @@ function showResults(race) {
     + (race.ghost?.finishTime ? `<tr><td></td><td></td><td>Ghost</td><td class="t">${fmtTime(race.ghost.finishTime)}</td><td class="t">${(race.ghost.finishTime - p.finishTime >= 0 ? '+' : '') + (race.ghost.finishTime - p.finishTime).toFixed(2)}</td></tr>` : '');
   const s = p.stats, strokes = Math.max(1, s.perfect + s.good + s.off);
   $('resChart').innerHTML = splitChart(race, order[0]) + timingChart();
-  $('nextUp').textContent = counts ? nextChallenge(race, place) : '';
+  $('nextUp').textContent = game.mode === 'training' ? trainingSummary() : counts ? nextChallenge(race, place) : '';
   $('resStats').textContent = `${p.strokes} strokes · average rate ${(p.strokes / p.finishTime * 60).toFixed(1)} · ${Math.round(s.perfect / strokes * 100)}% perfect catches`
     + (s.crabs ? ` · ${s.crabs} crab${s.crabs > 1 ? 's' : ''}` : '') + (s.buoys ? ` · hit the buoys ${s.buoys}×` : '');
   const careerNote = game.mode === 'career' ? (counts ? careerResult(race, place) : 'Not counted for the season: tuned physics or unfinished.')
@@ -164,7 +165,7 @@ function showResults(race) {
   $('btnAgain').textContent = game.mode === 'career' || game.mode === 'cup' && !cup.out && !cup.won ? 'Next race' : game.mode === 'cup' ? 'Enter a new cup' : 'Race again';
   // A duel's code only holds player 1's strokes, so it can't be replayed or shared.
   // Duel and practice codes can't be re-rowed (a code holds one crew in a full field), so no replay or link.
-  for (const id of ['btnReplay', 'btnShare']) $(id).classList.toggle('hide', !!race.player2 || game.mode === 'learn');
+  for (const id of ['btnReplay', 'btnShare']) $(id).classList.toggle('hide', !!race.player2 || practiceMode());
   $('results').classList.remove('hide');
   $('hud').classList.add('hide');
   AU.play(place === 1 ? 'win' : 'finish');
