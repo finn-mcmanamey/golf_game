@@ -203,3 +203,6 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 /* Photo mode: everything but the picture and the way back out is hidden. */
 .photo #hud > *:not(#tools), .photo #tools > *:not(#btnPhoto) { visibility: hidden }
 #toast { z-index: 30 }
+.board { grid-column: 1 / -1; font-size: 12.5px; text-align: left; background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px }
+.board:empty { display: none } .board b { display: block; margin-bottom: 4px; color: var(--acc) }
+.board div { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; padding: 1px 0 } .board div.me { color: var(--acc); font-weight: 700 } .board .t { font-variant-numeric: tabular-nums }
