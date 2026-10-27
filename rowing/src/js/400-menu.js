@@ -132,7 +132,7 @@ function showResults(race) {
   const place = game.mode === 'live' ? 1 + [...live.remote.values()].filter(r => r.finishTime != null && r.finishTime < p.finishTime).length : order.indexOf(p) + 1;
   const p2 = race.player2;
   const bumps = !!race.order;
-  $('resTitle').textContent = bumps ? bumpOutcome(race, p) : p2 ? (placeOf(race, p) < placeOf(race, p2) ? 'Player 1 wins the duel!' : 'Player 2 wins the duel!')
+  $('resTitle').textContent = bumps && !p2 ? bumpOutcome(race, p) : p2 ? (placeOf(race, p) < placeOf(race, p2) ? 'Player 1 wins the duel!' : 'Player 2 wins the duel!')
     : place === 1 ? 'Winner!' : `${ordinal(place)} place`;
   const code = encodeRace(opts, race.inputs);
   game.lastCode = code;
