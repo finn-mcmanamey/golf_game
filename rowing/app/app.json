@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "Voxel Regatta",
+    "slug": "voxel-regatta",
+    "version": "1.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0d1b2e",
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.example.voxelregatta" }
+  }
+}

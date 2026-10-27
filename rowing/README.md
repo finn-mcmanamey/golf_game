@@ -28,7 +28,10 @@ and **press again** just as the slide reaches the front. That's a perfect catch.
 | G, F8, Esc | | graphics, tuning panel, pause |
 
 Modes: single races, **head races** on a winding river, **indoor erg** races, the **Voxel Cup** knockout, a **season** of heats and finals, the **daily regatta**,
-**learn to row**, a two-player **duel**, ghosts of your best race, and shareable race links.
+**learn to row**, a two-player **duel**, **cox mode** for crew boats (the crew rows; you steer, set the rate and call
+three power tens), ghosts of your best race, and shareable race links.
+
+There's also an iPhone app wrapper in [`app/`](app/README.md): Expo plus a WebView, with real haptics.
 
 ## Layout
 

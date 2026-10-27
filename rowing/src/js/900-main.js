@@ -30,6 +30,8 @@ function startRace(opts, ghostInputs = null, mode = 'race') {
   resetSplits();
   resetCoaching();
   resetCommentary();
+  resetCox();
+  if (coxing()) toast('You are the cox: steer, set the rate, and press Space (or tap) for a power ten. Three to call.', 4200);
   $('replayTag').classList.toggle('hide', mode !== 'replay');
   $('lesson').classList.add('hide');
   tuneChanged();
@@ -75,6 +77,12 @@ function updateFps(dt) {
   if (game.time - fpsMeter.shown > 0.5) { fpsMeter.shown = game.time; $('fps').textContent = Math.round(fpsMeter.avg) + ' fps' }
 }
 
+// A haptic tap: through the iPhone app when the game runs inside it (rowing/app), otherwise the browser's vibration.
+function buzz(kind) {
+  if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(kind);
+  else navigator.vibrate?.(kind === 'perfect' ? 12 : 40);
+}
+
 // Turns what just happened on the water into sound and on-screen feedback.
 function handleEvents() {
   for (const b of race.boats) {
@@ -86,14 +94,15 @@ function handleEvents() {
         AU.play('catch');
         catchTimes.push(race.t);
         if (catchTimes.length > 8) catchTimes.shift();
-        if (b.strokes > 0) { if (e.grade === 'perfect') { AU.play('perfect'); navigator.vibrate?.(12) } showGrade(e.grade) }
+        if (b.strokes > 0) { if (e.grade === 'perfect') { AU.play('perfect'); buzz('perfect') } showGrade(e.grade) }
       } else if (e.type === 'release') {
         AU.play('release', 0.8);
-        if (e.grade === 'crab') { showGrade('crab'); AU.play('crab'); cam.shake = 1 }
+        if (e.grade === 'crab') { showGrade('crab'); AU.play('crab'); buzz('crab'); cam.shake = 1 }
         else if (e.grade === 'short') showGrade('short');
       } else if (e.type === 'buoy' || e.type === 'bank') { showGrade(e.type); AU.play('buoy'); if (e.type === 'bank') cam.shake = 0.6 }
       else if (e.type === 'finish') {
         AU.play(placeOf(race, b) === 1 ? 'cheer' : 'finish');
+        buzz('finish');
         game.finishShown = true;
         game.finishMsgUntil = game.time + 3;
       }

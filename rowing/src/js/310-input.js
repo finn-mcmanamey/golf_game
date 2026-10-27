@@ -26,6 +26,7 @@ function readInput() {
   if (keys.has('KeyD') || (!duel && keys.has('ArrowRight')) || touchState.right) bits |= IN.RIGHT;
   if (assistOn() && !(bits & (IN.LEFT | IN.RIGHT)) && race) bits |= assistSteer(race.player);
   if (keys.has('ShiftLeft') || (!duel && keys.has('ShiftRight')) || touchState.push) bits |= IN.PUSH;
+  if (coxing()) bits = coxInput(bits);   // coxing: the crew rows, you steer and call
   return packInput(bits, targetRate);
 }
 
@@ -53,6 +54,7 @@ addEventListener('keyup', e => keys.delete(e.code));
 addEventListener('blur', () => { keys.clear(); Object.keys(touchState).forEach(k => touchState[k] = false) });
 
 function onKey(code) {
+  if (code === 'Space' && game.state === 'race' && coxing()) return callPowerTen();
   if ((code === 'Escape' || code === 'KeyP') && (game.state === 'race' || game.state === 'paused')) return togglePause();
   if (game.state !== 'race') return;
   const duel = !!race.player2;
@@ -83,6 +85,7 @@ if (isTouch) document.body.classList.add('touchy');
 let driveFinger = null;
 const driveDown = e => {
   if (game.state !== 'race' || e.target.closest('button')) return;
+  if (coxing()) return callPowerTen();   // when coxing, a tap on the water calls a power ten
   AU.init();
   if (e.pointerType === 'mouse') keys.add('Mouse'); else { touchState.drive = true; driveFinger = e.pointerId }
 };
