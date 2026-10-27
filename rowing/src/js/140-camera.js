@@ -49,6 +49,14 @@ function finishShot(boat) {
   return { eye: [D + 1.6, 4.5, z + (race.course.bends ? race.course.halfW - 3 : LANES * LANE_W / 2 - 3)], at: [D + 1, 1.5, boat.z - 8], fov: 0.6 };   // inside the posts, over the outside lane
 }
 
+// The moment of a bump: a low cut from the water's edge, the two boats together, for a couple of seconds.
+function bumpShot(boat) {
+  const since = boat.out ? race.t - boat.out.t : -1;
+  if (since < 0 || since > 2.8 || cam.mode === 'rower' || race.player2) return null;
+  const x = boat.x - BOAT_CLASSES[boat.cls].length * 0.4, z = riverZ(race.course, x);
+  return { eye: [x + 7, 1.3, z + 15], at: [x - 2, 0.5, z], fov: 0.75, cut: true };
+}
+
 // Director: cuts between angles every few seconds, like a broadcast. Bank cameras stay put while the boats pass.
 const SHOTS = ['tv', 'aerial', 'bank', 'chase', 'tv', 'bow'];
 function directorShot(boat, raceT, L, mid, lead) {
@@ -64,7 +72,7 @@ function directorShot(boat, raceT, L, mid, lead) {
 }
 
 function updateCamera(boat, raceT, dt) {
-  const t = (race && finishShot(race.player)) || cameraTarget(boat, cam.mode, raceT);
+  const t = (race && (finishShot(race.player) || bumpShot(race.player))) || cameraTarget(boat, cam.mode, raceT);
   // A director's cut jumps straight to the new angle; other cameras glide.
   const cutNow = t.cut && Math.hypot(t.eye[0] - cam.eye[0], t.eye[1] - cam.eye[1], t.eye[2] - cam.eye[2]) > 15;
   const k = cam.mode === 'rower' || cutNow ? 1 : 1 - Math.exp(-dt * 4);
