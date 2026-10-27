@@ -16,10 +16,10 @@ function bumpCalls(race) {
   const ahead = t ? whistles(bumpGap(p, t), bumpLen(p)) : 0, behind = h ? whistles(bumpGap(h, p), bumpLen(p)) : 0;
   if (ahead > bumpCall.ahead) {
     blowWhistle(ahead);
-    say(['', `One whistle! We're closing on ${t.crewName}!`, 'Two whistles! Squeeze them!', 'Three whistles! Go for the bump!'][ahead], null, 0);
+    say(['', `One whistle! We're closing on ${t.crewName}!`, 'Two whistles! Power ten, now!', 'Three whistles! Go for the bump!'][ahead], null, 0);
   } else if (behind > bumpCall.behind) {
     blowWhistle(behind);
-    say(['', `${h.crewName} are coming. Hold them!`, `${h.crewName} on two whistles! Push away!`, 'Three whistles behind! Everything now!'][behind], null, 0);
+    say(['', `${h.crewName} are coming. Hold them!`, `${h.crewName} on two whistles! Push away!`, 'Three whistles behind! Power ten, hold them!'][behind], null, 0);
   }
   bumpCall.ahead = ahead;
   bumpCall.behind = behind;
