@@ -23,11 +23,11 @@ function readInput() {
   applyPlan();
   const duel = !!race.player2;
   let bits = game.autopilot && race.started ? autoRow(race.player) : 0;
-  if (keys.has('Space') || keys.has('Mouse') || touchState.drive) bits |= IN.DRIVE;
-  if (keys.has('KeyA') || (!duel && keys.has('ArrowLeft')) || touchState.left) bits |= IN.LEFT;
-  if (keys.has('KeyD') || (!duel && keys.has('ArrowRight')) || touchState.right) bits |= IN.RIGHT;
+  if (keys.has('Space') || keys.has('Mouse') || touchState.drive || padState.drive) bits |= IN.DRIVE;
+  if (keys.has('KeyA') || (!duel && keys.has('ArrowLeft')) || touchState.left || padState.left) bits |= IN.LEFT;
+  if (keys.has('KeyD') || (!duel && keys.has('ArrowRight')) || touchState.right || padState.right) bits |= IN.RIGHT;
   if (assistOn() && !(bits & (IN.LEFT | IN.RIGHT)) && race) bits |= assistSteer(race.player);
-  if (keys.has('ShiftLeft') || (!duel && keys.has('ShiftRight')) || touchState.push) bits |= IN.PUSH;
+  if (keys.has('ShiftLeft') || (!duel && keys.has('ShiftRight')) || touchState.push || padState.push) bits |= IN.PUSH;
   if (race.course.kind === 'erg') bits &= ~(IN.LEFT | IN.RIGHT);   // nothing to steer indoors, so no cost for trying
   if (coxing()) bits = coxInput(bits);   // coxing: the crew rows, you steer and call
   return packInput(bits, targetRate);

@@ -158,6 +158,7 @@ function showResults(race) {
   $('nextUp').textContent = game.mode === 'training' ? trainingSummary() : counts ? nextChallenge(race, place) : '';
   $('resStats').textContent = `${p.strokes} strokes · average rate ${(p.strokes / p.finishTime * 60).toFixed(1)} · ${Math.round(s.perfect / strokes * 100)}% perfect catches`
     + (s.crabs ? ` · ${s.crabs} crab${s.crabs > 1 ? 's' : ''}` : '') + (s.buoys ? ` · hit the buoys ${s.buoys}×` : '');
+  if (race.course.bends && place === 1 && counts) celebrate();
   const careerNote = game.mode === 'career' ? (counts ? careerResult(race, place) : 'Not counted for the season: tuned physics or unfinished.')
     : game.mode === 'cup' ? (counts ? cupResult(race) : 'Not counted for the cup: tuned physics or unfinished.') : '';
   if (counts) recordHistory(race, place);

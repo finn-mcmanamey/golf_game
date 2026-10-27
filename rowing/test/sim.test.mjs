@@ -73,6 +73,16 @@ assert.equal(wd.opts.rules, 2, 'rules survive a race code');
 assert.equal(simulateRace(wd.opts, wd.inputs).player.finishTime, w.player.finishTime, 'rules-2 codes re-row exactly');
 assert.equal(decodeRace(code).opts.rules, 1, 'old codes are rules 1');
 console.log(`rules 2: 500m ${fmtTime(w.player.finishTime)} (rules 1: ${fmtTime(a.player.finishTime)})`);
+// Rules 3: wash reaches, codes re-row, and a ghost of the run finishes in exactly its recorded time.
+const r3 = { ...opts, rules: 3, difficulty: 'olympic' };
+const drifter = race => { const v = scriptedPlayer(race, 34); return race.started && race.player.x < 250 ? (v & ~(IN.LEFT | IN.RIGHT)) | IN.RIGHT : v };
+const w3 = makeRace(r3); let washed = 0;
+while (!w3.done) { stepRace(w3, drifter(w3)); if (w3.player.inWash > 0) washed++ }
+const g3 = makeRace({ ...r3, ghostInputs: w3.inputs });
+while (!g3.done || g3.ghost.finishTime == null) stepRace(g3, packInput(0, 20));
+assert.ok(washed > 30, 'rules 3 wash is felt by a boat drifting towards its neighbour');
+assert.equal(g3.ghost.finishTime, w3.player.finishTime, 'a ghost finishes in exactly its run\'s time');
+console.log(`rules 3: drifting boat in wash for ${washed} ticks; ghost time matches (${fmtTime(g3.ghost.finishTime)})`);
 for (const difficulty of ['novice', 'elite']) assert.equal(decodeRace(encodeRace({ ...opts, difficulty }, [1, 2])).opts.difficulty, difficulty, `${difficulty} survives a race code`);
 
 // Indoor erg races: still air, no steering, and codes that re-row exactly.

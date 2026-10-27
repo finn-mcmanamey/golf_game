@@ -5,7 +5,7 @@
 const COX_TENS = 3;
 const coxState = { tens: COX_TENS, tenUntil: -1, planned: 0, lastStroke: -1, pressed: false };
 
-const coxing = () => settings.role === 'cox' && race && BOAT_CLASSES[race.player.cls].crew > 1 && !race.player2 && game.mode !== 'learn' && !game.replay;
+const coxing = () => settings.role === 'cox' && race && BOAT_CLASSES[race.player.cls].crew > 1 && !race.player2 && !practiceMode() && !game.replay;
 
 function resetCox() { Object.assign(coxState, { tens: COX_TENS, tenUntil: -1, planned: 0, lastStroke: -1, pressed: false }) }
 

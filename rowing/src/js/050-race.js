@@ -21,10 +21,16 @@ function makeRace(opts) {
     let k = 1;
     for (const b of boats) { b.z = targetZ(course, b); if (b.lane !== lane) b.startAt = 8 * k++ }
   }
-  let ghost = null;
-  if (ghostInputs) { ghost = makeBoat(cls, lane, 'Ghost', seed, 0.035); ghost.isGhost = true; ghost.z = targetZ(course, ghost) }
+  // A ghost re-rows its own race unseen alongside this one (same field, same wash), so it matches its code exactly.
+  let ghost = null, ghostRace = null;
+  if (ghostInputs) {
+    ghostRace = makeRace({ ...opts, ghostInputs: null, duel: false });
+    ghost = ghostRace.player;
+    ghost.crewName = 'Ghost';
+    ghost.isGhost = true;
+  }
   return {
-    opts, course, boats, brains, ghost, ghostInputs,
+    opts, course, boats, brains, ghost, ghostInputs, ghostRace,
     player: boats.find(b => b.lane === lane),
     player2: duel ? boats.find(b => b.lane === lane + 1) : null,
     tick: 0,
@@ -35,17 +41,20 @@ function makeRace(opts) {
 }
 
 // Rules versions: each one changes the physics, so a race keeps the rules it was rowed under forever.
-//  1: the original physics.  2: wash from crews in the next lane.
-const RULES_LATEST = 2;
+//  1: the original physics.
+//  2: wash from crews in the next lane (its reach was too short to matter; kept exactly for races rowed under it).
+//  3: wash that reaches: felt as soon as you drift from your lane centre towards a faster crew just ahead.
+const RULES_LATEST = 3;
+const WASH = { 2: { reach: 9.5, span: 2.5, drag: () => TUNE.washDrag }, 3: { reach: LANE_W - 0.5, span: 3, drag: () => TUNE.washDrag3 } };
 
-// Wash: a faster crew just ahead in the next lane leaves rough water. Only felt when both boats drift towards
-// each other, so it rewards holding the middle of your lane. Computed for every boat before any moves.
-function washFor(race, b) {
+// Wash: a faster crew just ahead in the next lane leaves rough water. Felt when the boats drift towards each
+// other, so it rewards holding the middle of your lane. Computed for every boat before any moves.
+function washFor(race, b, w) {
   let wash = 0;
   for (const o of race.boats) {
     if (o === b || Math.abs(o.lane - b.lane) !== 1 || o.v <= b.v) continue;
     const behind = o.x - BOAT_CLASSES[o.cls].length - b.x, side = Math.abs(o.z - b.z);
-    if (behind > -2 && behind < 25 && side < 9.5) wash = Math.max(wash, clamp((9.5 - side) / 2.5, 0, 1) * (1 - behind / 25));
+    if (behind > -2 && behind < 25 && side < w.reach) wash = Math.max(wash, clamp((w.reach - side) / w.span, 0, 1) * (1 - behind / 25));
   }
   return wash;
 }
@@ -63,19 +72,20 @@ function stepRace(race, playerInput, player2Input = 0) {
     player2Input &= ~(IN.DRIVE | IN.PUSH);
   }
   race.inputs.push(playerInput);
-  const wash = (race.opts.rules || 1) >= 2 && race.course.kind === 'regatta' ? race.boats.map(b => washFor(race, b)) : null;
+  const w = WASH[race.opts.rules || 1], wash = w && race.course.kind === 'regatta' ? race.boats.map(b => washFor(race, b, w)) : null;
   for (let i = 0; i < race.boats.length; i++) {
     const b = race.boats[i];
-    if (wash && wash[i] > 0) { b.v *= 1 - TUNE.washDrag * wash[i] * TUNE.dt; b.inWash = wash[i] } else b.inWash = 0;
+    if (wash && wash[i] > 0) { b.v *= 1 - w.drag() * wash[i] * TUNE.dt; b.inWash = wash[i] } else b.inWash = 0;
     if (b.finishTime != null && b.x > race.course.distance + 40) { b.v *= 0.99; b.x += b.v * dt; continue }
     const input = b === race.player ? playerInput : b === race.player2 ? player2Input : botInput(race.brains[b.lane], b, race);
     stepBoat(b, b.finishTime != null ? packInput(0, 18) : input, race.course, race);
     if (b.finishTime != null && !race.finishOrder.includes(b)) race.finishOrder.push(b);
   }
-  if (race.ghost) {
+  if (race.ghostRace) {
     const g = race.ghost, gi = race.ghostInputs;
-    if (g.finishTime == null) stepBoat(g, race.tick < gi.length ? gi[race.tick] : packInput(0, 18), race.course, race);
+    if (g.finishTime == null) stepRace(race.ghostRace, race.tick < gi.length ? gi[race.tick] : packInput(0, 18));
     else { g.v *= 0.99; g.x += g.v * dt }
+    for (const b of race.ghostRace.boats) b.events.length = 0;
   }
   race.tick++;
   const p = race.player;

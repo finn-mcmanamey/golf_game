@@ -28,7 +28,7 @@ for (const sd of [0.05, 0.08, 0.11, 0.15]) {
   for (const d of ['novice','club', 'national', 'elite', 'olympic']) {
     let places = 0, n = 12;
     for (let s = 1; s <= n; s++) {
-      const race = makeRace({ seed: s * 7919, distance: 500, cls: '1x', difficulty: d, lane: 2 }), h = human(sd, s);
+      const race = makeRace({ seed: s * 7919, distance: 500, cls: '1x', difficulty: d, lane: 2, rules: 3 }), h = human(sd, s);
       while (!race.done) stepRace(race, h(race));
       places += placeOf(race, race.player);
     }

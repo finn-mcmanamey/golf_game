@@ -6,17 +6,23 @@ const board = { db: null, uid: null, rows: [], verified: new Map(), unsub: null 
 
 async function connectBoard() {
   if (!window.claude?.use) return;   // a plain browser or the iPhone app: no shared board
-  const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
-  if (!db || !user) return;
-  board.db = db;
-  board.uid = await user.id();
-  watchDailyBoard();
+  try {
+    const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
+    if (!db || !user) return;
+    board.db = db;
+    board.uid = await user.id();
+    watchDailyBoard();
+    setInterval(watchDailyBoard, 60000);   // past midnight, move on to the new day's board
+  } catch (e) { /* no shared board this visit */ }
 }
 
 // Subscribe once to today's entries; re-render when anyone posts.
 function watchDailyBoard() {
-  if (!board.db || board.unsub) return;
   const seed = dailyOpts().seed;
+  if (!board.db || board.unsub && board.seed === seed) return;
+  board.unsub?.();
+  board.seed = seed;
+  board.rows = [];
   board.unsub = board.db.collection('scores').where('dailySeed', '==', seed).orderBy('dailyTime').limit(30)
     .onSnapshot(snap => { board.rows = snap.docs.map(d => ({ id: d.id, ...d.data() })); verifyRows(seed) }, () => { board.unsub = null });
 }
@@ -32,8 +38,11 @@ function verifyRows(seed) {
     if (!r) return renderBoard();
     let ok = false;
     try {
-      const { opts, inputs } = decodeRace(r.dailyCode), race = withDefaultTune(() => simulateRace(opts, inputs));
-      ok = opts.seed === seed && race.player.finishTime != null && Math.abs(race.player.finishTime - r.dailyTime) < 0.005;
+      // The code must be today's daily exactly (course, distance, boat, field, lane, rules) and reproduce the time.
+      const { opts, inputs } = decodeRace(r.dailyCode), want = { ...dailyOpts(), kind: 'regatta', rules: RULES_LATEST };
+      const same = ['seed', 'distance', 'cls', 'difficulty', 'lane', 'kind', 'rules'].every(k => opts[k] === want[k]);
+      const race = same && withDefaultTune(() => simulateRace(opts, inputs));
+      ok = same && race.player.finishTime != null && Math.abs(race.player.finishTime - r.dailyTime) < 0.005;
     } catch (e) { ok = false }
     board.verified.set(rowKey(r), ok);
     requestAnimationFrame(step);
@@ -55,7 +64,7 @@ function raceLeader(e) {
 function verifiedRows() {
   const seen = new Set();
   return board.rows.filter(r => board.verified.get(rowKey(r)))
-    .sort((a, b) => a.dailyTime - b.dailyTime || (a.at || 0) - (b.at || 0))
+    .sort((a, b) => a.dailyTime - b.dailyTime || (a.at || Infinity) - (b.at || Infinity))   // no posting time: last in line
     .filter(r => !seen.has(r.dailyCode) && seen.add(r.dailyCode));
 }
 
@@ -76,7 +85,11 @@ const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<':
 // After a daily regatta: post the time if it beats this player's posted time for today.
 async function postDaily(race, code) {
   if (!board.db || !board.uid) return;
-  const seed = race.opts.seed, mine = board.rows.find(r => r.id === board.uid);
+  const seed = race.opts.seed;
+  if (seed !== dailyOpts().seed) return;   // only today's daily goes on today's board
+  // Read this player's own row directly (it may not be in the top 30) so a slower time never replaces a faster one.
+  let mine = null;
+  try { const d = await board.db.doc('scores/' + board.uid).get(); mine = d.exists ? d.data() : null } catch (e) { return }
   if (mine && mine.dailySeed === seed && mine.dailyTime <= race.player.finishTime) return;
   try {
     await board.db.doc('scores/' + board.uid).set({ name: crew.club.slice(0, 14), dailySeed: seed, dailyTime: race.player.finishTime, dailyCode: code, at: Date.now() });

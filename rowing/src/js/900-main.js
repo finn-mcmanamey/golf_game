@@ -128,7 +128,8 @@ function handleEvents() {
       } else if (e.type === 'buoy' || e.type === 'bank') { showGrade(e.type); AU.play('buoy'); if (e.type === 'bank') cam.shake = 0.6 }
       else if (e.type === 'finish') {
         AU.play(placeOf(race, b) === 1 ? 'cheer' : 'finish');
-        if (placeOf(race, b) === 1 && !game.replay) celebrate();
+        // Fireworks for beating a field on a regatta course (a head race isn't decided until everyone's home).
+        if (placeOf(race, b) === 1 && !game.replay && race.boats.length > 1 && !race.course.bends && !practiceMode()) celebrate();
         buzz('finish');
         game.finishShown = true;
         game.finishMsgUntil = game.time + 3;
@@ -169,7 +170,7 @@ function frame(now) {
     startSequence();
     const p = race.player, d = race.course.distance;
     AU.ambient(p.v, Math.min(1, smooth(d - 400, d, p.x) * (p.finishTime != null ? 0.6 : 1) + comm.excite * 0.5), race.course.rain ? 1 : 0, p.phase === 'recover' && race.started ? 1 : 0);
-    if (race.done) { game.state = 'results'; game.replay ? showReplayEnd() : showResults(race) }
+    if (race.done) { game.state = 'results'; game.resultsAt = game.time; game.replay ? showReplayEnd() : showResults(race) }
     if (!game.halfSeen && race.player.x > race.course.distance / 2) { game.halfSeen = true; game.lastAtHalf = placeOf(race, race.player) === race.boats.length && race.boats.length > 1 }
     if (game.state === 'race') { updateHud(race); updateHud2(race); drawForceCurve(); updateCommentary(race); if (!game.replay && !practiceMode()) updateCalls(race); updateLearning(race); updateTraining(race) }
   } else if ((game.state === 'menu' || game.state === 'results') && race) {

@@ -20,16 +20,21 @@ const { chromium } = require('playwright');
   await p.waitForFunction(() => typeof dailyOpts === 'function');
   await p.evaluate(() => {
     // An honest run: re-row today's daily with the autopilot, and a forged one claiming an impossible time.
-    const o = dailyOpts(), r = makeRace(o);
+    const o = { ...dailyOpts(), kind: 'regatta', rules: RULES_LATEST }, r = makeRace(o);
     while (!r.done) stepRace(r, r.started ? packInput(autoRow(r.player), 34) : packInput(0, 34));
     const code = encodeRace(o, r.inputs);
     __rows.set('u_honest', { name: 'Honest Hans', dailySeed: o.seed, dailyTime: r.player.finishTime, dailyCode: code });
     __rows.set('u_cheat', { name: 'Cheaty Pete', dailySeed: o.seed, dailyTime: 60, dailyCode: code }); __rows.set('u_copy', { name: 'Copycat', dailySeed: o.seed, dailyTime: r.player.finishTime, dailyCode: code, at: Date.now() + 5 }); __rows.get('u_honest').at = Date.now();
+    // An honest run of a different race (250 m, novices) posted under today's seed, and a copy with no posting time.
+    const short = { ...o, distance: 250, difficulty: 'novice' }, sr = makeRace(short);
+    while (!sr.done) stepRace(sr, sr.started ? packInput(autoRow(sr.player), 34) : packInput(0, 34));
+    __rows.set('u_short', { name: 'Shortcut Sam', dailySeed: o.seed, dailyTime: sr.player.finishTime, dailyCode: encodeRace(short, sr.inputs) });
+    __rows.set('u_noat', { name: 'Copy NoAt', dailySeed: o.seed, dailyTime: r.player.finishTime, dailyCode: code });
     __push();
   });
   await p.waitForTimeout(3000);
   const text = await p.evaluate(() => $('dailyBoard').innerText);
-  const ok = text.includes('Honest Hans') && !text.includes('Cheaty Pete') && !text.includes('Copycat');
+  const ok = text.includes('Honest Hans') && !['Cheaty Pete', 'Copycat', 'Shortcut Sam', 'Copy NoAt'].some(n => text.includes(n));
   console.log(ok ? 'ok: only the honest run is shown' : 'FAIL: ' + text.replace(/\n/g, ' | '));
   if (!ok) process.exitCode = 1;
 

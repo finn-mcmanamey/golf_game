@@ -6,11 +6,11 @@ const PIECES = [
   { from: 450, to: 700, rate: 34, name: 'Piece 2 · race pace' },
   { from: 850, to: 1100, rate: 40, name: 'Piece 3 · sprint' },
 ];
-const training = { scores: [], piece: -1, strokes: 0, onRate: 0, perfect: 0, lastStrokes: 0 };
+const training = { done: new Set(), scores: [], piece: -1, strokes: 0, onRate: 0, perfect: 0, lastStrokes: 0 };
 const practiceMode = () => game.mode === 'learn' || game.mode === 'training';
 
 function startTraining() {
-  Object.assign(training, { scores: [], piece: -1, strokes: 0, onRate: 0, perfect: 0, lastStrokes: 0 });
+  Object.assign(training, { done: new Set(), scores: [], piece: -1, strokes: 0, onRate: 0, perfect: 0, lastStrokes: 0 });
   startRace({ seed: settings.seed, distance: 1150, cls: settings.kind === 'erg' ? '1x' : settings.cls, difficulty: 'club', lane: 2, solo: true }, null, 'training');
   showCoachPanel('Paddle up to the first piece. Hold the rate the coach asks for.');
 }
@@ -26,7 +26,7 @@ function updateTraining(race) {
   if (game.mode !== 'training' || !race.started) return;
   const p = race.player, i = PIECES.findIndex(pc => p.x >= pc.from && p.x < pc.to);
   if (i !== training.piece) {
-    if (training.piece >= 0) finishPiece();
+    if (training.piece >= 0 && !training.done.has(training.piece)) finishPiece();
     training.piece = i;
     Object.assign(training, { strokes: 0, onRate: 0, perfect: 0, lastStrokes: p.strokes });
     if (i >= 0) { AU.play('attention'); showCoachPanel(`<b>${PIECES[i].name}</b>: rate ${PIECES[i].rate}, ${PIECES[i].to - PIECES[i].from} m. Go!`) }
@@ -47,6 +47,7 @@ function finishPiece() {
   const n = Math.max(1, training.strokes), rate = training.onRate / n, clean = training.perfect / n;
   const score = Math.round((rate * 0.6 + clean * 0.4) * 100);
   training.scores.push(score);
+  training.done.add(training.piece);   // each piece scores once, even if the boat drifts back into it
   toast(`${PIECES[training.piece].name.split(' · ')[0]}: ${score}/100 · on rate ${Math.round(rate * 100)}% · clean ${Math.round(clean * 100)}%`, 3600);
 }
 
