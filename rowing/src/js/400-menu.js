@@ -73,6 +73,9 @@ function menuChanged() {
   $('btnGhost').classList.toggle('hide', !pb);
   renderCareer();
   renderCup();
+  const streak = STORE.get('dailyStreak', { n: 0, day: 0 }), today = Math.floor(Date.now() / 864e5);
+  const best = STORE.get('daily-' + dailyOpts().seed, null);
+  $('dailySub').textContent = best ? `Today's best ${fmtTime(best)}` + (streak.n > 1 && streak.day >= today - 1 ? ` · ${streak.n}-day streak` : '') : 'Same race for everyone today';
   $('welcome').classList.toggle('hide', STORE.get('history', []).length > 0);
   showPreview(currentOpts());
 }
@@ -128,6 +131,9 @@ function showResults(race) {
   if (counts && game.mode === 'daily') {
     const key = 'daily-' + opts.seed, best = STORE.get(key, null);
     if (!best || p.finishTime < best) STORE.set(key, p.finishTime);
+    // A streak counts days in a row with a daily regatta finished.
+    const today = Math.floor(Date.now() / 864e5), s = STORE.get('dailyStreak', { n: 0, day: 0 });
+    if (s.day !== today) STORE.set('dailyStreak', { n: s.day === today - 1 ? s.n + 1 : 1, day: today });
   }
   $('resSub').textContent = `${fmtTime(p.finishTime)} · ${race.course.name}, ${opts.distance} m ${BOAT_CLASSES[opts.cls].name.toLowerCase()}${pbNote}`;
   $('resTable').innerHTML = order.map((b, i) => `<tr class="${b === p ? 'me' : ''}"><td>${i + 1}</td><td>${race.course.bends ? 'Start ' + (b.startAt / 8 + 1) : 'Lane ' + (b.lane + 1)}</td><td>${displayName(b)}</td>

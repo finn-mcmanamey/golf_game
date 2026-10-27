@@ -193,3 +193,4 @@ details#more summary::before { content: '⚙ ' } details#more[open] summary { co
 #rateTarget.flash { color: var(--acc) }
 #welcome { margin: 4px 0 10px; text-align: left; font-size: 13.5px; border-color: rgba(255, 210, 58, .4) } #welcome b { color: var(--acc) }
 #nextUp { color: var(--acc); margin-top: -6px }
+.totals { margin: 0 0 6px; color: var(--dim); font-size: 13px } .totals b { color: var(--ink) }

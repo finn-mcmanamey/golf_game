@@ -63,13 +63,15 @@ function renderBoathouse(tab) {
       <div class="row"><label>Shirts</label><div class="swatches">${sw('shirt')}</div></div>
       <div class="row"><label>Blades</label><div class="swatches">${sw('blade')}</div></div>
       <div class="row"><label>Blade tips</label><div class="swatches">${sw('tip')}</div></div>
-      <div class="bladePreview" style="background:linear-gradient(90deg,#${crew.blade.toString(16).padStart(6, '0')} 70%,#${crew.tip.toString(16).padStart(6, '0')} 70%)"></div>`;
+      <div class="bladePreview" style="background:linear-gradient(90deg,#${crew.blade.toString(16).padStart(6, '0')} 70%,#${crew.tip.toString(16).padStart(6, '0')} 70%)"></div>
+      <div class="row"><label>Show</label><div class="seg" id="segShow"></div></div>`;
+    segmented('segShow', Object.keys(BOAT_CLASSES).map(k => [k, BOAT_CLASSES[k].name]), showroom.cls, v => { showroom.cls = v; openShowroom() });
     $('clubIn').oninput = () => { crew.club = $('clubIn').value.trim() || 'You'; STORE.set('crew', crew) };
     el.querySelectorAll('.sw').forEach(b => b.onclick = () => { crew[b.dataset.k] = +b.dataset.c; STORE.set('crew', crew); applyCrewColours(); AU.play('ui'); renderBoathouse('crew') });
   } else if (tab === 'history') {
     const h = STORE.get('history', []);
     if (!h.length) { el.innerHTML = '<p class="sub">No races yet. Your last 50 races will be listed here.</p>'; return }
-    el.innerHTML = historySpark(h) + `<table class="hist">${h.slice(0, 20).map(r => `<tr><td>${new Date(r.date).toLocaleDateString()}</td>
+    el.innerHTML = totalsLine(h) + historySpark(h) + `<table class="hist">${h.slice(0, 20).map(r => `<tr><td>${new Date(r.date).toLocaleDateString()}</td>
       <td>${{ head: 'Head ', erg: 'Erg ', knockout: 'Match ' }[r.kind] || ''}${r.distance} m ${r.cls}</td><td>${DIFFICULTY[r.diff]?.label || ''}</td><td>${r.venue}</td>
       <td class="t">${fmtTime(r.time)}</td><td class="t">${ordinal(r.place)}</td><td class="t">${r.perfect}%</td>
       <td>${r.code ? `<button class="sec mini" data-code="${r.code}" title="Race against this run">Race it</button>` : ''}</td></tr>`).join('')}</table>`;
@@ -89,6 +91,13 @@ function raceHistoryGhost(code) {
     showroom.on = false;   // startRace sets up its own scene
     startRace(opts, inputs);
   } catch (e) { toast('That run could not be loaded.') }
+}
+
+// Lifetime totals from the history (the last 50 races).
+function totalsLine(h) {
+  const km = h.reduce((n, r) => n + r.distance, 0) / 1000, wins = h.filter(r => r.place === 1).length;
+  const streak = STORE.get('dailyStreak', { n: 0 }).n;
+  return `<p class="totals"><b>${h.length}</b> races · <b>${wins}</b> wins · <b>${km.toFixed(1)}</b> km rowed${streak ? ` · daily streak <b>${streak}</b>` : ''}</p>`;
 }
 
 // Pace per 500 m over recent races of the most-rowed event, oldest to newest.
