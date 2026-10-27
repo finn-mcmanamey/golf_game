@@ -24,12 +24,17 @@ and **press again** just as the slide reaches the front. That's a perfect catch.
 | W / S | − / + | stroke rate |
 | A / D | ◀ / ▶ | steer |
 | Shift | PUSH | power ten (drains energy) |
-| C | TV button | camera: TV, chase, aerial, rower's eye |
+| C | TV button | camera: TV, director, chase, aerial, rower's eye |
+| F | 📷 | photo mode: freeze, drag to orbit, scroll to zoom |
 | G, F8, Esc | | graphics, tuning panel, pause |
+
+The **rate plan** (menu) sets your stroke rate down the course for you: Classic (fast start, settle, sprint), Even,
+or Manual. Pressing W/S takes over. Five fields, from Novice to Olympic; `test/balance.mjs` checks the steps between them.
 
 Modes: single races, **head races** on a winding river, **indoor erg** races, the **Voxel Cup** knockout, a **season** of heats and finals, the **daily regatta**,
 **learn to row**, a two-player **duel**, **cox mode** for crew boats (the crew rows; you steer, set the rate and call
-three power tens), ghosts of your best race, and shareable race links.
+three power tens), ghosts of your best race (or any race in your history),
+shareable race links, and a Boathouse with a 3D showroom of your boat, colours, badges and history.
 
 There's also an iPhone app wrapper in [`app/`](app/README.md): Expo plus a WebView, with real haptics.
 
@@ -41,16 +46,19 @@ rowing/
   src/index.html     markup with {{styles}} and {{script}}
   src/styles/        CSS
   src/js/            slices of one script, joined in filename order
-  test/sim.test.mjs  runs the simulation slices headless
+  test/sim.test.mjs  runs the simulation slices headless (determinism, codes, golden times)
+  test/e2e.cjs       plays one race per mode in headless Chromium
+  test/balance.mjs   races human-like rowers against each field
+  app/               the iPhone app wrapper (Expo + WebView)
 ```
 
 | Files | What they are |
 |---|---|
-| `000`–`060` | **The simulation**: seeded courses, stroke physics, bots, races, race codes. Runs in Node with no DOM. |
-| `100`–`160` | Drawing: WebGL shaders, meshes, scenery, boats and crews, cameras, effects |
-| `105`, `210` | Saves and sound |
-| `300`–`340` | HUD, input, cox calls, tuning panel, learn to row |
-| `400`–`420` | Menus, season mode, boathouse |
+| `000`–`060` | **The simulation**: seeded courses (lake, river, erg), stroke physics, bots, races, race codes. Runs in Node with no DOM. |
+| `100`–`160` | Drawing: WebGL shaders, saves (`105`), meshes, smooth poses, scenery, erg hall, boats and crews, cameras, effects |
+| `210`–`215` | Sound effects and menu music, all synthesised |
+| `300`–`370` | HUD, input, cox and coach calls, commentary, tuning panel, learn to row, force curve, cox mode, race plans, photo mode |
+| `400`–`430` | Menus and results, season, cup, boathouse, showroom, home-screen icon |
 | `900` | The main loop |
 
 ## The one rule: races must replay exactly
