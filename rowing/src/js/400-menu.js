@@ -77,6 +77,8 @@ function menuChanged() {
   $('venue').textContent = c.kind === 'erg' ? `${c.name} · six rowing machines, one big screen` : `${c.name}${c.bends ? ' · winding river, crews start 8 s apart' : ''} · ${{ alpine: 'Mountains · ', city: 'City · ' }[c.theme] || ''}${c.rain ? 'Rain · ' : c.night ? 'Evening, under lights · ' : ''}${windLabel(c.wind)}${c.current ? ` · ${c.current > 0 ? 'following' : 'opposing'} stream` : ''}`;
   // Erg races are always singles, so look records up with the options a race would really use.
   const o = currentOpts(), pb = getPB(o.distance, o.cls, o.kind);
+  const here = STORE.get('history', []).filter(r => r.seed === o.seed && r.distance === o.distance && r.cls === o.cls && (r.kind || 'regatta') === o.kind);
+  if (here.length) $('venue').textContent += ` · your best here ${fmtTime(Math.min(...here.map(r => r.time)))}`;
   $('pbLine').textContent = pb ? `Your best over ${o.distance} m in the ${BOAT_CLASSES[o.cls].name.toLowerCase()}${KIND_LABEL[o.kind] || ''}: ${fmtTime(pb.time)} (${pb.venue})` : '';
   $('btnGhost').classList.toggle('hide', !pb);
   renderCareer();

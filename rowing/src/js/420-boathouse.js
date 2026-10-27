@@ -16,7 +16,7 @@ function recordHistory(race, place) {
   const p = race.player, o = race.opts, s = p.stats, strokes = Math.max(1, s.perfect + s.good + s.off);
   const h = STORE.get('history', []);
   h.unshift({ date: Date.now(), kind: o.kind || 'regatta', distance: o.distance, cls: o.cls, diff: o.difficulty, time: p.finishTime,
-    place, venue: race.course.name, perfect: Math.round(s.perfect / strokes * 100), mode: game.mode, code: game.lastCode });
+    place, venue: race.course.name, seed: o.seed, perfect: Math.round(s.perfect / strokes * 100), mode: game.mode, code: game.lastCode });
   STORE.set('history', h.slice(0, 50));
 }
 
