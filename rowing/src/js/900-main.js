@@ -184,6 +184,8 @@ function startSequence() {
   setStartMsg(msg);
 }
 
+const IDLE_FRAME = 1 / 30 - 0.002;   // seconds between drawn frames on menus (a little slack so 30 fps isn't 20)
+
 function frame(now) {
   const dt = Math.min(0.1, (now - (game.last || now)) / 1000);
   game.last = now;
@@ -211,19 +213,27 @@ function frame(now) {
     if (game.state === 'menu' && race.done) showPreview(currentOpts());
   }
 
+  // Off the water (menu, results) the scene is drawn at most 30 times a second: nothing there needs more, and a
+  // phone's battery and fan notice. The skipped time is handed to the next drawn frame so animations keep their pace.
+  const idle = !showroom.on && (game.state === 'menu' || game.state === 'results');
+  game.drawDt = (game.drawDt || 0) + dt;
+  if (idle && game.time - (game.lastDraw || 0) < IDLE_FRAME) { requestAnimationFrame(frame); return }
+  game.lastDraw = game.time;
+  const ddt = game.drawDt;
+  game.drawDt = 0;
   if (gl && showroom.on) {
-    animateShowroom(dt, game.time);
-    renderFrame(showroom.race, game.time, dt);
+    animateShowroom(ddt, game.time);
+    renderFrame(showroom.race, game.time, ddt);
   } else if (gl && race) {
-    if (game.state === 'menu') menuCamera(dt);
+    if (game.state === 'menu') menuCamera(ddt);
     else if (photo.on) photoCamera();
     else {
       // Wide shots frame both crews in a duel or match race; on-board shots stay with your boat.
       const pair = (race.player2 || race.course.kind === 'knockout' || race.course.kind === 'boatrace') && !['rower', 'chase'].includes(cam.mode);
-      updateCamera(pair ? duelCameraBoat(race) : race.player, race.t, dt);
+      updateCamera(pair ? duelCameraBoat(race) : race.player, race.t, ddt);
     }
-    renderFrame(race, game.time, dt);
-    updateFps(dt);
+    renderFrame(race, game.time, ddt);
+    updateFps(ddt);
   }
   requestAnimationFrame(frame);
 }
