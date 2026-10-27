@@ -25,3 +25,7 @@ Build order follows `Depends on`. Status: idea → spec'd → approved → build
 | F-113 | Idle frame cap: menus and results draw at most 30 fps | shipped | P3 | Feel | — | Battery and heat on phones; races still draw every frame |
 | F-114 | Rivals read the river: Elite/Olympic head crews take the slack water against a strong stream (rules 6) | shipped | P2 | Truth | F-109 | 040-bots.js riverLine; olympic field −0.5 s/km against a −0.125 stream, no bank hits |
 | F-115 | Daily formats by weekday: erg Wednesdays, head race weekends (rules 6), regatta otherwise | shipped | P1 | Fair | F-004, F-109 | From day 20754 (28 Oct 2026) so no board changed mid-day; rules pinned per format |
+| F-116 | Cross-browser replay test in CI (Firefox, WebKit) | idea | P1 | Fair | F-002 | Only Chromium is installed here; V8 vs QuickJS already match. Needs browsers or a CI runner |
+| F-117 | Bumps daily with a place-based board | idea | P2 | Fair | F-005, F-115 | Bumps results are places, not times; the board would rank bumps made, then distance |
+| F-118 | Crew selection: pick seats with trade-offs (power vs timing spread) | idea | P2 | Truth | F-001 | Must stay a choice, not an upgrade (brief: no stat progression); behind a rules version |
+| F-119 | Second research pass once fetch works | idea | P1 | — | — | Re-run the five questions; the source hosts were blocked by the network policy this time |
