@@ -11,7 +11,7 @@ const SRC = path.join(ROOT, 'src');
 const JS_DIR = path.join(SRC, 'js');
 const STYLE_DIR = path.join(SRC, 'styles');
 const OUT = path.join(ROOT, 'dist', 'stick-clash.html');
-const SIZE_BUDGET = 1.5 * 1024 * 1024;   // bytes: the whole game must stay one small offline file
+const SIZE_BUDGET = 2 * 1024 * 1024;   // bytes: the whole game must stay one small offline file (2 MB from v5.1)
 
 function fail(msg) {
   console.error('\n BUILD FAILED\n ' + msg.split('\n').join('\n ') + '\n');

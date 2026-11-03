@@ -1,0 +1,260 @@
+/* 99-v5-polish.css: v5's visual polish pass (layered arcade glass, richer controls, atmospheric menus). Loaded last
+   so it layers over the other styles. */
+/* ===== VISUAL POLISH PASS: layered arcade glass, richer controls and atmospheric menus ===== */
+:root {
+  --panel: rgba(10, 12, 27, .96);
+  --panel2: #0b0e20;
+  --line: #353b68;
+  --line2: #535d99;
+}
+.card {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse at 50% -20%, rgba(78, 111, 255, .16), transparent 58%),
+    linear-gradient(145deg, rgba(17, 20, 43, .98), rgba(7, 9, 21, .98) 72%);
+  border-color: rgba(116, 130, 220, .42);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.035) inset,
+    0 28px 80px rgba(0,0,0,.62),
+    0 0 54px rgba(71, 86, 255, .13);
+}
+.card::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  left: 8%;
+  right: 8%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(91, 224, 255, .7), rgba(255, 138, 46, .55), transparent);
+  pointer-events: none;
+}
+.overlay:not(.clear) {
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(37, 49, 103, .16), transparent 60%),
+    rgba(3, 4, 11, .64);
+  backdrop-filter: blur(2px);
+}
+button {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.008));
+  border-color: rgba(104, 115, 184, .42);
+  box-shadow: 0 1px 0 rgba(255,255,255,.035) inset, 0 5px 14px rgba(0,0,0,.12);
+}
+button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,.075) 48%, transparent 72%);
+  transform: translateX(-120%);
+  transition: transform .35s ease;
+  pointer-events: none;
+}
+@media (hover: hover) {
+  button:hover {
+    border-color: rgba(111, 224, 255, .62);
+    background: linear-gradient(180deg, rgba(60, 100, 175, .2), rgba(255,255,255,.025));
+    box-shadow: 0 0 0 1px rgba(70, 210, 255, .07), 0 6px 18px rgba(0,0,0,.22);
+  }
+  button:hover::after { transform: translateX(120%); }
+}
+button:active { filter: brightness(1.12); }
+.go {
+  position: relative;
+  background: linear-gradient(105deg, #ffe56b, #ffc83f 48%, #ffad35);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.24) inset, 0 7px 22px rgba(255,190,55,.2), 0 0 34px rgba(255,216,74,.15);
+  transition: filter .15s, box-shadow .15s, transform .06s;
+}
+@media (hover: hover) {
+  .go:hover {
+    background: linear-gradient(105deg, #fff09a, #ffd45a 48%, #ffbd50);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.35) inset, 0 9px 28px rgba(255,190,55,.28), 0 0 42px rgba(255,216,74,.2);
+  }
+}
+.loadout, .set-group, .vote-card, .vote-side {
+  box-shadow: 0 1px 0 rgba(255,255,255,.025) inset;
+}
+.loadout {
+  background: linear-gradient(145deg, rgba(23,26,53,.78), rgba(7,9,22,.72));
+  border-color: rgba(95,105,172,.34);
+  transition: border-color .16s, transform .16s, background .16s;
+}
+.loadout:hover {
+  border-color: rgba(86, 208, 255, .5);
+  background: linear-gradient(145deg, rgba(27,35,70,.88), rgba(8,10,25,.82));
+}
+select, input, textarea {
+  accent-color: var(--p1);
+}
+kbd {
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.015));
+  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset;
+}
+.stat { text-shadow: 0 0 12px rgba(255,216,74,.16); }
+@media (prefers-reduced-motion: reduce) {
+  button, .loadout { transition: none; }
+  button::after { display: none; }
+}
+
+
+/* ===== ULTRA POLISH V4 ===== */
+:root {
+  --glow-1: #5ef2ff;
+  --glow-2: #b98cff;
+  --gold-glow: 0 0 20px rgba(255,216,74,.5);
+}
+html { scrollbar-width: none; }
+body { background: radial-gradient(120% 120% at 20% 0%, #1a1240 0%, #07080f 55%, #02030a 100%) fixed; }
+
+/* Screen Effects */
+@keyframes hitFlash {
+  0% { filter: brightness(1.8) contrast(1.2); }
+  100% { filter: brightness(1) contrast(1.05); }
+}
+.hit-flash { animation: hitFlash .12s ease-out; }
+
+/* Improved cards */
+.card {
+  background: linear-gradient(180deg, rgba(18,20,42,.96) 0%, rgba(10,11,26,.98) 100%);
+  border: 1px solid rgba(255,255,255,.08);
+  box-shadow: 0 20px 80px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.06) inset, 0 0 40px rgba(94,242,255,.08);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+}
+.card.wide { max-width: 960px; }
+.card h1, .card h2 { letter-spacing: -0.02em; text-shadow: 0 2px 20px rgba(0,0,0,.8); }
+
+/* Weapon tiles - ultra polished */
+.weapon-tile, .map-tile, .mode-tile {
+  position: relative;
+  overflow: hidden;
+  transition: transform .18s cubic-bezier(.2,1.5,.6,1), box-shadow .18s, border-color .18s, filter .18s;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+}
+.weapon-tile:hover, .map-tile:hover, .mode-tile:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 12px 30px rgba(0,0,0,.5), 0 0 20px var(--pc, rgba(94,242,255,.3));
+  border-color: var(--pc, #5ef2ff);
+  z-index: 2;
+}
+.weapon-tile.sel, .map-tile.sel, .mode-tile.sel {
+  border-color: var(--gold);
+  box-shadow: var(--gold-glow), 0 0 0 2px var(--gold) inset;
+  transform: translateY(-2px);
+}
+.weapon-tile.new::after {
+  content:'NEW';
+  position:absolute; top:6px; right:6px;
+  font-size:9px; font-weight:900; letter-spacing:.8px;
+  background: linear-gradient(90deg,#ffd84a,#ffb02e);
+  color:#000; padding:3px 6px; border-radius:20px;
+  box-shadow: 0 2px 8px rgba(255,216,74,.5);
+  animation: newPulse 1.5s infinite;
+}
+@keyframes newPulse { 0%,100%{ transform:scale(1)} 50%{ transform:scale(1.1)} }
+
+.mode-tile.new::before {
+  content:'NEW • ' attr(data-new);
+  position:absolute; top:8px; right:8px;
+  font-size:10px; font-weight:800;
+  background: linear-gradient(90deg,#b98cff,#5ef2ff);
+  color:#000; padding:4px 8px; border-radius:20px;
+  letter-spacing:.3px;
+}
+
+/* Rarity colors for new weapons */
+.w-chrono-katana { --pc:#8cf6ff; }
+.w-graviton { --pc:#b98cff; }
+.w-echo-blades { --pc:#5ef2ff; }
+.w-thornvine { --pc:#7dff6a; }
+.w-phase-rifle { --pc:#b98cff; }
+.w-meteor-flail { --pc:#ff8a2e; }
+.w-prism-cannon { --pc:#ffffff; }
+.w-singularity { --pc:#7a5cff; }
+
+/* HUD Polish */
+#hud { font-variant-ligatures: none; }
+.hud-bar { height: 8px; border-radius: 99px; overflow:hidden; background: rgba(0,0,0,.5); box-shadow: 0 1px 3px rgba(0,0,0,.8) inset; }
+.hud-bar i { border-radius: 99px; box-shadow: 0 0 10px currentColor; transition: width .15s ease-out; }
+
+/* Floating combat text polish */
+.float-text {
+  font-weight: 900;
+  text-shadow: 0 2px 0 rgba(0,0,0,.8), 0 0 12px currentColor;
+  letter-spacing: -0.5px;
+}
+
+/* Kill feed */
+.kill-feed {
+  position: fixed; top: 14px; right: 14px; z-index: 30;
+  display: grid; gap: 6px; pointer-events: none;
+}
+.kf-item {
+  display:flex; align-items:center; gap:8px;
+  background: rgba(10,11,26,.9); border:1px solid rgba(255,255,255,.12);
+  padding:6px 12px; border-radius: 10px; font: 700 12px var(--body);
+  animation: kfIn .3s cubic-bezier(.2,1.4,.4,1), kfOut .3s ease-in 2.7s forwards;
+  box-shadow: 0 4px 20px rgba(0,0,0,.5);
+}
+@keyframes kfIn { from{ transform:translateX(100%) scale(.8); opacity:0 } to{ transform:translateX(0) scale(1); opacity:1 } }
+@keyframes kfOut { to{ transform:translateX(20%) scale(.95); opacity:0 } }
+
+/* Combo meter */
+.combo-meter {
+  position: fixed; left: 50%; top: 22%; transform: translateX(-50%);
+  z-index: 25; text-align:center; pointer-events:none;
+  font-family: var(--display);
+}
+.combo-meter b { display:block; font-size:56px; line-height:.9; font-weight:900; color:#ffd84a; text-shadow: 0 3px 0 #000, 0 0 20px #ffd84a, 0 0 40px #ffb02e; }
+.combo-meter small { font:700 13px var(--body); color: var(--faint); letter-spacing:2px; text-transform:uppercase; }
+.combo-meter.pop b { animation: comboPop .35s cubic-bezier(.2,1.8,.4,1); }
+@keyframes comboPop { 0%{ transform:scale(.5) } 60%{ transform:scale(1.25)} 100%{ transform:scale(1)} }
+
+/* Screen vignette on low HP */
+.low-hp-vignette {
+  position: fixed; inset:0; pointer-events:none; z-index:20;
+  background: radial-gradient(120% 120% at 50% 50%, transparent 60%, rgba(255,60,60,.22) 100%);
+  opacity:0; transition: opacity .3s;
+}
+.low-hp-vignette.on { opacity:1; animation: hpPulse 1.1s infinite; }
+@keyframes hpPulse { 0%,100%{ opacity:.6 } 50%{ opacity:1 } }
+
+/* Better buttons */
+button.go {
+  background: linear-gradient(180deg,#ffe066,#ffb02e);
+  color:#1a1200; font-weight:900; letter-spacing:.5px;
+  border:0; box-shadow: 0 4px 0 #a67c00, 0 8px 20px rgba(255,176,46,.35), 0 0 0 1px rgba(255,255,255,.2) inset;
+  transform: translateY(0); transition: transform .1s, box-shadow .1s, filter .15s;
+}
+button.go:hover { filter:brightness(1.08); transform: translateY(-1px); box-shadow: 0 5px 0 #a67c00, 0 12px 24px rgba(255,176,46,.45); }
+button.go:active { transform: translateY(2px); box-shadow: 0 1px 0 #a67c00, 0 2px 10px rgba(255,176,46,.25); }
+
+/* Improved background canvas */
+
+/* Weapon trails polish */
+.trail { mix-blend-mode: screen; }
+
+/* Loading screen polish */
+#loading { background: radial-gradient(100% 100% at 50% 0%, #1a1240, #02030a); }
+#loading b { font-size: 28px; letter-spacing: -1px; }
+
+/* Mobile touch polish */
+#touch button { backdrop-filter: blur(8px); background: rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+#touch button.on { background: rgba(255,216,74,.28); box-shadow: 0 0 20px rgba(255,216,74,.4); }
+
+/* Tooltip */
+.tip { background: rgba(10,11,26,.95); border:1px solid rgba(255,255,255,.1); box-shadow: 0 10px 30px rgba(0,0,0,.6), 0 0 20px rgba(94,242,255,.1); backdrop-filter: blur(12px); }
+
+/* Scrollbar hide but keep functionality */
+.card::-webkit-scrollbar { width:0; }
+
+/* Rarity shine sweep */
+.weapon-tile::before {
+  content:''; position:absolute; inset:0; pointer-events:none; opacity:0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,.18) 50%, transparent 70%);
+  transform: translateX(-100%); transition: transform .6s, opacity .6s;
+}
+.weapon-tile:hover::before { opacity:1; transform: translateX(100%); }

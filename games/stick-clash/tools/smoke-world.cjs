@@ -176,7 +176,7 @@ async function run(browser, { check, rows, SHOTS }) {
       for (const kind in need) for (const k of need[kind]) if (!/^t-/.test(k) && !(L[kind] && L[kind][k])) missing.push(kind + ':' + k);
       const sentences = lines.flatMap(t => t.split(/(?<=[.!?])\s+/));
       return { n: lines.length, unique: new Set(lines).size === lines.length, uniqueSentences: new Set(sentences).size === sentences.length, missing, bad,
-        katana: codexLore('w', 'katana', 'Katana', 'blade') === L.w.katana, boss: codexEntries('b').length === 8 && codexEntries('r').length === 4, kb: Math.round(JSON.stringify(L).length / 1024) };
+        katana: codexLore('w', 'katana', 'Katana', 'blade') === L.w.katana, boss: codexEntries('b').length === CAMP_NODES.filter(n => n.kind === 'boss' || n.kind === 'mini').length && codexEntries('r').length === CAMP_REALMS.length, kb: Math.round(JSON.stringify(L).length / 1024) };
     });
     return { ok: r.unique && r.uniqueSentences && !r.missing.length && !r.bad.length && r.katana && r.boss && r.n >= 140, note: JSON.stringify(r) };
   });

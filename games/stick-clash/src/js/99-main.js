@@ -245,6 +245,152 @@ function frame(now) {
   } catch (e) { report(e, 'frame'); }
 }
 
+// A brief damage rim-flash gives a hit a readable contact beat without changing hitstun or combat timing.
+const UPGRADE_DAMAGE_FLASHES = new Map();
+function drawUpgradeDamageFlash(f) {
+  const m = UPGRADE_DAMAGE_FLASHES.get(f.id);
+  if (!m || !f.alive || !f.P || f.status.invis) return;
+  const age = G_STATE.t - m.t0;
+  if (age < 0 || age >= m.life) { UPGRADE_DAMAGE_FLASHES.delete(f.id); return; }
+  const k = age / m.life, alpha = (1 - k) * (1 - k) * m.strength * (SETTINGS.reduceFlash ? .52 : 1);
+  const P = f.P, sc = f.scale;
+  ctx.save(); ctx.globalAlpha *= alpha; ctx.strokeStyle = m.color; ctx.lineCap = ctx.lineJoin = 'round';
+  ctx.shadowColor = m.color; ctx.shadowBlur = 12 * GLOW_SCALE * (1 - k);
+  ctx.lineWidth = (4.5 - 2 * k) * sc;
+  ctx.beginPath();
+  for (const [a, b] of BODY_LINKS) { ctx.moveTo(P[a].x, P[a].y); ctx.lineTo(P[b].x, P[b].y); }
+  ctx.stroke();
+  ctx.shadowBlur = 0; ctx.strokeStyle = '#fffdf5'; ctx.lineWidth = Math.max(.8, 1.25 * sc);
+  ctx.beginPath();
+  for (const [a, b] of BODY_LINKS) { ctx.moveTo(P[a].x, P[a].y); ctx.lineTo(P[b].x, P[b].y); }
+  ctx.stroke();
+  const headR = HEAD_R * sc * (f.headMul || 1);
+  ctx.beginPath(); ctx.arc(P[0].x, P[0].y, headR + 1.8 * sc, -.45, Math.PI * 1.42); ctx.stroke();
+  // Short angular streaks expand from the torso instead of using a full-screen white flash.
+  const cx = (P[1].x + P[2].x) * .5, cy = (P[1].y + P[2].y) * .5;
+  const dx = P[2].x - P[1].x, dy = P[2].y - P[1].y, len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len, ny = dx / len, ext = (5 + k * 8) * sc;
+  ctx.globalAlpha *= .72; ctx.lineWidth = Math.max(.7, 1.1 * sc);
+  for (const sign of [-1, 1]) {
+    ctx.beginPath(); ctx.moveTo(cx + nx * 4 * sc * sign, cy + ny * 4 * sc * sign);
+    ctx.lineTo(cx + nx * (4 * sc + ext) * sign, cy + ny * (4 * sc + ext) * sign); ctx.stroke();
+  }
+  ctx.restore();
+}
+on('damage', (B, amt, o) => {
+  if (G_STATE.sim || !B || B.id == null || !(amt > 0)) return;
+  const weapon = o && (o.weapon || (o.src && o.src.w));
+  const color = o && o.head ? '#fff0a8' : SETTINGS.hitFx === 'red' ? '#ff4a6a' : weapon && weapon.color ? weapon.color : (B.color || '#ffffff');
+  UPGRADE_DAMAGE_FLASHES.set(B.id, { t0: G_STATE.t, life: SETTINGS.reduceFlash ? .075 : .105, color,
+    strength: clamp(.36 + amt / 26, .36, .9) });
+});
+on('roundStart', () => UPGRADE_DAMAGE_FLASHES.clear());
+on('matchStart', () => UPGRADE_DAMAGE_FLASHES.clear());
+on('state', (now, before) => { if (now === 'killcam' || before === 'killcam') UPGRADE_DAMAGE_FLASHES.clear(); });
+
+// Weapon-readable hit glyphs add a different visual signature to blades, heavy weapons and polearms.
+// These are cosmetic-only and expire on game time, so pause/slow-motion behavior stays coherent.
+const UPGRADE_HITMARKS = [];
+function upgradeHitmarkSpawn(data) {
+  const now = typeof KC !== 'undefined' && KC.play ? KC.play.clock : G_STATE.t;
+  const m = Object.assign({}, data, { t0: now });
+  UPGRADE_HITMARKS.push(m);
+  if (UPGRADE_HITMARKS.length > 48) UPGRADE_HITMARKS.splice(0, UPGRADE_HITMARKS.length - 48);
+  return m;
+}
+function upgradeHitmarkReplay(x, y, nx, ny, color, cat, amt, life, seed, head) {
+  upgradeHitmarkSpawn({ x, y, nx, ny, color, cat, amt, life, seed, head });
+  if (cat === 'clash') postfxLight(x, y, 88, '#ffe9a8', .12, 1.1);
+}
+if (typeof KC_FX === 'object') KC_FX.hitmark = upgradeHitmarkReplay;
+function upgradeHitmarkLog(m) {
+  if (FX_RECORD) FX_RECORD('hitmark', [m.x, m.y, m.nx, m.ny, m.color, m.cat, m.amt, m.life, m.seed, m.head]);
+}
+function upgradeHitmarkAdd(B, amt, o) {
+  if (G_STATE.sim || !o || o.small || amt < 4 || !['melee', 'proj', 'explode'].includes(o.kind)) return;
+  const weapon = o.weapon || (o.src && o.src.w), cat = weapon && weapon.cat;
+  if (!cat) return;
+  const mark = upgradeHitmarkSpawn({ x: o.x ?? B.P[1].x, y: o.y ?? B.P[1].y,
+    nx: o.nx || 1, ny: o.ny || 0, color: o.head ? '#ffd84a' : SETTINGS.hitFx === 'red' ? hitColor(B) : weapon.color || (o.src && o.src.color) || hitColor(B),
+    cat: o.head ? 'headshot' : (o.kind === 'explode' ? 'blast' : cat), head: !!o.head,
+    amt, life: amt >= 18 || o.head ? .26 : .16, seed: (o.src && o.src.id || 0) * 17 + B.id * 7 });
+  upgradeHitmarkLog(mark);
+}
+on('damage', upgradeHitmarkAdd);
+on('clash', (A, B, x, y) => {
+  if (G_STATE.sim) return;
+  const nx = (B.P[2].x - A.P[2].x) || 1, ny = B.P[2].y - A.P[2].y;
+  postfxLight(x, y, 88, '#ffe9a8', .12, 1.1);
+  const mark = upgradeHitmarkSpawn({ x, y, nx, ny, color: '#ffe9a8', cat: 'clash', amt: 22, life: .22, seed: A.id * 17 + B.id * 7 });
+  upgradeHitmarkLog(mark);
+});
+on('roundStart', () => { UPGRADE_HITMARKS.length = 0; });
+on('matchStart', () => { UPGRADE_HITMARKS.length = 0; });
+on('state', (now, before) => { if (now === 'killcam' || before === 'killcam') UPGRADE_HITMARKS.length = 0; });
+
+function drawCombatMarks(c2) {
+  if (!UPGRADE_HITMARKS.length) return;
+  const now = G_STATE.t;
+  let keep = 0;
+  c2.save(); c2.lineCap = 'round'; c2.lineJoin = 'round';
+  for (const m of UPGRADE_HITMARKS) {
+    const age = now - m.t0;
+    if (age < 0 || age >= m.life) continue;
+    UPGRADE_HITMARKS[keep++] = m;
+    const k = age / m.life, fade = (1 - k) * (m.amt >= 18 ? 1 : .7) * (SETTINGS.reduceFlash ? .58 : 1), nx = m.nx, ny = m.ny;
+    const rot = Math.atan2(ny, nx), push = k * (5 + m.amt * .35);
+    c2.save(); c2.translate(m.x + nx * push, m.y + ny * push); c2.rotate(rot); c2.globalAlpha = fade * .75;
+    c2.strokeStyle = m.color; c2.fillStyle = m.color;
+    if (m.cat === 'headshot') {
+      const r = (9 + m.amt * .25) * (1 + k * .2);
+      c2.strokeStyle = '#ffd84a'; c2.lineWidth = 1.8 * (1 - k * .35);
+      c2.beginPath(); c2.arc(0, 0, r, -.8 + k, 2.1 + k); c2.stroke();
+      c2.beginPath(); c2.moveTo(-r * .75, -r * .25); c2.lineTo(r * .75, r * .25);
+      c2.moveTo(-r * .2, r * .78); c2.lineTo(r * .2, -r * .78); c2.stroke();
+      c2.globalAlpha = fade * (1 - k) * .8; c2.fillStyle = '#fff6c4';
+      c2.beginPath(); c2.moveTo(0, -4); c2.lineTo(2.5, 0); c2.lineTo(0, 4); c2.lineTo(-2.5, 0); c2.closePath(); c2.fill();
+    } else if (m.cat === 'blast') {
+      const r = (7 + m.amt * .25) * (1 + k * .9);
+      c2.lineWidth = 2.2 * (1 - k); c2.strokeStyle = m.color;
+      c2.beginPath(); c2.arc(0, 0, r, 0, TAU); c2.stroke();
+      c2.globalAlpha *= .7; c2.beginPath(); c2.arc(0, 0, r * .54, 0, TAU); c2.stroke();
+    } else if (m.cat === 'clash') {
+      const r = 8 + m.amt * .3, rays = 8;
+      c2.rotate(k * .8); c2.lineWidth = 2.1 * (1 - k * .35);
+      for (let q = 0; q < rays; q++) {
+        const a = q * TAU / rays, inner = r * (q % 2 ? .42 : .6), outer = r * (q % 2 ? .88 : 1.2);
+        c2.globalAlpha = fade * (1 - k * .4); c2.beginPath();
+        c2.moveTo(Math.cos(a) * inner, Math.sin(a) * inner);
+        c2.lineTo(Math.cos(a) * outer, Math.sin(a) * outer); c2.stroke();
+      }
+      c2.globalAlpha = fade; c2.fillStyle = '#fffdf0';
+      c2.beginPath(); c2.moveTo(0, -4.5); c2.lineTo(4.5, 0); c2.lineTo(0, 4.5); c2.lineTo(-4.5, 0); c2.closePath(); c2.fill();
+    } else if (m.cat === 'blade' || m.cat === 'polearm') {
+      c2.lineWidth = (m.cat === 'polearm' ? 2.5 : 2) * (1 - k * .25);
+      c2.beginPath(); c2.moveTo(-17, -11); c2.quadraticCurveTo(-1, -2, 20, 4); c2.stroke();
+      if (m.cat === 'blade' && m.amt >= 12) {
+        c2.globalAlpha *= .62; c2.lineWidth = 1.1; c2.beginPath(); c2.moveTo(-10, -17); c2.quadraticCurveTo(3, -4, 13, 12); c2.stroke();
+      } else if (m.cat === 'polearm') {
+        c2.globalAlpha *= .45; c2.beginPath(); c2.moveTo(-12, -15); c2.lineTo(13, -8); c2.moveTo(-14, 2); c2.lineTo(15, 9); c2.stroke();
+      }
+    } else if (m.cat === 'heavy') {
+      for (let q = 0; q < 3; q++) {
+        const off = (q - 1) * 9, len = 9 + m.amt * .22;
+        c2.globalAlpha = fade * (1 - k) * .85; c2.lineWidth = q === 1 ? 2.4 : 1.4;
+        c2.beginPath(); c2.moveTo(-5, off); c2.lineTo(len, off + (q - 1) * 4); c2.stroke();
+      }
+    } else {
+      const r = (5 + m.amt * .22) * (1 - k * .2);
+      c2.globalAlpha *= .75; c2.lineWidth = 1.6;
+      c2.beginPath(); c2.arc(0, 0, r, -.9, 1.4); c2.stroke();
+      c2.beginPath(); c2.moveTo(-r * .65, -r * .3); c2.lineTo(r * .55, r * .4); c2.moveTo(-r * .25, r * .8); c2.lineTo(r * .35, -r * .65); c2.stroke();
+    }
+    c2.restore();
+  }
+  UPGRADE_HITMARKS.length = keep;
+  c2.restore();
+}
+
 // ---------- boot ----------
 function validateContent() {
   for (const [name, reg] of [['weapon', WEAPONS], ['map', MAPS], ['mode', MODES]]) {
@@ -321,4 +467,4 @@ window.SC = {
   setState,
 };
 
-boot();
+

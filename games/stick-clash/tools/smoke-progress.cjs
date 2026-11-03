@@ -72,7 +72,7 @@ async function testSim(page, { check, rows }) {
       return [k, KO_PARTS.length > 0];
     });
     // Taunt: key bound, meter at a safe distance, cancelled by a hit.
-    SC.start({ mode: 'pvp', weapons: ['katana', 'katana'] }); SC.G.lock = 0;
+    SC.start({ mode: 'pvp', map: 'dojo', weapons: ['katana', 'katana'] }); SC.G.lock = 0;   // a floor (Void Arena has none)
     moveFighter(SC.F[1], 900 - SC.F[1].P[2].x, 0); moveFighter(SC.F[0], 200 - SC.F[0].P[2].x, 0); SC.sim(.3);
     let s0 = SC.F[0].super; SC.press(0, 'taunt'); SC.sim(1.3);
     out.tauntMeter = SC.F[0].super - s0 >= TAUNT.meter - .01;
@@ -360,7 +360,10 @@ async function testPicker(browser, ctx) {
       navigator.getGamepads = () => [window.__pad];
       document.querySelector('#loadout [data-key="tab-weapon"]').focus();
     });
-    const press = async b => { await page.evaluate(i => { __pad.buttons[i].pressed = true; }, b); await page.waitForTimeout(90); await page.evaluate(i => { __pad.buttons[i].pressed = false; }, b); await page.waitForTimeout(90); };
+    // Held until focus moves (at most 600 ms): the UI polls pads once a frame, and a slow frame could miss a short tap.
+    const press = async b => { const from = await page.evaluateHandle(i => { __pad.buttons[i].pressed = true; return document.activeElement; }, b);
+      await page.waitForFunction(f => document.activeElement !== f, from, { timeout: 600 }).catch(() => {});
+      await page.evaluate(i => { __pad.buttons[i].pressed = false; }, b); await page.waitForTimeout(90); };
     await press(13);                                                              // d-pad down from the Weapon tab
     const into = await page.evaluate(() => document.activeElement.dataset.key);
     await press(13);
@@ -476,9 +479,16 @@ async function testMigration(browser, ctx) {
     return { ok, note: JSON.stringify(first) + errors.join('|') };
   });
   await step('migrates once (reload: same saves, no second notice)', async () => {
-    const before = await page.evaluate(() => JSON.stringify(Object.keys(localStorage).sort().map(k => [k, localStorage.getItem(k)])));
+    let before = await page.evaluate(() => JSON.stringify(Object.keys(localStorage).sort().map(k => [k, localStorage.getItem(k)])));
     await page.goto(URL);                     // a fresh load of the game without "?v3" (a reload would seed again)
     await page.waitForFunction(() => window.SC && SC.G.state === 'menu');
+    // Headless Chromium on file:// sometimes drops every key between documents (the game never clears all storage):
+    // then the old save is seeded and migrated again, once, before the check.
+    if (!(await page.evaluate(() => localStorage.getItem('stickclash.v2.profile')))) {
+      await page.goto(URL + '?v3'); await page.waitForFunction(() => window.SC && SC.G.state === 'menu');
+      before = await page.evaluate(() => JSON.stringify(Object.keys(localStorage).sort().map(k => [k, localStorage.getItem(k)])));
+      await page.goto(URL); await page.waitForFunction(() => window.SC && SC.G.state === 'menu');
+    }
     const again = await kept(), after = await page.evaluate(() => JSON.stringify(Object.keys(localStorage).sort().map(k => [k, localStorage.getItem(k)])));
     const ok = Object.entries(again).every(([k, v]) => k === 'toast' ? v === false : k === 'errors' ? !v.length : v === true) && before === after;
     return { ok, note: JSON.stringify(again) + (before === after ? '' : ' storage changed on reload') };

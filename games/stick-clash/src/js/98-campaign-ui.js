@@ -60,8 +60,8 @@ MODES.challenge.loadoutNext = () => openScreen('challenges');
 // fit each realm's nodes below a strip for its name.
 function campUV(n) {
   if (!CAMP_UI.tall) return { x: n.x, y: n.y };
-  const r = clamp(Math.floor(n.x / 25), 0, 3);
-  return { x: 4 + n.y * .92, y: r * 25 + 5 + (n.x - r * 25) / 25 * 19 };
+  const N = CAMP_REALMS.length, B = 100 / N, r = clamp(Math.floor(n.x / B), 0, N - 1);
+  return { x: 4 + n.y * .92, y: r * B + B * .2 + (n.x - r * B) / B * B * .76 };
 }
 // A gentle curve between two nodes (the walker follows the same curve the path is drawn with).
 function campCurve(a, b, t) {
@@ -112,7 +112,7 @@ SCREENS.campaign = () => {
   u.canvas = el('canvas', { class: 'camp-canvas', 'aria-hidden': 'true' });
   const realmAt = campRealmAt(s);
   const labels = CAMP_REALMS.map((r, i) => {
-    const p = CAMP_UI.tall ? { x: 2, y: i * 25 + 2.4 } : { x: i * 25 + 12.5, y: 4 };
+    const p = CAMP_UI.tall ? { x: 2, y: i * 100 / CAMP_REALMS.length + 2.4 } : { x: (i + .5) * 100 / CAMP_REALMS.length, y: 4 };
     return el('span', { class: 'camp-realm', style: { left: p.x + '%', top: p.y + '%', '--rc': r.color } }, (i > realmAt ? '🔒 ' : '') + r.name);
   });
   const box = el('div', { class: 'camp-map' + (u.tall ? ' tall' : '') }, u.canvas, labels, CAMP_NODES.map(n => campNodeButton(n, s)));
@@ -261,7 +261,7 @@ function campRng(seed) { return () => (seed = seed * 16807 % 2147483647) / 21474
 const CAMP_DECOR = CAMP_REALMS.map((r, i) => {
   const rand = campRng(97 + i * 131), out = [];
   for (let k = 0; k < 40 && out.length < 14; k++) {
-    const d = { x: i * 25 + 2 + rand() * 21, y: 8 + rand() * 86, s: .6 + rand() * .8, k: rand() };
+    const B = 100 / CAMP_REALMS.length, d = { x: i * B + B * .08 + rand() * B * .84, y: 8 + rand() * 86, s: .6 + rand() * .8, k: rand() };
     if (CAMP_NODES.every(n => Math.hypot(n.x - d.x, (n.y - d.y) * .6) > 6)) out.push(d);
   }
   return out;
@@ -290,7 +290,7 @@ function campDraw(t) {
   return true;
 }
 // The band of realm i (landscape: a column; portrait: a row).
-function campBand(i, w, h) { return CAMP_UI.tall ? [0, i * h / 4, w, h / 4] : [i * w / 4, 0, w / 4, h]; }
+function campBand(i, w, h) { const N = CAMP_REALMS.length; return CAMP_UI.tall ? [0, i * h / N, w, h / N] : [i * w / N, 0, w / N, h]; }
 function campFillBand(g, i, w, h, fill) { const [x, y, bw, bh] = campBand(i, w, h); g.fillStyle = fill; g.fillRect(x, y, bw, bh); }
 
 function campDrawRealm(g, r, i, P, w, h, k, t) {

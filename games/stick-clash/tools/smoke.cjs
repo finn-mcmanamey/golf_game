@@ -470,10 +470,12 @@ async function testV3Core(page) {
     const dashFrom = x => { const f = SC.F[x]; const x0 = f.P[2].x; SC.press(x, 'dash'); SC.sim(.45); return Math.abs(f.P[2].x - x0); };
     const trick = (__V.place(B, 300), SC.sim(.3), dashFrom(1)), invis = !!B.status.invis;
     [A, B] = __V.duel({ classes: ['gunner', 'none'], weapons: ['pistol', 'blade'] });
-    const plain = (__V.place(B, 300), SC.sim(.3), dashFrom(1));
+    out.gunnerAmmo = A.ammo === Math.round(WEAPONS.pistol.ranged.ammo * 1.5);
+    // The plain dash in the same blade duel as the Trickster's: a gunner foe can shoot (or set off v5's perfect dodge) mid-dash.
+    [A, B] = __V.duel({ classes: ['ninja', 'none'], weapons: ['blade', 'blade'] });
+    const plain = (SC.sim(1.5), __V.place(B, 300), SC.sim(.3), dashFrom(1));
     out.tricksterDash = trick > plain * 1.3 && invis;
     notes.tricksterDash = `${Math.round(trick)} vs ${Math.round(plain)} px`;
-    out.gunnerAmmo = A.ammo === Math.round(WEAPONS.pistol.ranged.ammo * 1.5);
     [A, B] = __V.duel({ classes: ['mage', 'none'], weapons: ['blade', 'blade'] });
     out.mageCooldown = A.skillCdMul < 1;
 

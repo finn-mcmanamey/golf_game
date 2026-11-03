@@ -60,20 +60,30 @@ function juiceCheckLanding(f) {
   if (!f.grounded) { st.air = true; st.vy = Math.max(st.vy, vy(f.P[2])); return; }
   if (st.air && st.vy > 700 && f.alive) {
     const power = clamp((st.vy - 700) / 900, .25, 1) * f.scale;
-    juiceDust(f.P[2].x, feetY(f), power);
+    juiceDust(f.P[2].x, feetY(f), power, landingDustColor());
     sfx('land', .4 + power * .6);
     if (power > .7) shake(3 * power);
   }
   st.air = false; st.vy = 0;
 }
 
+// Material-specific landing dust (v5): snow, sand, spores or hot grit make the arena feel physical.
+function landingDustColor() {
+  const k = String(MAP && MAP.key || '').toLowerCase();
+  if (/frost|moon|storm/.test(k)) return '#beebff';
+  if (/desert|temple/.test(k)) return '#ebc891';
+  if (/jungle|graveyard/.test(k)) return '#9fc27e';
+  if (/foundry|factory|eruption|caldera|train|station/.test(k)) return '#ff914b';
+  if (/neon|asteroid|sky/.test(k)) return '#8796ff';
+  return '#c8cdf0';
+}
 // Soft dust puffs (particles 35 draws as swelling sprites) that spread sideways along the ground and drift up.
-function juiceDust(x, y, power) {
+function juiceDust(x, y, power, color = '#c8cdf0') {
   if (G_STATE.sim) return;
   for (let k = 0, n = Math.round((3 + 5 * power) * FX.partMul); k < n; k++) {
     const dir = k % 2 ? 1 : -1, life = rnd(.35, .6);
     PARTS.push({ x: x + dir * rnd(2, 10), y: y - 5, vx: dir * rnd(60, 260) * power, vy: -rnd(10, 50) * power, life, max: life,
-      c: '#c8cdf0', s: rnd(7, 13) * (.7 + power * .5), grav: -60, soft: 1 });
+      c: color, s: rnd(7, 13) * (.7 + power * .5), grav: -60, soft: 1 });
   }
 }
 

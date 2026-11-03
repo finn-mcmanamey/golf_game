@@ -175,10 +175,52 @@ function drawStdBackground(c2, m, t) {
   else mapGlow(c2, W / 2, H, W / 2, p.accent, .18);   // bottomless: a faint glow rising out of the void
 }
 
+// Background-only particles provide weather and atmosphere without touching simulation or collision state.
+// Each map family gets a different motion profile; fixed seeds keep shapes stable between frames.
+function drawAmbientLayer(c2, m, t) {
+  if (!m) return;
+  const key = String(m.key || '').toLowerCase(), p = m.palette || {};
+  const qualityMul = SETTINGS.quality === 'low' ? .42 : SETTINGS.quality === 'medium' ? .7 : 1;
+  const particleMul = PARTICLE_MULS[SETTINGS.particles] || 1;
+  const cold = /frost|moon|storm/.test(key), hot = /foundry|factory|eruption|caldera|train|station/.test(key);
+  const spooky = /graveyard|mansion/.test(key), water = /pirate|ocean|ship/.test(key);
+  const sweet = /candy|bounce/.test(key), kitchen = /kitchen/.test(key);
+  const sand = /desert|temple|jungle/.test(key), space = /asteroid|sky|neon|space/.test(key);
+  const color = cold ? '#ccefff' : hot ? '#ffad66' : spooky ? '#c4ffd9' : water ? '#8deaff' : sweet ? '#ffc0ef' : kitchen ? '#dfedff' : sand ? (key.includes('jungle') ? '#baff9a' : '#f3d19a') : (p.accent || '#b6c6ff');
+  const count = Math.max(5, Math.round((cold || hot || spooky ? 24 : 17) * qualityMul * particleMul));
+  c2.save(); c2.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < count; i++) {
+    const seed = i * 127.13 + (key.length * 31.7);
+    const drift = Math.sin(t * (cold ? .4 : spooky ? .7 : .22) + i * 1.71) * (cold ? 10 : spooky ? 18 : 16);
+    const speed = cold ? 19 + (i % 5) * 7 : hot ? 12 + (i % 7) * 8 : spooky ? 7 + (i % 4) * 4 : water ? 4 + (i % 5) * 3 : sand ? 5 + (i % 4) * 3 : 2;
+    const xMotion = water ? t * speed * (i % 2 ? 1 : -.75) : hot ? t * speed * .45 : t * (cold ? 5 : 1.5);
+    const x = ((seed * 13.37 + drift + xMotion) % (W + 40) + W + 40) % (W + 40) - 20;
+    const yMotion = spooky || kitchen ? -t * speed : t * speed;
+    const y = ((seed * 7.91 + yMotion + Math.sin(t * .7 + i) * 11) % (H + 40) + H + 40) % (H + 40) - 20;
+    const r = cold ? .8 + (i % 3) * .55 : hot ? .7 + (i % 3) * .35 : .65 + (i % 2) * .4;
+    c2.globalAlpha = (cold || spooky ? .22 : hot || water ? .24 : sweet ? .18 : .13) * (.65 + .35 * Math.sin(t * 1.7 + i * 2));
+    c2.fillStyle = color;
+    if (cold) { c2.beginPath(); c2.arc(x, y, r, 0, TAU); c2.fill(); }
+    else if (hot) { c2.strokeStyle = color; c2.lineWidth = r; c2.beginPath(); c2.moveTo(x, y); c2.lineTo(x - 1.5 - (i % 3), y + 3 + (i % 4)); c2.stroke(); }
+    else if (spooky) { c2.beginPath(); c2.arc(x, y, r * 1.7, 0, TAU); c2.strokeStyle = color; c2.lineWidth = .7; c2.stroke(); }
+    else if (water) { c2.strokeStyle = color; c2.lineWidth = r; c2.beginPath(); c2.moveTo(x - 4, y); c2.quadraticCurveTo(x, y - 1.5, x + 5, y); c2.stroke(); }
+    else if (sweet) { c2.beginPath(); c2.moveTo(x, y - 2.5); c2.lineTo(x + 1.3, y); c2.lineTo(x, y + 2.5); c2.lineTo(x - 1.3, y); c2.closePath(); c2.fill(); }
+    else if (kitchen) { c2.strokeStyle = color; c2.lineWidth = .8; c2.beginPath(); c2.moveTo(x, y + 4); c2.quadraticCurveTo(x - 3, y, x + 1, y - 4); c2.stroke(); }
+    else if (sand) { c2.fillRect(x, y, r * 1.8, r * .8); }
+    else if (space) { c2.fillRect(x, y, r, r); }
+    else { c2.beginPath(); c2.arc(x, y, r, 0, TAU); c2.fill(); }
+  }
+  c2.restore();
+}
+
 function drawSolid(c2, s, m, t) {
   if (s.draw) return hook(s, 'draw', c2, s, t);
   if (m.drawSolid) return hook(m, 'drawSolid', c2, s, t);
   mapSlab(c2, s, m.palette.solid, s.move ? m.palette.accent : m.palette.line);   // the shared slab (60-maps)
+  // v5: one-way ledges show rail posts and moving platforms carry end lights, so both read at a glance.
+  const p = m.palette;
+  if (s.oneWay) { c2.fillStyle = rgba(p.line, .32); for (let xx = s.x + 18; xx < s.x + s.w - 8; xx += 34) c2.fillRect(xx, s.y + 5, 1, Math.max(1, Math.min(s.h, 14) - 8)); }
+  if (s.move) for (const x of [s.x + 10, s.x + s.w - 10]) { circle(c2, x, s.y + 7, 4.2, rgba(p.accent, .16)); circle(c2, x, s.y + 7, 2.2, p.accent); circle(c2, x, s.y + 7, .8, '#ffffff'); }
 }
 
 // Liquid pool (lava, acid...): a fainter wave rolling the other way behind the glowing one, a bright crest, bubbles.
@@ -275,21 +317,34 @@ function recordTrail(f) {
   if (f.trail.length > 8) f.trail.shift();
 }
 
-// While swinging, a filled swoosh shows the arc of the attack so it reads clearly; otherwise a faint tip trail.
+// The attack ribbon combines a translucent swept surface with a crisp, tapered tip trace.
+// Saving canvas state prevents trail alpha and shadow settings leaking into the fighter body pass.
 function drawTrail(f, base) {
   const tr = f.trail;
   if (tr.length < 2 || !f.alive) return;
+  ctx.save();
+  const swinging = f.swingT > 0, swing = Math.min(1, f.swingT / .12);
+  const trailColor = f.element && ELEMENTS[f.element] ? ELEMENTS[f.element].color : (f.w && f.w.color && f.w.color !== '#dfe6ff' ? f.w.color : f.color);
   for (let k = 1; k < tr.length; k++) {
     const a = tr[k - 1], b = tr[k], age = k / tr.length;
-    if (f.swingT > 0) {
-      ctx.globalAlpha = base * age * .4 * Math.min(1, f.swingT / .12);
-      poly(ctx, [{ x: a.hx, y: a.hy }, a, b, { x: b.hx, y: b.hy }], f.color);
-    } else if (b.fast) {
-      ctx.globalAlpha = base * age * .35;
-      line(ctx, a, b, f.color, 2 + k);
+    if (swinging) {
+      ctx.globalAlpha = base * age * .34 * swing;
+      poly(ctx, [{ x: a.hx, y: a.hy }, a, b, { x: b.hx, y: b.hy }], trailColor);
+    }
+    if (swinging || b.fast) {
+      const power = swinging ? swing : .6;
+      ctx.globalAlpha = base * age * (swinging ? .52 : .2) * power;
+      ctx.strokeStyle = trailColor; ctx.lineCap = 'round';
+      ctx.lineWidth = (1.3 + age * (swinging ? 3.6 : 2.2)) * f.scale;
+      ctx.shadowColor = trailColor; ctx.shadowBlur = 8 * GLOW_SCALE;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      if (swinging && age > .55) {
+        ctx.globalAlpha *= .58; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(.7, ctx.lineWidth * .32);
+        ctx.shadowBlur = 0; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
     }
   }
-  ctx.globalAlpha = base;
+  ctx.restore();
 }
 
 function drawBody(f, color, width) {
@@ -340,20 +395,126 @@ function drawIceBlock(f) {
   ctx.beginPath(); ctx.moveTo(x + 8, y + h * .35); ctx.lineTo(x + w * .35, y + 8); ctx.moveTo(x + 8, y + h * .55); ctx.lineTo(x + w * .2, y + h * .4); ctx.stroke();
 }
 
+// Lightweight combat rim-light. It follows the actual ragdoll joints, so effects stay
+// attached through knockback and unusual poses instead of behaving like a static sticker.
+function drawFighterEnergy(f, sc) {
+  const low = !f.status.invis && f.hp / f.maxHp < .22;
+  const active = f.swingT > 0 || f.dashT > 0 || f.status.rage || f.status.burn || f.status.haste || f.status.freeze || low;
+  if (!active || !f.alive) return;
+  const color = f.status.freeze ? '#9fe8ff' : f.status.burn ? '#ff7a2e' : f.status.rage ? '#ff3d5a' : low ? '#ff435d' : f.color;
+  const strength = f.swingT > 0 ? .34 : low ? .14 + .045 * (1 + Math.sin(G_STATE.t * 10 + f.id)) : .19;
+  ctx.save(); ctx.globalAlpha *= strength;
+  ctx.strokeStyle = color; ctx.lineWidth = (f.swingT > 0 ? 10 : 7) * sc;
+  ctx.lineCap = ctx.lineJoin = 'round'; ctx.shadowColor = color; ctx.shadowBlur = 13 * GLOW_SCALE;
+  ctx.beginPath();
+  for (const [a, b] of BODY_LINKS) { ctx.moveTo(f.P[a].x, f.P[a].y); ctx.lineTo(f.P[b].x, f.P[b].y); }
+  ctx.stroke();
+  ctx.shadowBlur = 0; ctx.globalAlpha *= .9; ctx.lineWidth = 1.5 * sc;
+  ctx.beginPath();
+  for (const [a, b] of BODY_LINKS) { ctx.moveTo(f.P[a].x, f.P[a].y); ctx.lineTo(f.P[b].x, f.P[b].y); }
+  ctx.stroke();
+  if (f.swingT > 0) {
+    const h = f.P[f.main.hand], tip = f.P[f.tip];
+    const dx = tip.x - h.x, dy = tip.y - h.y, len = Math.hypot(dx, dy) || 1;
+    ctx.globalAlpha *= .8; ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 18 * GLOW_SCALE;
+    circle(ctx, h.x + dx / len * len * .72, h.y + dy / len * len * .72, 3.2 * sc, color);
+  }
+  ctx.restore();
+}
+
+function drawFighterShadow(f) {
+  if (!f.alive || !f.P || f.P.length < 11) return;
+  const feet = [f.P[8], f.P[10]].filter(Boolean);
+  if (!feet.length) return;
+  const x = feet.reduce((n, p) => n + p.x, 0) / feet.length;
+  const y = Math.max(...feet.map(p => p.y)) + 8 * f.scale;
+  // Find the nearest visible landing surface beneath the fighter instead of using only MAP.floor.
+  // This lets the shadow tighten under jumps and land on the top of raised platforms.
+  let groundY = MAP.floor == null ? H + 140 : MAP.floor;
+  for (const s of MAP.solids || []) {
+    if (x < s.x - 4 || x > s.x + s.w + 4 || s.y < y - 6) continue;
+    if (s.y < groundY || groundY < y - 6) groundY = s.y;
+  }
+  const height = Math.max(0, groundY - y);
+  const spread = clamp(1 - height / 620 * .68, .28, 1);
+  const opacity = .2 * clamp(1 - height / 1100, .24, 1);
+  const auraColor = f.status.freeze ? '#9fe8ff' : f.status.burn ? '#ff7a2e' : f.status.rage ? '#ff3d5a' : f.color;
+  // A faint palette glow pins the fighter to the arena visually; it fades rapidly while airborne.
+  const contact = clamp(1 - height / 100, 0, 1) * .22;
+  if (contact > .005) {
+    ctx.save(); ctx.globalAlpha = contact;
+    const rad = ctx.createRadialGradient(x, y + 1, 0, x, y + 1, 44 * f.scale * spread);
+    rad.addColorStop(0, rgba(auraColor, .5)); rad.addColorStop(.45, rgba(auraColor, .14)); rad.addColorStop(1, rgba(auraColor, 0));
+    ctx.fillStyle = rad; ctx.beginPath(); ctx.ellipse(x, y + 1, 44 * f.scale * spread, 9 * f.scale * spread, 0, 0, TAU); ctx.fill(); ctx.restore();
+  }
+  ctx.save(); ctx.globalAlpha = opacity; ctx.fillStyle = '#02030a'; ctx.shadowColor = '#000'; ctx.shadowBlur = 12 * GLOW_SCALE * spread;
+  ctx.beginPath(); ctx.ellipse(x, y, 29 * f.scale * spread, 6 * f.scale * spread, 0, 0, TAU); ctx.fill(); ctx.restore();
+}
+
+// A restrained specular pass gives rigid metal weapons a readable edge without changing their hitboxes.
+function drawWeaponEdgePass(c2, f, rig, v) {
+  const cat = rig.w && rig.w.cat;
+  if (!v || rig.w.chain || !['blade', 'heavy', 'polearm'].includes(cat) || v.L < 18) return;
+  c2.save();
+  const a = v.at(v.L * .18, 1.1 * v.k), b = v.at(v.L * .78, 1.1 * v.k);
+  const shine = c2.createLinearGradient(a.x, a.y, b.x, b.y);
+  shine.addColorStop(0, 'rgba(255,255,255,0)');
+  shine.addColorStop(.38, 'rgba(255,255,255,.22)');
+  shine.addColorStop(.72, 'rgba(255,255,255,.68)');
+  shine.addColorStop(1, 'rgba(255,255,255,.04)');
+  c2.globalAlpha *= .8; c2.strokeStyle = shine; c2.lineWidth = Math.max(.65, 1.15 * f.scale);
+  c2.lineCap = 'round'; c2.beginPath(); c2.moveTo(a.x, a.y); c2.lineTo(b.x, b.y); c2.stroke();
+  const glint = v.at(v.L * (.52 + .08 * Math.sin(G_STATE.t * 5 + f.id)), 1.1 * v.k);
+  c2.globalAlpha *= .75; c2.fillStyle = '#ffffff'; c2.shadowColor = '#ffffff'; c2.shadowBlur = 5 * GLOW_SCALE;
+  c2.beginPath(); c2.arc(glint.x, glint.y, 1.1 * f.scale, 0, TAU); c2.fill();
+  c2.restore();
+}
+
+// Tiny joint collars and a broken head rim make the ragdoll silhouette feel deliberately designed,
+// while remaining attached to the live physics points during flips, grabs and knockback.
+function drawFighterDetailPass(c2, f) {
+  if (!f.alive || !f.P || f.P.length < 11 || f.status.invis) return;
+  const P = f.P, sc = f.scale, col = f.status.freeze ? '#c7f1ff' : f.status.burn ? '#ffb06e' : f.color;
+  c2.save(); c2.globalAlpha *= .42; c2.lineCap = 'round'; c2.lineJoin = 'round';
+  const headR = HEAD_R * sc * (f.headMul || 1);
+  c2.strokeStyle = col; c2.lineWidth = Math.max(.8, 1.25 * sc);
+  c2.beginPath(); c2.arc(P[0].x, P[0].y, headR + 2.1 * sc, Math.PI * 1.04, Math.PI * 1.82); c2.stroke();
+  c2.globalAlpha *= .76; c2.strokeStyle = '#ffffff'; c2.lineWidth = Math.max(.65, .75 * sc);
+  c2.beginPath(); c2.arc(P[0].x - 1.2 * sc, P[0].y - 1.2 * sc, headR + .7 * sc, Math.PI * 1.08, Math.PI * 1.48); c2.stroke();
+  c2.fillStyle = col;
+  for (const i of [3, 5, 7, 9]) {
+    const p = P[i]; if (!p) continue;
+    c2.beginPath(); c2.arc(p.x, p.y, Math.max(1.3, 1.8 * sc), 0, TAU); c2.fill();
+  }
+  const cx = P[1].x * .38 + P[2].x * .62, cy = P[1].y * .38 + P[2].y * .62;
+  c2.globalAlpha *= .7; c2.fillStyle = '#ffffff'; c2.beginPath(); c2.arc(cx, cy, Math.max(.8, 1.3 * sc), 0, TAU); c2.fill();
+  c2.restore();
+}
+
 function drawFighter(f) {
   if (!f.alive && f.shatterT > 0) return;          // K.O.'d: the body burst into neon pieces (36-shatter)
   const P = f.P, sc = f.scale, base = fighterAlpha(f);
   ctx.save();
   postfxSquash(ctx, f);                            // squash and stretch on hits (84)
   ctx.globalAlpha = base; ctx.lineCap = ctx.lineJoin = 'round';
+  drawFighterShadow(f);
   drawTrail(f, base);
   drawFighterUnder(f);                             // v3: hoverboard, dragon (22-moves dispatches)
-  if (f.alive && (f.status.haste || f.dashT > 0)) {   // afterimage
-    ctx.globalAlpha = base * .22;
-    ctx.save(); ctx.translate(-f.face * 16 * sc, 0); drawBody(f, f.color, 6 * sc); ctx.restore();
-    ctx.globalAlpha = base;
+  if (f.alive && (f.status.haste || f.dashT > 0)) {   // velocity-led afterimages, not a fixed sideways duplicate
+    const torso = P[2], speedX = vx(torso), speedY = vy(torso);
+    const mag = Math.hypot(speedX, speedY), inv = mag > 1 ? 1 / mag : 0;
+    const backX = mag > 70 ? -speedX * inv : -f.face, backY = mag > 70 ? -speedY * inv : 0;
+    const streak = clamp(mag * .018, 13, 30) * sc;
+    ctx.save();
+    for (let ghost = 2; ghost >= 1; ghost--) {
+      ctx.globalAlpha = base * (ghost === 1 ? .16 : .075);
+      ctx.translate(backX * streak * .46, backY * streak * .46);
+      drawBody(f, f.status.haste ? '#b9f8ff' : f.color, (6 - ghost * .55) * sc);
+    }
+    ctx.restore(); ctx.globalAlpha = base;
   }
   const look = lookOf(f), hm = f.headMul || 1;      // 78-outfits: outfit, weapon skins; 79: big-heads mutator
+  drawFighterEnergy(f, sc);
   outfitDraw(ctx, f, look, 'back', G_STATE.t);
   artBody(f, bodyColor(f), sc);                    // in the arena's art style (59)
   outfitDraw(ctx, f, look, 'front', G_STATE.t);
@@ -362,7 +523,10 @@ function drawFighter(f) {
   for (const rig of rigsOf(f)) if (f.P[rig.hand] && f.P[rig.tip]) {   // a rig can outlive its points (replay ghosts)
     const view = weaponView(f, rig);
     artWeaponShadow(f, rig, view); skinDrawWeapon(ctx, f, rig, view, look);   // paper: a shadow first (59)
+    drawWeaponEdgePass(ctx, f, rig, view);
   }
+  drawFighterDetailPass(ctx, f);
+  drawUpgradeDamageFlash(f);                      // crisp, short-lived impact response (visual only)
   drawStatusOverlays(f);
   for (const key of f.skills) if (key && SKILLS[key] && SKILLS[key].draw) hook(SKILLS[key], 'draw', ctx, f);
   drawFighterOver(f);                              // v3: guard arc, element glow, Lv3 trail, mech/jetpack, ultimates
@@ -440,6 +604,26 @@ function drawProjectiles() {
     for (const p of g.list) { ctx.moveTo(p.x + g.r * .6, p.y); ctx.arc(p.x, p.y, g.r * .6, 0, TAU); }
     ctx.fillStyle = '#ffffff'; ctx.fill();
   }
+  // Velocity-led tail sheens make fast shots read clearly against busy arenas. This is a single
+  // narrow stroke per projectile, layered over the batched trails above to keep the renderer cheap.
+  ctx.save(); ctx.lineCap = 'round'; ctx.globalCompositeOperation = 'lighter';
+  const qualityCap = SETTINGS.quality === 'low' ? 12 : SETTINGS.quality === 'medium' ? 36 : 72;
+  const streakLimit = Math.min(PROJ.length, Math.max(8, Math.round(qualityCap * (PARTICLE_MULS[SETTINGS.particles] || 1))));
+  let streaks = 0;
+  for (let i = PROJ.length - 1; i >= 0 && streaks < streakLimit; i--) {
+    const p = PROJ[i];
+    if (p.draw || p.trail === false || !(p.r > 0)) continue;
+    const speed = Math.hypot(p.vx || 0, p.vy || 0);
+    if (speed < 300) continue;
+    const ux = (p.vx || 0) / speed, uy = (p.vy || 0) / speed;
+    const len = Math.min(25, 5 + speed * .004) * clamp(p.r / 5, .65, 1.7);
+    const tail = ctx.createLinearGradient(p.x - ux * len, p.y - uy * len, p.x, p.y);
+    tail.addColorStop(0, rgba(p.color, 0)); tail.addColorStop(.68, rgba(p.color, .38)); tail.addColorStop(1, 'rgba(255,255,255,.86)');
+    ctx.strokeStyle = tail; ctx.lineWidth = Math.max(.8, p.r * .52);
+    ctx.beginPath(); ctx.moveTo(p.x - ux * len, p.y - uy * len); ctx.lineTo(p.x, p.y); ctx.stroke();
+    streaks++;
+  }
+  ctx.restore();
 }
 
 // Arrows at the screen edge for fighters launched out of view (drawn in arena coordinates).
@@ -450,10 +634,20 @@ function drawOffscreen() {
     const head = f.P[0], sx = (head.x - left) * s, sy = (head.y - top) * s + y0;
     if (sx > -10 && sx < W + 10 && sy > y0 - 10 && sy < y1 + 10) continue;
     const x = clamp(sx, 26, W - 26), y = clamp(sy, y0 + 26, y1 - 26), a = Math.atan2(sy - y, sx - x);
-    ctx.save(); ctx.translate(x, y); ctx.rotate(a);
-    poly(ctx, [[14, 0], [-8, -10], [-8, 10]], f.color, '#07080f', 2);
+    const pulse = .5 + .5 * Math.sin(G_STATE.t * 5.5 + f.id * 1.9);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = .18 + pulse * .12; ctx.strokeStyle = f.color; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(x, y, 15 + pulse * 3, 0, TAU); ctx.stroke();
     ctx.restore();
-    circle(ctx, x - Math.cos(a) * 20, y - Math.sin(a) * 20, 9, 'rgba(8,9,20,.8)', f.color, 2);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+    ctx.globalAlpha = .28 + pulse * .12; poly(ctx, [[17, 0], [-10, -12], [-10, 12]], f.color, f.color, 1);
+    ctx.globalAlpha = 1; poly(ctx, [[14, 0], [-8, -9], [-8, 9]], f.color, '#07080f', 2);
+    ctx.strokeStyle = 'rgba(255,255,255,.72)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(8, 0); ctx.stroke();
+    ctx.restore();
+    const bx = x - Math.cos(a) * 20, by = y - Math.sin(a) * 20;
+    circle(ctx, bx, by, 9, 'rgba(8,9,20,.88)', rgba(f.color, .65 + pulse * .25), 2);
+    circle(ctx, bx, by, 3.2, f.color);
   }
 }
 
@@ -517,6 +711,30 @@ function hudTextShadow(on) {
   ctx.shadowColor = on ? 'rgba(0,0,0,.9)' : 'transparent'; ctx.shadowBlur = on ? 3 : 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = on ? 1 : 0;
 }
 
+// Finishing pass for health bars: a restrained gloss, dark lower bevel, 10% scale marks and a fine rim.
+// It is clipped to the actual filled health so damage remains immediately legible.
+function drawHealthBarFinish(x, y, w, h, frac, right) {
+  const liveW = w * clamp(frac, 0, 1), liveX = right ? x + w - liveW : x;
+  ctx.save();
+  if (liveW > 0) {
+    ctx.beginPath(); ctx.rect(liveX, y, liveW, h); ctx.clip();
+    const gloss = ctx.createLinearGradient(0, y, 0, y + h);
+    gloss.addColorStop(0, 'rgba(255,255,255,.24)');
+    gloss.addColorStop(.35, 'rgba(255,255,255,.055)');
+    gloss.addColorStop(1, 'rgba(0,0,0,.19)');
+    ctx.fillStyle = gloss; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(255,255,255,.16)'; ctx.lineWidth = 1;
+    for (let i = 1; i < 10; i++) {
+      const xx = x + w * i / 10;
+      ctx.beginPath(); ctx.moveTo(xx, y + 3); ctx.lineTo(xx, y + h - 3); ctx.stroke();
+    }
+  }
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(230,238,255,.26)'; ctx.lineWidth = 1;
+  ctx.strokeRect(x + .5, y + .5, Math.max(0, w - 1), Math.max(0, h - 1));
+  ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(x + 1, y + 1, Math.max(0, w - 2), 1);
+}
+
 function drawCard(f, x, y, w, right) {
   f.hpShow = lerp(f.hpShow, f.hp, .08);
   const dir = right ? -1 : 1, ax = right ? x + w : x;
@@ -553,6 +771,7 @@ function hudHealth(f, x, y, w, h, right) {
   ctx.fillStyle = rgba('#ffffff', big ? .45 : .4); fillBar(x, y, w, h, f.hpShow / f.maxHp, right);
   ctx.fillStyle = f.alive ? f.color : '#444a66'; fillBar(x, y, w, h, frac, right);
   if (big && f.alive && frac < .25) { ctx.fillStyle = `rgba(255,60,90,${.25 + .2 * Math.sin(G_STATE.t * 10)})`; fillBar(x, y, w, h, frac, right); }
+  drawHealthBarFinish(x, y, w, h, frac, right);   // v5: gloss and tick marks
   accessCardMark(f, x, y, w, h, right);   // colour-blind marker + pattern (92-access)
   ctx.font = `700 ${big ? 12 : 10}px ${FONT_BODY}`; ctx.textBaseline = 'middle'; ctx.textAlign = right ? 'left' : 'right';
   ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(7,8,15,.85)'; ctx.fillStyle = '#ffffff'; ctx.lineJoin = 'round';
@@ -748,6 +967,7 @@ function drawScreenOverlays(dt) {
 function drawWorld(dt, t, sx, sy) {
   setWorldTransform(sx, sy);
   if (typeof MAP.drawBg === 'function') hook(MAP, 'drawBg', ctx, t); else drawStdBackground(ctx, MAP, t);
+  drawAmbientLayer(ctx, MAP, t);  // map-family weather and drifting motes, behind all gameplay geometry
   artSurfaces(ctx, true);    // paper: card shadows
   for (const hz of MAP.hazards) drawHazard(ctx, hz, MAP, t);
   for (const s of MAP.solids) drawSolid(ctx, s, MAP, t);
@@ -761,6 +981,7 @@ function drawWorld(dt, t, sx, sy) {
   koFxDraw(ctx); petsDraw(ctx); miniDrawWorld(ctx);   // K.O. effects, pets (78), mini-game props (79)
   drawProjectiles();
   ART.dots = 1; drawFx(ctx); ART.dots = 0;   // particles in the art style's shape (59)
+  drawCombatMarks(ctx);  // signature marks for weapon-specific hit feedback
   hook(MAP, 'drawFg', ctx, t);
   worldDrawTop(ctx, t);      // weather, darkness and lights (58)
   postfxDrawWorld(ctx);      // dynamic lights, impact sparks and flashes (84)

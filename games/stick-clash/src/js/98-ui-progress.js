@@ -160,7 +160,7 @@ function codexEntries(tab) {
   if (tab === 'r') return (typeof CAMP_REALMS === 'object' ? CAMP_REALMS : []).map((r, i) => {
     const s = typeof campSave === 'function' ? campSave() : { stars: {} }, nodes = CAMP_NODES.filter(n => n.r === i);
     const cleared = nodes.filter(n => (s.stars || {})[n.id] > 0).length;
-    return { name: r.name, icon: ['🔥', '❄', '☁', '🌑'][i] || '🗺', text: `${cleared}/${nodes.length} places cleared`, lore: codexLore('r', r.key, r.name),
+    return { name: r.name, icon: ['🔥', '❄', '☁', '🌑', '✷'][i] || '🗺', text: `${cleared}/${nodes.length} places cleared`, lore: codexLore('r', r.key, r.name),
       stats: [cleared, nodes.reduce((a, n) => a + ((s.stars || {})[n.id] || 0), 0)], labels: ['Cleared', 'Stars'] };
   });
   return Object.entries(SECRETS).map(([k, s]) => secretFound(k)   // found: the code (or feat) stays on the card and its lore joins it

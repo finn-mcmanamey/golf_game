@@ -39,6 +39,12 @@ secret extras stay hidden until you find them (see **Secrets** below). None of i
   pops up mid-fight after five Shift presses; Player 2's super moved to backslash (\). Fighters no longer get stuck
   hooked over the Pirate Ship's railings (you can climb back aboard over them).
 
+## New in v5: the Rift
+
+18 Rift weapons with rarity tiers and weapon mastery, perfect dodges and counters, tech recovery, new skills and orbs,
+the Ascension roguelite climb, the Infection, Blitz and Rift modes, two new arenas and a fifth Mythic Quest realm, the
+Neon Rift.
+
 ## Controls
 
 | Action | Player 1 | Player 2 | Gamepad |

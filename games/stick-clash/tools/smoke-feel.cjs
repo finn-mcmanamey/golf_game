@@ -47,9 +47,10 @@ const HELPERS = () => {
     },
     // CPU vs CPU on one arena: upright share and the longest stretch any fighter spent not upright.
     upright(map, secs) {
-      let alive = 0, up = 0, worst = 0;
+      let alive = 0, up = 0, worst = 0; const keep = Math.random;
       const down = new Map();
       for (let k = 0; k < 2; k++) {
+        __F.seed(map.length * 31 + k + 1);
         SC.start({ mode: 'watch', map, weapons: ['random', 'random'], winScore: 999 }); SC.G.state = 'play';
         for (let t = 0; t < secs / 2; t += 1 / 30) {
           const was = SC.F.map(f => f.upT);
@@ -62,6 +63,7 @@ const HELPERS = () => {
           });
         }
       }
+      Math.random = keep;
       return { map, upright: up / Math.max(1, alive), worstDown: worst };
     },
   };

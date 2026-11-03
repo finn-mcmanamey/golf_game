@@ -409,7 +409,7 @@ function aiMicro(f, L, dt) {
   if (f.w.ranged || a.fire) aiShoot(f, L, foe);
   else if (a.queue && G_STATE.t >= a.queue) { inp.attack = true; a.queue = 0; }      // the swing that follows a dash/jump
   else if (a.armed && !a.queue && f.atkCd <= 0) aiTryMove(f, L, foe);
-  if (f.w.ai.think && f.w.ranged) hook(f.w.ai, 'think', f, foe, Math.abs(foe.P[2].x - f.P[2].x));   // charge/hold weapons
+  if (f.w.ai.think) hook(f.w.ai, 'think', f, foe, Math.abs(foe.P[2].x - f.P[2].x));   // charge/hold weapons, v5 melee brains
 }
 
 // A human with a gun has none of the CPU gunner's evasion reflexes, so the dash- and jump-in tactics that beat

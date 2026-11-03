@@ -137,7 +137,7 @@ function questStep(dt) {
   const rules = run.spec.rules || {}, goal = run.spec.goal || { kind: 'win' };
   if (!me || !me.alive) {
     // A trade (you and the last foe K.O.'d in the same instant) still wins a plain "defeat them" fight.
-    const trade = me && goal.kind !== 'survive' && goal.kind !== 'count' && !run.broke && !F.some(f => f.team !== 0 && f.alive && !f.summon);
+    const trade = me && goal.kind !== 'survive' && goal.kind !== 'count' && goal.kind !== 'hold' && !run.broke && !F.some(f => f.team !== 0 && f.alive && !f.summon);
     return questEnd(trade ? 0 : 1, 'ko');
   }
   if (rules.noBlock && me.blocking) run.broke = 'You blocked!';
@@ -145,7 +145,10 @@ function questStep(dt) {
   if (run.broke) return questFail(run.broke);
   const foesUp = F.some(f => f.team !== 0 && f.alive && !f.summon);
   if (goal.kind === 'survive' && run.t >= goal.secs) return questEnd(0, 'survived');
-  if (goal.kind === 'count') {
+  if (goal.kind === 'hold') {
+    if (questHold(run, me, goal, dt)) return questEnd(0, 'goal');
+    questRespawnFoes(run, dt);
+  } else if (goal.kind === 'count') {
     if ((run.count[goal.stat] || 0) >= goal.n) return questEnd(0, 'goal');
     questRespawnFoes(run, dt);
   } else if (!foesUp) return questEnd(0, 'ko');
@@ -213,6 +216,7 @@ function questOutcome(run) {
 function questGoalText(spec, run) {
   const g = spec.goal || { kind: 'win' };
   if (g.kind === 'survive') return `SURVIVE  ${Math.max(0, Math.ceil(g.secs - (run ? run.t : 0)))} s`;
+  if (g.kind === 'hold') return questHoldText(g, run);
   if (g.kind === 'count') return `${QUEST_STAT_NAMES[g.stat].toUpperCase()}  ${Math.min(g.n, run ? run.count[g.stat] || 0 : 0)} / ${g.n}`;
   return spec.foes.length > 1 ? 'DEFEAT ALL FOES' : 'DEFEAT YOUR FOE';
 }
@@ -441,6 +445,76 @@ const CAMP_NODES = [
     post: [[LUMEN, 'Look! The Great Candle burns again!'], [LUMEN, 'Light returns to every realm. Well walked, little Wick.'],
       [LUMEN, 'When you want more, the Challenges are waiting on the title screen.']] },
 ];
+// ---------- v5: Realm 5, The Neon Rift (opens after the Unlit Throne) ----------
+// The four original realms keep their layout, squeezed from 0-100 to 0-80 across; the rift takes 80-100.
+for (const n of CAMP_NODES) n.x = Math.round(n.x * .8 * 10) / 10;
+CAMP_REALMS.push({ key: 'rift', name: 'The Neon Rift', color: '#ff5ad1', foe: '#5ef2ff', maps: ['void-arena', 'crystal-cavern', 'neon', 'station'] });
+(n => { n.to = ['r1']; n.post = n.post.slice(0, 2).concat([[LUMEN, 'Wait... the Candle\u2019s light tore the sky open. Something is singing on the other side.'],
+  [LUMEN, 'A new realm, the Neon Rift, is on the map. Rest first if you like: it isn\u2019t going anywhere.']]); })(CAMP_NODES.find(n => n.id === 'd5'));
+QUEST_PHASES.warden = [
+  { at: .5, name: 'LOCKDOWN', sub: 'A drone joins: the shield still has a back', color: '#5ef2ff',
+    fx: [['adds', { n: 1, weapon: 'javelin', name: 'WARDEN DRONE', color: '#8cf6ff', hpMul: .3 }], ['buff', { statuses: ['rage'], secs: 30 }]] }];
+QUEST_PHASES.conductor = [
+  { at: .9, name: 'OVERTURE', sub: 'Watch his feet: a gold ring means a wave', color: '#ffd84a', fx: [['riftWave', { every: 6.5 }]] },
+  { at: .6, name: 'CRESCENDO', sub: 'Jump the shockwaves on the downbeat', color: '#ffd84a', fx: [['riftWave', { every: 5.2 }]] },
+  { at: .3, name: 'FINALE', sub: 'The whole rift plays along', color: '#ff5ad1',
+    fx: [['riftWave', { every: 3.6 }], ['rain', { every: 1.5, dmg: 8, radius: 60, color: '#ffd84a', status: ['stun', .3, 1] }],
+      ['adds', { n: 2, weapon: 'bass-drop', name: 'BACKUP DANCER', color: '#ff5ad1', hpMul: .25 }]] }];
+// The Conductor: a 0.8 s ring warns, then a wave runs out both ways along the ground. Readable and jumpable.
+BOSS_PHASE_FX.riftWave = (ctl, o) => questPeriodic(o, (boss, o) => {
+  const x0 = boss.P[2].x, y0 = feetY(boss), hit = new Set();
+  sfx('rift-beat', .8);
+  skillZone({ owner: boss, x: x0, y: y0, life: .8, danger: 90,
+    draw(ctx, z) { const k = z.t / z.life; circle(ctx, z.x, z.y - 4, 30 + 70 * k, null, rgba('#ffd84a', .3 + .6 * k), 3 + 3 * k); },
+    onExpire() {
+      shake(7); sfx('rift-onbeat', .9);
+      for (const dir of [-1, 1]) skillZone({ owner: boss, x: x0, y: y0, life: 2.2, danger: 60,
+        onStep(z, dt) {
+          z.x += dir * (o.speed || 560) * dt;
+          for (const e of enemiesOf(boss)) if (e.alive && !hit.has(e) && Math.abs(e.P[2].x - z.x) < 30 && feetY(e) > z.y - 52) {
+            hit.add(e);
+            damage(e, o.dmg || 9, { src: boss, kind: 'skill', nx: dir, ny: -1, kb: 540, status: ['stun', .35, 1], color: '#ffd84a' });
+          }
+        },
+        draw(ctx, z) {
+          for (let k = 0; k < 4; k++) {
+            const h = 30 + 14 * Math.sin(z.t * 24 + k * 2), x = z.x - dir * k * 10;
+            lineXY(ctx, x, z.y, x + dir * 4, z.y - h, k ? rgba('#ffd84a', .7) : '#ffffff', 4 - k * .6);
+          }
+        } });
+    } });
+});
+CAMP_NODES.push(
+  { id: 'r1', r: 4, x: 83, y: 76, kind: 'fight', name: 'Riftfall', to: ['r2', 'rs'], map: 'void-arena', par: 45, heroSave: 2,
+    foes: [['Rift Skirmisher', 'grapnel', 'normal', { hp: .5 }], ['Rift Skirmisher', 'gloop', 'normal', { hp: .5 }]],
+    pre: [[LUMEN, 'Broken floors floating over nothing. Mind the edges, little Wick: the rift tugs at anyone in the air.'],
+      ['RIFT SKIRMISHER', 'Fresh light! Hook it, goo it, drop it!']],
+    post: [[LUMEN, 'They came through with weapons I\u2019ve never seen. Pick some up yourself: the arsenal has grown.']] },
+  { id: 'r2', r: 4, x: 87, y: 52, kind: 'fight', name: 'Resonance Well', to: ['r3'], map: 'crystal-cavern', par: 50,
+    goal: { kind: 'hold', secs: 16, x: 640, w: 230 },
+    foes: [['Crystal Mite', 'echo-blades', 'easy', { hp: .4 }], ['Crystal Mite', 'javelin', 'easy', { hp: .4 }]],
+    pre: [[LUMEN, 'The well hums with the Candle\u2019s light. Stand on it and let it charge!'],
+      [LUMEN, 'It only charges while no mite stands on it with you. Knock them off, then hold your ground.']] },
+  { id: 'rs', r: 4, x: 82, y: 26, kind: 'side', name: 'Echo Gallery', to: [], map: 'neon', par: 40,
+    goal: { kind: 'survive', secs: 35 },
+    foes: [['Echo', 'chrono-katana', 'normal', { hp: .45 }], ['Echo', 'phase-rifle', 'normal', { hp: .45 }], ['Echo', 'bass-drop', 'easy', { hp: .45 }]],
+    pre: [[LUMEN, 'Echoes of fighters who came before. You can\u2019t beat them all, but you can outlast them.'],
+      [LUMEN, 'Try the new tricks: dash right as a hit lands for a PERFECT dodge, and hold guard as you land to TECH back up.']] },
+  { id: 'r3', r: 4, x: 91, y: 70, kind: 'fight', name: 'Gravity Garden', to: ['r4'], map: 'void-arena', par: 55, heroSave: 2,
+    foes: [['Gardener', 'thornvine', 'normal', { hp: .55, skills: ['snare', 'rewind'] }], ['Gardener', 'anchor', 'normal', { hp: .55 }]],
+    pre: [['GARDENER', 'Every vine here grows toward the void. So will you.']] },
+  { id: 'r4', r: 4, x: 94, y: 44, kind: 'mini', name: "Warden's Gate", to: ['r5'], map: 'crystal-cavern', phases: 'warden', par: 60,
+    foes: [['Rift Warden', 'aegis-tower', 'hard', { scale: 1.3, hp: .85, boss: true, color: '#5ef2ff', skills: ['parry', 'overclock'] }]],
+    pre: [['RIFT WARDEN', 'None pass the Gate.'],
+      [LUMEN, 'That tower shield stops anything from the front. Get behind it, or bait the riposte (it glows) and punish.']] },
+  { id: 'r5', r: 4, x: 97, y: 68, kind: 'boss', name: "The Conductor's Stage", to: [], map: 'neon', phases: 'conductor', par: 100, final: true,
+    finalTitle: 'THE RIFT IS SEALED!',
+    foes: [['The Conductor', 'conductor', 'hard', { scale: 1.5, hp: .82, dmg: .85, boss: true, color: '#ffd84a', skills: ['blink', 'overclock'] }]],
+    pre: [['THE CONDUCTOR', 'You lit a candle and the whole universe heard it. Now hear MY song.'],
+      [LUMEN, 'His rods arc lightning between them. Never stand between two, and jump when the stage pulses!']],
+    post: [[LUMEN, 'The song has stopped. The rift closes, and the light holds.'], [LUMEN, 'You walked every realm there is, little Wick.'],
+      [LUMEN, 'Ascension waits in the modes list, if you still want a climb.']] });
+
 const CAMP_BY_ID = Object.fromEntries(CAMP_NODES.map(n => [n.id, n]));
 const CAMP_PARENTS = {};
 for (const n of CAMP_NODES) for (const k of n.to) (CAMP_PARENTS[k] = CAMP_PARENTS[k] || []).push(n.id);
@@ -451,7 +525,7 @@ const CAMP_KINDS = { fight: { icon: '⚔', label: 'Battle' }, side: { icon: '✦
 const CAMP_HERO_HP = { fight: 1.3, side: 1.3, mini: 1.4, boss: 1.6 };
 // A node as a trial spec (the star rules: health and the node's par time).
 function campSpec(n) {
-  return { foes: n.foes, map: n.map, wx: n.wx, mods: n.mods, me: { hp: n.heroHp || CAMP_HERO_HP[n.kind], ringSave: n.heroSave }, goal: { kind: 'win' }, rules: {},
+  return { foes: n.foes, map: n.map, wx: n.wx, mods: n.mods, me: { hp: n.heroHp || CAMP_HERO_HP[n.kind], ringSave: n.heroSave }, goal: n.goal || { kind: 'win' }, rules: n.rules || {},
     st: ['hp', n.kind === 'boss' ? .3 : .4, 'time', n.par || 45] };
 }
 
@@ -540,6 +614,6 @@ function campSettle(run, dryRun) {
   const lines = [o.won ? `${questStarStr(o.stars)}  in ${Math.round(o.t)} s with ${Math.round(o.hp * 100)}% health` : `${node.name} stands. Try again, Wick!`];
   if (gained) lines.push(`+${gained} skill point${gained > 1 ? 's' : ''} (${campPoints(s)} to spend)`);
   if (opened.length) lines.push('Unlocked: ' + opened.map(n => n.name).join(', '));
-  const title = !o.won ? 'Defeated' : node.final ? 'THE CANDLE BURNS AGAIN!' : node.kind === 'boss' ? `${node.foes[0][0]} falls!` : `${node.name} cleared!`;
+  const title = !o.won ? 'Defeated' : node.final ? (node.finalTitle || 'THE CANDLE BURNS AGAIN!') : node.kind === 'boss' ? `${node.foes[0][0]} falls!` : `${node.name} cleared!`;
   return { title, color: o.won ? CAMP_REALMS[node.r].color : '#ff8a2e', won: o.won, stars: o.stars, lines };
 }

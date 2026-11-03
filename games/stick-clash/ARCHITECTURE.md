@@ -1062,6 +1062,35 @@ between matches, and fights drift with it), so two builds render the same fight.
 times drift by several % between runs); `--base file.json` compares with a saved run; `--styles` adds smoke-styles'
 styled-vs-neon ratios. Wrap it in the shared lock when another agent measures too.
 
+## v5 "Rift" expansion and the v5.1 merge
+
+v5 (the player's own build) added, on top of v4.0:
+- the Rift arsenal in `79-progress.js`: 18 weapons with rarity tiers (`tier`: common/rare/epic/mythic);
+- the Void Arena and Crystal Cavern, and the Infection, Blitz and Rift modes;
+- the Neon Rift realm (`r1`–`r5`) in `76-campaign.js`;
+- `99-v5-expansion.js`:
+  - perfect dodge and counter, tech recovery;
+  - the Overclock, Rift Recall and Blood Pact skills; the Quicksilver, Siphon and Tempo orbs;
+  - Ascension (a roguelite climb with relics), cosmetic weapon mastery, the codex Techniques tab;
+  - a kill feed, combo meter and low-health vignette;
+  - settings `v5Slowmo`, `v5Beat`, `v5MasteryFx` and `v5Tips`;
+- a damage rim flash (`99-main.js`) and drawing polish in `85-render.js`;
+- `styles/99-v5-polish.css`.
+
+v5 was built from v4.0, so v5.1 merges it with v4.1/v4.1.1 slice by slice (three-way, base v4.0):
+- v4.1.1's resolution ladder, arena depth and laptop fixes are kept;
+- v5's default-platform rail posts and moving-platform lights sit on v4.1's shared `mapSlab`;
+- v5's health-bar gloss (`drawHealthBarFinish`) sits in `hudHealth`;
+- landing dust uses v4.1's soft puffs in v5's per-arena colours.
+
+Fixes made in the merge:
+- v5's banner helper was a second top-level `announce` that silently replaced 82's spoken announcer; it is now
+  `feedAnnounce`.
+- v5's weapon insert had deleted the secret Prism Crown hat that the SHINY code still unlocks; it is restored.
+- The 28 new weapons, skills, arenas, bosses and the realm got codex lore.
+
+The size budget is 2 MB from v5.1.
+
 ## v4.1.1 fixes (laptop play)
 
 - **Dash off Shift:** the default dash keys are Space (P1) and Enter (P2), and P2's super is backslash: on Windows,
