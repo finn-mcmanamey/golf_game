@@ -7,8 +7,8 @@ install, and the whole game is one offline HTML file.
 **To play:** open `dist/stick-clash.html` in Chrome, Edge, Firefox or Safari. If it isn't there yet, run
 `node build.mjs` first. It works offline from your disk.
 
-Everything is unlocked from the start: 51 weapons, 24 skills, 6 classes, 6 throwables, 8 ultimates, 23 arenas and
-25 modes, the **Mythic Quest** campaign (24 stops across 4 realms) and **31 challenges**, and every look: hats, colour
+Everything is unlocked from the start: 81 weapons, 35 skills, 9 classes, 10 throwables, 6 mounts, 8 ultimates, 25 arenas
+and 37 modes, the **Mythic Quest** campaign (30 stops across 5 realms) and **31 challenges**, and every look: hats, colour
 packs, outfits, weapon skins, K.O. effects, pets, victory poses and titles. There is nothing to buy or grind; only a few
 secret extras stay hidden until you find them (see **Secrets** below). None of it changes how strong you are.
 

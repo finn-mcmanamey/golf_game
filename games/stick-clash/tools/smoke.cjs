@@ -713,10 +713,13 @@ async function testUI(browser) {
     return page.evaluate(() => { __atkOff(); return __atk > 0; });
   });
   await step('block key raises the guard', async () => {
-    await page.keyboard.down('KeyF'); await page.waitForTimeout(150);
-    const up = await page.evaluate(() => SC.F[0].blocking);
-    await page.keyboard.up('KeyF'); await page.waitForTimeout(60);
-    return up && !(await page.evaluate(() => SC.F[0].blocking));
+    // Waits for the guard (at most 600 ms) instead of a fixed 150 ms: a slow frame in a long run can step past it.
+    // All 81 weapons raise it within 150 ms after the attack step above when run alone.
+    const guard = want => page.waitForFunction(w => SC.F[0].blocking === w, want, { timeout: 600 }).then(() => true, () => false);
+    await page.keyboard.down('KeyF');
+    const up = await guard(true);
+    await page.keyboard.up('KeyF');
+    return up && await guard(false);
   });
   await step('grab, throwable and super keys', async () => {
     await page.keyboard.press('KeyC'); await page.waitForTimeout(60);
