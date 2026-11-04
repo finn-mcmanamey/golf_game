@@ -1066,6 +1066,15 @@ between matches, and fights drift with it), so two builds render the same fight.
 times drift by several % between runs); `--base file.json` compares with a saved run; `--styles` adds smoke-styles'
 styled-vs-neon ratios. Wrap it in the shared lock when another agent measures too.
 
+## v7.1 painted arenas
+
+`64c-maps-painted.js` adds the Lantern Festival (`lanterns`) and the Glowshroom Forest (`glowshroom`). Their backdrops
+are pictures generated with the GameFoundry connector (two panoramas, cropped and scaled to 960 px wide WebP, ~47 KB
+in total) kept in `assets/arena-*.webp`. `build.mjs` turns any `'@asset:file.webp'` string in a slice into a data URL,
+so the game stays one offline file. `paintedBackdrop` draws the picture with a little parallax and dims it (`dim`) so
+painted scenery never competes with the real ledges; headless runs, which have no `Image`, simply skip it. The ledges,
+lantern platforms (`move`), mushroom caps and spring pads (60's `mapStepPads`) are ordinary map content.
+
 ## v7 "More fun" update
 
 v7 makes fights feel better without adding modes: three new slices, each hooking in by wrapping and events.

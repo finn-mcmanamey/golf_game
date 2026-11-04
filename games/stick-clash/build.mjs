@@ -27,7 +27,17 @@ function errorLine(err, filename) {
 function readSlices() {
   const names = fs.readdirSync(JS_DIR).filter(n => n.endsWith('.js')).sort();
   if (!names.length) fail('no slices found in src/js');
-  return names.map(name => ({ name, code: fs.readFileSync(path.join(JS_DIR, name), 'utf8').replace(/\r\n/g, '\n') }));
+  return names.map(name => ({ name, code: embedAssets(fs.readFileSync(path.join(JS_DIR, name), 'utf8').replace(/\r\n/g, '\n'), name) }));
+}
+
+// '@asset:file.webp' in a slice becomes a data: URL of assets/file.webp, so the built game stays one offline file.
+const ASSET_MIME = { webp: 'image/webp', png: 'image/png', jpg: 'image/jpeg' };
+function embedAssets(code, slice) {
+  return code.replace(/'@asset:([\w.-]+)'/g, (_, file) => {
+    const p = path.join(ROOT, 'assets', file), mime = ASSET_MIME[file.split('.').pop()];
+    if (!fs.existsSync(p) || !mime) fail(`${slice}: asset ${file} is missing or not an image`);
+    return `'data:${mime};base64,${fs.readFileSync(p).toString('base64')}'`;
+  });
 }
 
 // Each slice must be valid on its own (strict mode) so errors are reported against the right file.

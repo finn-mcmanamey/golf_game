@@ -7,7 +7,7 @@ install, and the whole game is one offline HTML file.
 **To play:** open `dist/stick-clash.html` in Chrome, Edge, Firefox or Safari. If it isn't there yet, run
 `node build.mjs` first. It works offline from your disk.
 
-Everything is unlocked from the start: 81 weapons, 35 skills, 9 classes, 10 throwables, 6 mounts, 8 ultimates, 25 arenas
+Everything is unlocked from the start: 81 weapons, 35 skills, 9 classes, 10 throwables, 6 mounts, 8 ultimates, 27 arenas
 and 37 modes, the **Mythic Quest** campaign (30 stops across 5 realms) and **31 challenges**, and every look: hats, colour
 packs, outfits, weapon skins, K.O. effects, pets, victory poses and titles. There is nothing to buy or grind; only a few
 secret extras stay hidden until you find them (see **Secrets** below). None of it changes how strong you are.
@@ -74,6 +74,8 @@ More to fight with, and much more for two players on one keyboard.
 - **No more weak weapons:** every weapon now wins about half its fights, and 16 have a signature bonus to aim for: the
   Spear's TIP! crit, the Katana's IAI CUT!, three Haymakers in a row for an UPPERCUT!, the Pulse Pistol's OVERCHARGE!
   last round and more. The weapon picker tells you each bonus.
+- **Two painted arenas (v7.1):** the **Lantern Festival** (lantern ledges that rise and sink over a night river) and
+  the **Glowshroom Forest** (giant glowing mushroom caps and springy little mushrooms).
 
 ## Controls
 
@@ -447,6 +449,8 @@ Each fighter carries two skills (Skill 1 and Skill 2) with their own cooldowns, 
 | **Space Asteroid** | Every planetoid has its own gravity: run right round it, jump to hop to the next. Deep space is a ring-out. |
 | **Haunted Mansion** | The lights flicker and die every few seconds: fighters and blades glow in the dark. |
 | **Giant's Kitchen** | Tiny fighters on a giant countertop: a toaster launcher, a whirring blender and runaway fruit. |
+| **Lantern Festival** | A night river full of floating lanterns. The lantern ledges rise and sink on the breeze, so time your jumps. |
+| **Glowshroom Forest** | A glowing mushroom forest. Stand on the giant caps, and step on the small glowing mushrooms to spring sky-high. |
 
 Arena traps always flash a warning before they strike, and they stay quiet for the first seconds of each round.
 Crates, glass panes and stone pillars on many arenas break under hits, shots and blasts (and what stood on them falls).
