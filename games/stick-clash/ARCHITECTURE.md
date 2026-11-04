@@ -1066,6 +1066,554 @@ between matches, and fights drift with it), so two builds render the same fight.
 times drift by several % between runs); `--base file.json` compares with a saved run; `--styles` adds smoke-styles'
 styled-vs-neon ratios. Wrap it in the shared lock when another agent measures too.
 
+## v7 "More fun" update
+
+v7 makes fights feel better without adding modes: three new slices, each hooking in by wrapping and events.
+
+| Slice | Contents |
+|---|---|
+| `46b-weapons-tune.js` | `power` retunes for 48 weapons (every weapon 42–58% at Normal) and 16 signature bonuses through one `damage` wrapper |
+| `68-ai-v7.js` | CPU trick brains, charge reads, weapon swaps, the Volley fix, personality lines and show-offs, W7 bonus hints |
+| `87c-juice-v7.js` | impact tiers, named finishers, the streak ladder, comic body gags, the "Comic callouts" setting |
+
+Merge notes (v7.0): on a combo-ladder rung (3, 5, 8, 12, 16) the corner sticker replaces 30-combat's in-world
+"N HIT COMBO" label for that hit (a `float` wrapper at the end of 87c). Talk lines (68) and juice effects (87c) draw from
+their own random streams, so seeded fights are unchanged by them.
+Once 68's CPUs aimed for the new bonuses, the Rapier, Energy Saber, Haymakers and Nunchaku won 61-70%, so their `power` came
+down (.82, .86, .84, .98) and the Longshot went from .85 to .9: all 81 weapons now win 41-58% at Normal
+(`V3=1 node tools/balance.cjs 120`). The v6 kit's duck-lure test gives its CPU a Blade, because the Katana's v7
+quick-draw hint rushes in and pops the duck mid-air.
+
+### Weapon tuning and bonuses (`46b-weapons-tune.js`)
+
+The player said "some weapons feel weak". That meant two things, and this pass fixes both:
+1. **Win rate**: in the v6 round robin a third of the arsenal sat outside 42–58% (Echo Blades 32%, Conductor 74%).
+2. **Feel**: plenty of weapons won about half their rounds and still felt limp: a spear that pokes like a stick, a
+   pistol that plinks, gloves whose third punch looks like the first.
+
+Everything is in one new slice that retunes the existing defs at boot; no older weapon slice was edited.
+
+#### Files
+
+| File | What |
+|---|---|
+| `src/js/46b-weapons-tune.js` (new, 26.1 KB) | `W7_POWER` (power table), `W7` (bonus numbers), 16 signature bonuses through one `damage` wrapper and a few def hooks, new descriptions/sigs, bonus sounds and 6 `WSND` signatures, 3 lore lines, a How to Play card and codex technique |
+| `tools/smoke-v7-weapons.cjs` (new) | seeded CPU duels per bonus, focused mechanics, content, balance-table check, screenshots |
+| `tools/smoke.cjs` | one guarded registration line (after `smoke-v6-kit`) |
+
+No CSS. `dist/stick-clash.html`: 1,929,496 → 1,956,269 bytes (+26,773; budget +40 KB).
+
+#### The bonuses
+
+Each bonus shows a label in its colour, two rings, a burst of sparks, a little extra hit-stop and shake, and plays its
+own sound (all effects: nothing visual changes the fight). `emit('weaponBonus', attacker, key, victim)` fires when one
+lands; per-fighter counts are in `f.mem.w7n`.
+
+| Weapon | Bonus (label) | How it triggers | What it does | Sound |
+|---|---|---|---|---|
+| Spear | TIP! | the contact point is within 30 px of the spear tip, on a hit of 4+ | ×1.5 damage, ×1.3 knockback | bright ding |
+| Halberd | HOOKED! | a hit from the sweeping chop (not the lunge); once per foe per 1.2 s | ×1.15 and trips the foe flat (`pwTrip`) | metal hook + thud |
+| Katana | IAI CUT! | the first hit within 0.4 s of a rested quick-draw | ×1.45, ×1.3 knockback | high whoosh + ring |
+| Energy Saber | RIPOSTE! | the first cut within 2 s after deflecting a shot or winning a clash (the blade flickers white while armed) | ×1.3, ×1.25 knockback | sizzle + ring |
+| Rapier | TOUCHÉ! | the 3rd hit in a row on one foe (each within 1.6 s) | ×1.7 | ding |
+| Viper Whip | CRACK! | the tip moving at 1250+ px/s (was a 1500 px/s check for the slow only) | ×1.55, ×1.3 knockback, 1 s slow | sharp crack |
+| Nunchaku | STAGGER! | every 5th hit in a row (each within 1.8 s) | ×1.3 and a 0.45 s stun | double clack |
+| Quake Hammer | QUAKE! | the downswing slam (unchanged trigger) | shockwave radius 150 → 200 px, damage 7 → 10 | deep rumble |
+| Ripper Saw | RIP! | 6 grind ticks in a row on one foe | grind ticks ramp 2 → 3.4; the 6th is an 8-damage melee rip that throws the foe and ends the rev | rising snarl |
+| Haymakers | UPPERCUT! | the 3rd punch in a row on one foe (each within 1.5 s) | ×1.6, ×1.5 knockback, aimed straight up | boxing bell |
+| Kusarigama | REAP! | a hit on a bleeding foe; once per foe per 1.2 s | ×1.35 and a harder drag | rising rasp |
+| Tempest Fan | GALE! | every 3rd swing | the gust becomes a gale: radius 15 → 26, push 620 → 1050, damage 3 → 5, flies further | big gust |
+| Echo Blades | RESONANCE! | the echo cuts a foe the main swing hit just before | the echo hits ×2.2 | chord |
+| Chrono Katana | TICK! | any cut on a Time-Warped foe | ×1.3; the Time Stop field also winds back up in 4.5 s (was 6) | clock tick |
+| Pulse Pistol | OVERCHARGE! | the last round in the clip | a fat bolt (radius 7, its own glow and muzzle ring): ×1.8 damage, 640 knockback | charge-up zap |
+| Thunder Six | DOUBLE TAP! | a hit within 1.1 s of the previous one on the same foe | ×1.3; every hit now also staggers 0.3 s | heavy thud |
+
+Finishers (iai, riposte, touché, stagger, uppercut, reap) never count as less than 6 damage before their multiplier,
+so a bonus from a slow swing still lands like one (`W7.finMin`), and no bonus hit counts as more than 30 before
+`power` and weapon level (`W7.bonusCap`; `TUNE.maxHit` is 26), so a crit can't one-shot. Streaks count contacts
+within 0.08 s once (both ends of a swing, both gloves). Every number above is in `W7`, and the descriptions are built from it.
+
+New `WSND` signatures (the six had only their category's): spear, halberd, saber, kusarigama, pistol (hit), revolver.
+Three lore lines were rewritten to match the new identities (spear, Haymakers, Thunder Six). Pistol and revolver
+descriptions now say five rounds (their magazines hold 5).
+
+#### How it is wired
+
+- **`damage` wrapper** (`w7Damage0`): inside v5's (perfect dodge runs first) and outside 46's soak wrapper. For melee
+  and shot damage from a fighter whose weapon (or the shot's `w7Key`) has an entry in `W7_HIT`, `pre(A, B, o, amount)`
+  may return `{ key, mul, kb, min, o }`; after a hit that dealt damage, `post` runs (streaks, statuses) and then the
+  feedback (`w7Land`). Blocked or dodged hits show nothing and don't count.
+- **Def hooks** (`w7Wrap(key, method, fn)` keeps the old method): katana `attack` (marks a quick-draw), saber `draw`
+  (armed flicker), war fan `attack` (upgrades every 3rd gust), chrono katana `onHit` (shorter wind-up). Whip `onHit`,
+  hammer `onStep` and chainsaw `onStep` are replaced with versions that keep the old behaviour plus the bonus.
+- **Events**: `on('block')` with no attacker (a deflected shot) and `on('clash')` arm the saber; `on('fire')` turns the
+  pistol's last round into the bolt and tags revolver shots.
+- **Help**: a "Weapon bonuses" card in How to Play and a codex Techniques entry.
+
+#### Balance
+
+`V3=1 node tools/balance.cjs 120 normal 4` (every visible weapon, same random class and throwables both sides;
+±~2.3% at ~460 rounds per weapon). "Before" is v6 at 60 s/pair (±~3.7%).
+
+Sorted by the v6 rate; **bold** = outside 42–58% before. Hard is `V3=1 node tools/balance.cjs 60 hard 4` (±~3.7%).
+
+| Weapon | Before % | After % | Hard % | `power` | Bonus |
+|---|---|---|---|---|---|
+| Echo Blades | **32** | 47 | 54.5 | 0.82 → 0.9 | RESONANCE! |
+| Haymakers | **35.2** | 53.4 | 60.1 | 1 → 0.96 | UPPERCUT! |
+| Chrono Katana | **37.1** | 48.3 | 52.5 | 1.02 → 1.15 | TICK! |
+| Ripper Saw | **39.1** | 48.4 | 63.8 | 1.38 | RIP! |
+| Thunder Six | **39.6** | 52.8 | 38 | 1 → 1.02 | DOUBLE TAP! |
+| Kickback Gauntlet | **39.7** | 48.1 | 59.3 | 1.25 → 1.5 |  |
+| Viper Whip | **40.5** | 46.2 | 59.6 | 1.33 → 1.22 | CRACK! |
+| Singularity Gauntlets | **40.7** | 55.4 | 65.3 | 0.88 → 1.06 |  |
+| Energy Saber | **40.8** | 52.4 | 56.2 | 1.18 → 1 | RIPOSTE! |
+| Kusarigama | **40.9** | 48 | 56.3 | 1.16 → 1.1 | REAP! |
+| Tempest Fan | **41** | 43.8 | 51 | 1.24 | GALE! |
+| Katana | **41.1** | 51.9 | 52.5 | 1.12 → 1.08 | IAI CUT! |
+| Spear | **41.6** | 48.3 | 58.1 | 1.12 | TIP! |
+| Pillow | 42.9 | 50.2 | 48.1 | 1.15 → 1.25 |  |
+| Rapier | 43.3 | 54.3 | 62.3 | 1.02 | TOUCHÉ! |
+| Halberd | 43.9 | 50 | 48.7 | 1.12 | HOOKED! |
+| Quake Hammer | 44.8 | 42.4 | 56.1 | 1.14 → 1.2 | QUAKE! |
+| Magnet Glove | 44.9 | 49.9 | 52.5 | 1.2 → 1.32 |  |
+| Starlight Wand | 45 | 58 | 59.1 | 0.74 → 0.8 |  |
+| Bubble Blaster | 45.2 | 54.3 | 43.5 | 1.15 → 1.25 |  |
+| Reaver Axe | 45.5 | 50 | 57.1 | 1.1 → 1.22 |  |
+| Twinblade Axe | 45.8 | 45.1 | 43.9 | 1.2 |  |
+| Tidecaller | 45.9 | 50.2 | 52.9 | 1.11 → 1.2 |  |
+| Slugger | 45.9 | 48 | 49.5 | 1.13 → 1.2 |  |
+| Moonreach Naginata | 46 | 50.4 | 53.5 | 1.25 → 1.3 |  |
+| Pebble Sling | 46.4 | 48 | 45.5 | 0.84 → 0.96 |  |
+| Twin Plasma Staff | 46.6 | 46.4 | 44.4 | 1.08 → 1.14 |  |
+| Shadow Kunai | 47.5 | 48.4 | 46.6 | 1.12 |  |
+| Snowball Launcher | 47.5 | 45.1 | 42.8 | 0.8 → 0.84 |  |
+| Blade | 47.6 | 50.1 | 49 | 1.1 |  |
+| Void Orb | 47.6 | 49.8 | 31.7 | 0.74 → 0.8 |  |
+| Gloop Cannon | 47.9 | 51.9 | 37.9 | 1.3 → 1.35 |  |
+| Sugar Rush | 48.2 | 47.8 | 48.9 | 1.16 |  |
+| Plunger Bow | 48.3 | 49.7 | 42.1 | 1.2 → 1.25 |  |
+| Spiked Mace | 48.4 | 50.4 | 48.4 | 1.2 |  |
+| Nailbow | 48.5 | 48.4 | 39.4 | 0.82 |  |
+| Water Blaster | 48.8 | 48.3 | 36.8 | 1.15 → 1.2 |  |
+| Grapnel Chain | 48.9 | 48.9 | 45.7 | 1.1 → 1.16 |  |
+| Longshot | 49.1 | 45.9 | 34.4 | 0.85 |  |
+| Bo Staff | 49.2 | 47.9 | 54.6 | 1.1 → 1.16 |  |
+| Umbrella | 49.4 | 53.2 | 58.6 | 1.06 → 1.2 |  |
+| Skyrocket | 49.7 | 52.3 | 36.7 | 0.82 |  |
+| Rock Guitar | 49.7 | 47.5 | 49.7 | 0.9 |  |
+| Pop Launcher | 50 | 44.5 | 41.7 | 0.8 |  |
+| Bass Drop | 50.5 | 53.5 | 45.6 | 1.22 |  |
+| Wingrang | 50.6 | 52.5 | 41.6 | 0.7 |  |
+| Moonbow | 50.6 | 45.6 | 42.4 | 0.9 |  |
+| Pulse Pistol | 50.9 | 45.2 | 37.7 | 1.1 → 1 | OVERCHARGE! |
+| flamethrower | 51.5 | 44.2 | 36.7 | 1.4 → 1.45 |  |
+| Banana Launcher | 51.9 | 54.6* | 39.8 | 0.77 |  |
+| Greatsword | 52 | 52.5 | 62.8 | 1 → 1.1 |  |
+| Thornvine | 52 | 52 | 51.3 | 1.12 → 1.3 |  |
+| Guardian | 52.1 | 53 | 57.8 | 1.08 |  |
+| Nunchaku | 52.1 | 49.7 | 59.7 | 1.08 | STAGGER! |
+| Twin Fangs | 52.2 | 51.5 | 49.7 | 0.87 |  |
+| Morning Star | 52.2 | 49.4 | 56 | 1.18 → 1.22 |  |
+| Party Popper | 52.4 | 51.8 | 36.9 | 0.95 → 1 |  |
+| Buzzsaw | 52.5 | 50.4 | 38 | 0.9 → 0.96 |  |
+| Iron Skillet | 53 | 54 | 56.8 | 1.18 |  |
+| Emberbrand | 53.4 | 44.8 | 54.7 | 1.1 |  |
+| Cryo Ray | 53.4 | 42.9 | 39.7 | 0.88 |  |
+| Reaper Scythe | 54 | 45.7 | 52.7 | 1.21 |  |
+| Paint Roller | 54.2 | 47.3 | 54.1 | 1.12 |  |
+| Boomstick | 54.4 | 48 | 37.1 | 0.87 |  |
+| Aegis Tower | 54.7 | 49.5 | 54.1 | 0.88 |  |
+| Graviton Maul | 55.2 | 56.1 | 43.1 | 1.02 |  |
+| Photon Lance | 55.3 | 56.6 | 52.2 | 1 |  |
+| Tennis Racket | 56.9 | 55.1 | 56.1 | 1.15 → 1.2 |  |
+| Pogo Hammer | 57.5 | 49.5 | 48.1 | 1.1 |  |
+| Broadsword | 57.6 | 57.4 | 59 | 1 → 1.02 |  |
+| Nova Cannon | 57.7 | 48.5 | 40.3 | 0.89 |  |
+| Storm Staff | **58.5** | 49.2 | 58.6 | 1 → 0.97 |  |
+| Prism Cannon | **59.3** | 54.6 | 47.5 | 1.2 → 1.08 |  |
+| Tidebreaker Anchor | **59.5** | 52.5 | 52.9 | 1.04 → 0.96 |  |
+| Rimefang | **59.7** | 52.9 | 60.8 | 1.14 |  |
+| Yo-Yo | **60.8** | 46.8 | 65.4 | 0.8 → 0.76 |  |
+| Skyfall Javelin | **63** | 45.9 | 46.8 | 1.05 → 0.96 |  |
+| Starfall Mortar | **64.8** | 53.3 | 46.3 | 1 → 0.8 |  |
+| Meteor Flail | **66.2** | 53.2 | 52.6 | 1.05 → 0.95 |  |
+| Phase Rifle | **68.5** | 53.7 | 54.9 | 0.96 → 0.82 |  |
+| Conductor Rods | **74** | 54.2 | 35.6 | 0.95 → 0.74 |  |
+
+\* The Banana Launcher was re-measured alone (`balance.cjs 120 <diff> 4 banana`) after its trim (.77 → .74) was undone:
+at .74 it fell to 25% at Hard.
+
+How it got there (four 60–120 s passes): the first pass with the bonuses overshot (Pulse Pistol 68, Energy Saber 64,
+Thunder Six 60), so the multipliers came down (overcharge 2.2 → 1.8, riposte 1.7 → 1.3, double tap 1.5 → 1.3) and so
+did their base `power`. The finisher floor briefly pushed Saber to 68% and Kusarigama to 63% until riposte, reap,
+iai and touché were trimmed. Buffing ~20 weapons pulled the untouched middle down a few points, so a second ring of
+plain `power` buffs (umbrella, thornvine, battle axe, naginata...) followed.
+
+**Normal: every weapon 42.4–58.0%** (v6: 32–74%, 23 outside 42–58). **Hard: 31.7–65.4%**, all inside 30–70%.
+
+The bonus cap (`W7.bonusCap`) and the deflected-shot guard went in after that pass. A 60 s/pair re-run of the 16 bonus
+weapons with them (`balance.cjs 60 normal 4 <keys>`, ~185 rounds each, ±3.7%) gave 44.1–61.9%; the one above 58
+(Rapier 61.9) had measured 53.0 and 54.3 in the two 120 s passes, so it was left alone.
+
+Classes and skills (spot checks with this build; both sides of a class or skill fight hold the same random weapon):
+- `node tools/class-balance.cjs 72 20 normal 4`: every class 46.8–54.2% (v6: 46.3–55.0). Widest pair Gunner over Mage
+  68/32 on ~65 rounds (v6's widest was 35/65 at the same size).
+- `node tools/skill-balance.cjs`: every skill's field rate 40.6–57.5% (target 40–60). Impact (~120 rounds each, ±4.5%)
+  ranges 42.5 (Blood Pact) to 73 (Fireball); the v6 kit's skills (Rally Cry 67, Shrink Bolt 57.5, Shadow Step 57.8,
+  Mirror Shield 56.9, Wall Up 55.9, Spring Pad 51.4, Pinball 47.2, Tornado 55.9) are within sampling of their numbers
+  in ARCHITECTURE.md.
+
+Performance (`node tools/arena-perf.cjs --runs 3 --vs tmp/v6-base.html`): 34 of 36 scenes within −10%…+6.5%. The two
+above 8% in that run (Colossus +26%, Station +12%) were re-measured with `--runs 5 --only
+colossus,station,candy,mansion,void-arena`: −2.8%, −4.9%, +2.3%, −1.8%, +4.4%. The scenes are seeded CPU fights, so new
+weapon numbers change the frozen frame being drawn; the slice itself only adds the saber's armed flicker and the
+pistol bolt.
+
+#### Tests
+
+`node tools/smoke-v7-weapons.cjs` (standalone, after `node build.mjs`; `--no-shots` skips screenshots), also run by
+`tools/smoke.cjs`:
+- one seeded CPU duel per bonus weapon (Math.random seeded as in smoke-feel) until its bonus lands twice: it must deal
+  damage, leave no errors or NaN, and the victim must show the effect (stun, slow, trip, launch, stagger...);
+- focused checks with scripted inputs: the pistol's 5th shot is the bolt (and only it), the spear tip crit, a clash
+  arms the saber and the riposte lands (and the arm wears off), the hammer's quake reaches 180 px, Time Stop rearms
+  in 4.5 s, the chainsaw ramp and rip;
+- content: the power table is applied, every description names its bonus, every bonus sound exists and plays without
+  an AudioContext, the `WSND` signatures, lore present and unique, v5 tiers intact;
+- balance: if a `tools/balance.cjs` result from the last 3 days is in `tmp/`, every weapon is inside 42–58% (Normal) and
+  30–70% (Hard), ± 2.5
+  (a newer `-only` re-measure replaces the rows of the weapons it re-measured);
+- screenshots of each bonus landing in a real CPU duel on Neon City, the picker showing the Spear's new description and
+  the How to Play card, at 1920x1080 @1 and 1536x864 @1.25 (`tmp/smoke/v7w-<weapon>-1080.png`, `-864.png`,
+  `v7w-loadout-*.png`, `v7w-howto-*.png`).
+
+### Smarter, funnier CPUs (`68-ai-v7.js`)
+
+One new slice, `src/js/68-ai-v7.js` (after 68-ai-adapt, before 70-modes), and one test module. No other slice was
+edited; everything hooks in through `THINK_AFTER` (25-classes-v6), weapon `ai.think` fields patched at boot, 67's
+`aiSay` / `aiTalk` / `aiFlourish`, and `on(...)` events.
+
+| File | What |
+|---|---|
+| `src/js/68-ai-v7.js` (new, ~27 KB) | `AI_V7_LEVELS` knobs, the after-think hook, charge reads, baiting, weapon swaps, throwable openings, Volley Clash net fix, four weapon brains, hints for W7's weapon bonuses, the v7 lines and rival voices, show-offs, bubble stacking |
+| `tools/smoke-v7-ai.cjs` (new) | seeded trick/kit measurements, scripted smart-play checks, talk checks, ladder, screenshots |
+| `tools/smoke.cjs` | one guarded registration line (after `smoke-v6-kit`) |
+
+`dist/stick-clash.html` grows by 28,016 bytes (1,929,496 → 1,957,512; budget +50 KB).
+
+#### Knobs (`AI_V7_LEVELS`, merged into `AI_LEVELS`)
+
+| level | trick | read | bait | upgrade | showoff | early |
+|---|---|---|---|---|---|---|
+| Easy | .45 | .12 | 0 | .3 | .5 | .3 |
+| Normal | .75 | .35 | .05 | .6 | .3 | .12 |
+| Hard | .95 | .62 | .12 | .9 | .15 | .03 |
+| Insane | 1 | .8 | .16 | 1 | .08 | 0 |
+
+- `trick`: chance (per decision) that a v7 weapon brain goes for its weapon's trick.
+- `read`: chance to respect a telegraphed charge (per decision) or, ×.5, a big two-handed windup (per swing).
+- `bait`: chance per decision to hover just outside a melee foe's reach and punish its whiff.
+- `upgrade`: chance per decision to go for a clearly better weapon lying close.
+- `showoff`: ×.12 per decision, the chance to pose or bounce when far ahead with nobody close.
+- `early`: chance a big hit (≥ 14) makes it celebrate too soon: a slip (`aiSlip(f, 'celebrate')`).
+
+All six are in `AI_CHANCE_KEYS`, so personas (`mul`/`add`), classes (`cls.ai`) and adaptive difficulty shape them like
+any other knob.
+
+#### How it runs
+
+`aiV7After(f, dt)` is pushed onto `THINK_AFTER` at boot. 65 resets `f.ai.t` at every decision, so a jump in it marks a
+fresh decision (`f.ai.v7n` counts them; weapon brains roll their trick once per decision with it). Per decision it reads
+charges, shows off, throws at openings, and (outside objective modes) swaps weapons or baits. Every step it keeps a
+read move's distance (`f.ai.v7wary`), fires a queued punish (`f.ai.v7punish`) and runs the Volley fix. If it changed any
+input it calls `aiSafety(f)` again, so nothing new walks or dashes off a ledge or into a hazard.
+
+**Only against people** (like 65's flinch): charge reads, windup steps and baiting look at human foes only, so CPU vs
+CPU fights (the ladder, `tools/balance.cjs`) are unchanged by them.
+
+#### 1. Tricks
+
+Four weapon brains (`AI_V7_THINKS`, installed on `WEAPONS[k].ai.think` at boot; v5's weapons load after this slice):
+
+- **Meteor Flail** (`aiV7MeteorThink`, replaces v5's): v5's brain re-rolled the hold every step, so the thruster dropped
+  within a few frames and never got hot (0 hot hits in 10 rounds). Now it lights the rocket inside 330 px (on
+  `AI_V7.meteor` = 30% of decisions), keeps it lit, and once hot drops the hold, arms and dashes in. Lighting it at every
+  chance took the flail from 64% to 73% in `tools/balance.cjs` (60 s/pair); at 30% it is 64.2% vs v6's 63.2% (180 s/pair,
+  ~800 rounds each), so the trick shows up without changing the weapon's balance.
+- **Thornvine** (`aiV7VineThink`): paces back and forth at the edge of reach to grow the vine, then lashes on the move
+  (a dash-swing; standing still shrinks it in a few frames).
+- **Anchor** (`aiV7AnchorThink`): hops at a grounded foe 70–230 px away so v5's in-air check can drop on it, and walks off
+  a ledge above a foe.
+- **Chrono Katana** (`aiV7ChronoThink`): after a cut, keeps swinging; after two, dashes back in so the third lands inside
+  the 2 s window.
+
+Throwables at an opening (`aiV7Opening`): a foe that is stunned, frozen, a snowman, pinned, tethered, time-warped,
+guard-broken, knocked down or taunting gets a throwable with chance `throw × 1.6` (when `aiThrowFits`).
+
+Seeded duels (`node tools/smoke-v7-ai.cjs --measure`, 6 × 40 s per weapon against pistol / blade / grenade on dojo /
+sky / neon), tricks per round by the weapon's holder (weaponTrick events, trick floats, `gravitonPulse` /
+`conductorPlant` calls). Rows the v7 pass targets in bold; the rest move only because fights diverge. (The Hard column is from the build just
+before the last tidy-up, which moved talk to its own random numbers.)
+
+| Weapon | Normal v6 | Normal v7 | Hard v6 | Hard v7 |
+|---|---|---|---|---|
+| Tennis Racket | .77 | 1.32 | 1.94 | 1.11 |
+| Umbrella | 2.5 | 3.24 | 5.06 | 4.33 |
+| Yo-Yo | 2.55 | 2.19 | 3.37 | 3.19 |
+| Paint Roller | 1.68 | 1.85 | 1.35 | 1 |
+| Snowball | 1.2 | 1.72 | 1.11 | 1.69 |
+| Water Blaster | 2 | 2.38 | 1 | 1 |
+| Magnet Glove | 3.33 | 4 | 3.64 | 3.45 |
+| Pogo Hammer | 2.36 | 2.26 | 2.53 | 3.25 |
+| Rock Guitar | 2.47 | 1.95 | 2.05 | 2.38 |
+| Banana | 3.86 | 3.95 | 4.47 | 3.53 |
+| Plunger Bow | 4 | 3.21 | 4.6 | 4.83 |
+| Pillow | 3.17 | 3.53 | 3 | 3.69 |
+| **Chrono Katana** | .55 | .65 | .88 | .76 |
+| Graviton | .95 | 1.24 | 1.36 | 1.4 |
+| **Thornvine** | .14 | .76 | .7 | .56 |
+| **Meteor Flail** | .04 | .74 | .09 | .77 |
+| Prism Cannon | 1.12 | 1.04 | .75 | 1 |
+| Aegis Tower | .22 | .39 | .1 | .1 |
+| **Anchor** | .21 | .32 | .32 | .46 |
+| Naginata | .62 | .38 | .5 | .63 |
+| Grapnel | 1.65 | 1.14 | 1.62 | 2.57 |
+| Javelin | .95 | .96 | .58 | .71 |
+| Conductor | 5.18 | 5.27 | 7.61 | 6.43 |
+| Bass Drop | 1.05 | 1 | 1.11 | 1.39 |
+| **Total** | 42.6 | 45.5 | 49.7 | 50.2 |
+
+The v6 Party weapons already used their tricks (their v6 brains work); the gaps were the v5 Rift weapons whose trick
+needs a held button, growth or a jump. Thornvine numbers swing most between builds (.25–.76): it only grows while
+running (> 160 px/s for 1.6 s) and a fighting CPU is airborne about half the time.
+
+Throwables per round, carried by a Normal CPU (4 × 30 s): average .29 → .72 (grenade 0 → .82, sticky .1 → .91, mine
+.2 → .4, smoke .4 → .4, ice .2 → .55, cluster 0 → .6, glue .4 → .6, bouncer .33 → 1.1, tornado jar .4 → .8,
+duck .9 → 1). Skills: unchanged at 1.04 a round; all 35 are used (Mirror Shield and Blood Pact only in their
+situations: incoming shots, a half-full meter).
+
+#### 2. Smarter play
+
+- **Charge reads** (`aiV7Telegraph(foe)` → `{ reach, guard }`): a Graviton pulse armed, a Rock Guitar chord charging, a
+  hot Meteor Flail, an Anchor Drop overhead. The CPU backs out of reach (dashing if deep inside), guards (or hops over)
+  when cornered, and punishes when the charge is spent (`punish`).
+- **Big windups**: when a human starts a swing with a two-handed or slow (cd ≥ .95) weapon, a CPU in reach that isn't
+  guarding steps out with chance `read × .5`.
+- **Bait** (`aiV7Bait`): hovers 30 px outside a human's melee reach for .7 s; if the human swings at air, it dashes in.
+- **Weapon swaps** (`aiV7Upgrade`, `aiV7Worth`: tier common 1, rare 2, epic 3, mythic 4, untiered 1.5): a pickup worth at
+  least one tier more within 380 px (and no foe within 1.4× reach) is walked to and swapped with the grab key.
+- **Volley Clash** (`aiV7Volley`): knocked (or hopped) onto the rival's court, a CPU used to stay there all point and
+  let serves drop (one Hard match ended 7–0 on unserved balls). It now runs at the net and clears it with a double jump,
+  and on its own court never hops or dashes across. Time on the wrong court: 13% → 2.6% (4 seeded matches); longest
+  rallies 3/5/5/3 → 10/10/8/3.
+
+Other modes were checked with CPUs on autopilot (90 s each): CTF 5 captures, Soccer 5 goals, Paint Wars 70% of the floor,
+Tower Race and Royale finish, KotH has someone on the hill 46% of the time (the rest is respawns and zone moves). Only
+Volley needed a fix. Self K.O.s (falls with no hit in the last 2.5 s) on six pit arenas were already rare: 6/6/7/12%
+of K.O.s (Easy → Insane) in v6, 3/0/3/9% now.
+
+Scripted checks (seeded): an Insane CPU backs out of a human's armed Graviton pulse in 6/6 tries, Easy 2/6; a CPU with
+a blade swaps for a mythic lying 200 px away within 3 s (Insane 4/4, Easy 1/4).
+
+**Hints for W7's weapon bonuses** (`46b-weapons-tune.js`, agent W). Each no-ops unless `W7` exists, so this copy plays
+exactly as before; measured in a scratch build with W7's slice (`tmp/a/w7`, 6 × 40 s per weapon, bonuses per round by
+the holder, W7 alone → W7 + these hints):
+
+| Weapon | Hint | Bonus / round |
+|---|---|---|
+| Katana | rest ~1 s at 160–280 px, then the quick-draw lunge | IAI CUT .95 → 1.23 |
+| Energy Saber | `f.mem.w7Riposte` armed: cut while in reach, step in | RIPOSTE 2.61 → 3.35 |
+| Rapier, Haymakers, Nunchaku | keep hitting the same foe inside .85 × the streak gap (dash in) | TOUCHÉ .87 → 1.36, UPPERCUT 1.0 → 1.52, STAGGER .36 → .35 |
+| Spear | back off under 135 px, poke from 150–180 px | TIP 1.42 → 1.46 |
+| Pulse Pistol | hold the last round (up to 1.5 s, so the gun never stalls) for a foe under 300 px | OVERCHARGE 1.33 → 1.06 |
+| Thunder Six | fire the follow-up within 1 s of a hit | DOUBLE TAP 1.28 → 1.65 |
+| Chrono Katana | swing eagerly at a `timewarp`ed foe | TICK .53 → .60 |
+
+Kusarigama (press in on a bleeding foe) was tried and left out: REAP went 1.86 → 1.48, and 1.23 with a softer version.
+The pistol's number is within noise of W7 alone (18 vs 24 bonuses); the hold keeps the bolt for a close foe vs humans.
+
+#### 3. Personality
+
+`AI_V7_LINES` (new kinds; a rival's own `lines[kind]` wins if it has one) through `aiV7Say(f, kind, force)` → 67's
+`aiSay`, so `SETTINGS.taunts`, the per-fighter and global rate limits and the "crowds: only rivals talk" rule all apply.
+Each line plays a soft `ai-chirp` (silent without an AudioContext).
+
+| Moment | Kind | Example |
+|---|---|---|
+| hit by a pillow / frying pan / rubber chicken (once per round) | `pillow`, `pan`, `chicken` | "Was that a PILLOW?!" |
+| a trick lands on it: banana slip, snowman, plunger, racket return, magnet rip, pillow splat, paint | `slipped`, `frozen`, `tethered`, `aced`, `robbed`, `splat`, `slick` | "Who left that there?!" |
+| it pulls off a trick (half the time) | `boast` | "Trick shot!" |
+| K.O. by ring-out / within 2 s of its trick or ultimate / on whoever K.O.'d it last | `ring`, `flashy`, `revenge` | "Payback time!" |
+| next round, after losing it (by weapon, streak, or plain) / after a comeback win | `lostPan`, `lostPillow`, `lostBanana`, `lostChicken`, `streak`, `salty`, `comeback` | "Lost to a frying pan… again?!" |
+| far ahead, foe 320 px+ away | (67's `taunt` lines, more added) | "Dance break!" |
+
+Each rival also has its own voice for some of these (`AI_V7_RIVAL_LINES`: Fenn "VENGEANCE!", Ivo "Gravity: undefeated.",
+Skitter "I wasn't ready!"…).
+| celebrating a big hit too early (low levels) | `early` | "Victory dan— wait." |
+
+Bubbles no longer overlap: when two fighters stand close, the newer bubble is lifted above the older one (67's
+`aiTalkDraw` / `aiBubble` wrapped; drawing only).
+
+Show-offs reuse 67's `aiFlourish` (taunt pose or bouncing) and are off with talk off, like taunts. Lower levels show off
+more (chance per second: `showoff × react × .2` per decision), and Easy/Normal sometimes celebrate a big hit as if the round were won.
+
+#### 4. Difficulty ladder
+
+Seeded CPU vs CPU, 24 matches × 90 s per pair on rotating arenas with random weapons (`--ladder-only`, ~100 rounds per
+pair, ±~4.5%):
+
+| Pair | v6 | v7 |
+|---|---|---|
+| Normal beats Easy | 78.6% | 78.8% |
+| Hard beats Normal | 89.0% | 78.8% |
+| Insane beats Hard | 71.3% | 70.7% |
+
+All three now sit in the 65–85% band (Hard vs Normal was above it). Easy stays the easiest: it uses tricks least, reads
+almost nothing, and shows off and celebrates early the most. Against people, the reads and baits only add to Normal and
+up in small doses (`read` .35, `bait` .05 at Normal), and adaptive difficulty blends these knobs like the rest.
+
+Weapon balance (`tools/balance.cjs 60 normal 4 <keys>`, v6 → v7): Meteor Flail 64.1 → 64.2 (180 s), Anchor 65.5 → 62,
+Thornvine 42.9 → 42.1, Chrono Katana 37.3 → 37.0: unchanged within noise.
+
+**Seeded fights stay seeded.** Lines are picked with their own generator (`aiV7Rnd`), never `Math.random`, and the
+per-decision rolls (weapon swap, show-off, early celebration) only happen when their situation exists, so a seeded
+fight with no pickups, no big lead and no big hit plays exactly as before this slice's talk. (A v6-kit duck test that
+depended on the exact random stream failed until this was done.)
+
+#### Performance
+
+All per-decision work is a few comparisons; drawing adds only the bubble-overlap pass when someone is talking.
+`node tools/arena-perf.cjs --runs 3 --vs tmp/v6-base.html`: median change about +1.6%, single arenas −13% to +9%
+both ways; a 5-run recheck of the worst ones gave desert −0.7%, caldera +1.2%, eruption +6.0%, pirate +8.0%,
+neon:rain +1.2%. The spread is the scenes themselves: arena-perf simulates a CPU match before freezing the picture, and
+v7 CPUs move differently, so each build draws a slightly different scene.
+
+#### Tests (`tools/smoke-v7-ai.cjs`)
+
+`node tools/smoke-v7-ai.cjs [--no-shots] [--ladder]` (after `node build.mjs`), also run by `tools/smoke.cjs`;
+`--measure` prints the trick and kit tables (`TAG=… HTML=tmp/v6-base.html DIFF=hard` compares builds):
+- tricks: 24 trick weapons in seeded duels (6 × 40 s against pistol / blade / grenade on dojo / sky / neon); the four
+  fixed weapons must reach their floor, the set must total ≥ 38 tricks a round, no errors;
+- kit: every skill and throwable carried by a Normal CPU; throwables ≥ .35 a round, all but 3 skills used;
+- smarts: an Insane CPU backs off a human's armed Graviton pulse (≥ 4/6, more than Easy), swaps a blade for a mythic
+  lying close, Volley CPUs spend < 5% of the time on the wrong court;
+- talk: ≥ 80% of K.O.s get a line (a K.O. whose plain line was rate-limited away gets one anyway), pillow and banana reactions, revenge and salty lines, Easy shows off more than Insane,
+  no lines with talk off or in a plain 6-CPU crowd;
+- ladder: each level beats the one below (seeded, 8 × 60 s per pair; `--ladder` 24 × 90 s);
+- screenshots: `tmp/smoke/v7a-bubbles-1920.png`, `tmp/smoke/v7a-bubbles-1536.png` (1536×864 @1.25); the two bubbles
+  must be stacked, not overlapping.
+
+### Juicier fights (`87c-juice-v7.js`)
+
+Fights now hit harder on screen and talk back: three impact tiers, named finishers, streak callouts and a handful of
+comic body gags. Everything is drawing, sound or callouts on top of 35-effects, 84-postfx and 87-juice; it is one new
+slice that hooks in by wrapping (no other slice was edited) and one test module.
+
+#### Files
+
+| File | What |
+|---|---|
+| `src/js/87c-juice-v7.js` | the `JZ` state, tiers, finishers, streaks, gags, their sounds, drawing and the Settings row (~32 KB) |
+| `tools/smoke-v7-juice.cjs` | its smoke module (one guarded line in `tools/smoke.cjs`) |
+
+#### Fairness rules
+
+- Every handler skips `SC.sim`, the menu's attract demo and the balance tools, so balance numbers cannot move.
+- It never writes hp, velocity or points, and never calls `Math.random` or `burst()`: comic variety comes from a
+  private LCG (`jzRand`), and the 5% ghost from a hash of fighter id, round and time (`jzGhostRoll`). A seeded fight
+  therefore ends the same with the callouts on or off (checked by the smoke module).
+- The only timing it touches is the existing feel system: a crushing blow freezes at least 100 ms (`hitstop()`; throws
+  and ultimates deal too little damage for 30's own hit-stop, and the v4 limit of 120 ms for non-K.O. hits holds) and a
+  close call gets 0.3 s of `slowmo()`. Both act on real-time play only.
+- Fighters get a few drawing-only numbers: `jzDizzy` (game time the birds leave), `jzFly` (seconds of the current
+  flight), `jzFire` (on-fire aura) and `jzBoingT`. They are plain numbers, so the kill-cam snapshots them.
+- Every timed effect is recorded through `FX_RECORD` and replayed through `KC_FX` (`jzImpact`, `jzWord`, `jzSticker`,
+  `jzGhost`, `jzSplat`, `jzTwinkle`, `jzSquash`), so replays show it in sync. Sounds started by a recorded effect use
+  `jzSfx`, which stays quiet during a replay because the recorded `sfx` event already plays it.
+
+#### Impact tiers (`jzTier(B, amt, o)`)
+
+| Tier | When | What it adds |
+|---|---|---|
+| light | under 12 damage | nothing (a flurry stays fluid) |
+| HEAVY | 12-19 | a camera kick of 6 px along the blow, a four-point glint, `jz-thump` under the hit (30's hit-stop, 35-80 ms) |
+| CRUSHING | 20+, any grab throw, 10+ during an ultimate, a K.O. blow of 15+ | a 15 px kick, a zoom punch (`CAM.punch` .1), a comic starburst with focus lines, a comic word on a speech burst (WHAM!, KRAK!, BLAM!, KA-BOOM!, SUPLEX!...), `jz-crush`, a hit-stop of at least 100 ms, dizzy birds on a survivor |
+
+The kick lives in `JZ.kx/ky` (screen units, decays in about 0.2 s) and is added by a `setWorldTransform` wrap.
+
+#### Finishers
+
+The round-deciding K.O. gets `jzFinishKind(victim, opts)`:
+
+| Kind | Title | How |
+|---|---|---|
+| `home` | HOME RUN! | a ring-out past the side or the top while flying fast; a twinkle and a "ding" where it left |
+| `wipe` | WIPEOUT! | any other ring-out (a fall) |
+| `splat` | SPLAT! | the body was within 60 px of an arena wall or 40 px of a block's side; a paint splat runs down the wall |
+| `boom` | KABOOM! | an explosion |
+| `suplex` | SUPLEX! | a grab throw |
+| `crush` | CRUSHED! | a crushing blow |
+| `oops` | WHOOPS! | a hazard or a status effect |
+| `ko` | K.O. | anything else: the banner is left alone |
+
+All of them add a zoom punch, focus lines on the loser and the `jz-finish` stinger at the K.O.; then, on `roundEnd`,
+the title replaces the "K.O." banner (in its colour), the announcer says it after "K.O.!" and the crowd roars or
+gasps. The title is stored on `KC.lastKO.jzFinish`, and a `kcDrawTag` wrap prints it in the middle of the kill-cam's
+top bar, so the replay repeats it instead of adding a second celebration.
+
+#### Streaks and callouts
+
+Callouts are slanted stickers under the HUD on the fighter's side (team 0 left, team 1 right; by position in a
+free-for-all), at most three per side, drawn with the banners (so photo mode hides them).
+- **Combo ladder:** every new combo step plays `jz-combo:n`, a tick that climbs a major scale. Stickers at 3 HIT,
+  5 HIT, FRENZY (8), RAMPAGE (12), UNSTOPPABLE (16); from FRENZY on, the fighter burns with flames in its own colour and the
+  crowd roars. In fights of more than two, CPUs only show FRENZY and up.
+- **Multi-K.O.:** DOUBLE / TRIPLE / MEGA K.O.! for K.O.s by one fighter within 3 s.
+- **ON FIRE!:** a team that wins three rounds in a row gets the sticker, `jz-fire`, the announcer and an orange flame
+  aura (`f.jzFire`) until it loses a round; whoever ends it gets STREAK BROKEN!.
+- **COMEBACK!:** the round winner was 50% of health or more behind the best other team at some point in the round
+  (`JZ.gap`), or wins the match after trailing by two rounds or more (`JZ.rgap`).
+- **CLOSE CALL!:** a hit that leaves someone on 5 hp or less (once per fighter a round): a word over the head, a crowd
+  gasp and 0.3 s of slow-mo. 87's heartbeat already covers low health.
+
+#### Comic bodies
+
+- **Dizzy:** two cartoon birds and a star circle the head after a crushing hit (1.7 s) or a stun of 1 s or more.
+- **Screams:** a body launched by a hit (750+ px/s) that stays in the air screams "AAAAH!" behind its head, with
+  motion arcs at its hands and feet, until it lands.
+- **Squash:** a hard landing (falling faster than 900 px/s) squashes the body through 84's squash-and-stretch.
+- **BOING!:** a body whose fall turns into a fast rise without being hit (pads, marshmallows, the Bouncy Floor rule).
+- **The ghost:** 5% of non-ring-out K.O.s release a little sheet ghost with a halo and cross eyes that waves goodbye
+  as it floats up, to a "wooo" and a harp.
+
+#### Settings and accessibility
+
+- Settings > Effects > **Comic callouts** (`SETTINGS.fightGags`, default on) turns off the stickers, words, finisher
+  titles and body gags. The impact tiers, their sounds and hit-stop stay.
+- The tiers follow the Juice level: the kick and zoom scale with its shake (Calm .4, Chaos 1.5).
+- Reduced flashing (or the OS reduce-motion preference, as for banners) skips every kick, zoom punch, starburst, glint,
+  focus line, squash and the close-call slow-mo; stickers then appear without popping or sliding.
+
+#### Sounds
+
+`jz-thump`, `jz-crush`, `jz-combo` (`jz-combo:n`), `jz-finish`, `jz-boing`, `jz-ghost`, `jz-ding`, `jz-pop`, `jz-splat`,
+`jz-fire`, all synthesized with 80's `tone`/`noise`, silent without WebAudio.
+
+#### Tests (`tools/smoke-v7-juice.cjs`)
+
+Real (non-sim) steps with drawing:
+- tiers: light adds nothing; heavy adds a glint and a kick; crushing adds the starburst, punch, kick, word, dizzy and a
+  longer hit-stop; a throw counts as crushing; three seeded CPU duels land both tiers by themselves;
+- finishers: every title reaches the banner, the announcer log and `KC.lastKO`; a plain K.O. keeps "K.O.";
+- streaks: the 3 / 5 / FRENZY ladder and its flames, CLOSE CALL, COMEBACK, DOUBLE K.O., ON FIRE with its aura next round;
+- gags: dizzy from a stun, a flight scream, a landing squash, BOING, the ghost, and the ghost roll's rate (3-7%);
+- settings: reduced flashing draws no starburst or kick; callouts off shows no words or stickers but keeps the tiers;
+  the Settings row;
+- fairness: `SC.sim` logs nothing; a seeded real-time fight ends the same with the callouts on, off and on again;
+- screenshots at 1920x1080@1 and 1536x864@1.25 (`tmp/smoke/v7j-{crush,flight,splat,killcam}-{1080,864}.png`),
+  including a match-deciding SPLAT and its kill-cam tag.
+
 ## v6 "Party" expansion
 
 v6 adds more to fight with and much more for two players on one keyboard. It is eleven new slices plus two stylesheets;

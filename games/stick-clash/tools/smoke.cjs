@@ -835,6 +835,9 @@ function summary(r) {
     if (fs.existsSync(path.join(__dirname, 'smoke-v6-weapons.cjs'))) await require('./smoke-v6-weapons.cjs').run(browser, { check, rows, SHOTS });   // v6 Party Arsenal: 12 weapons' tricks in seeded CPU duels, round-end cleanup, focused mechanics, screenshots
     if (fs.existsSync(path.join(__dirname, 'smoke-v6-games.cjs'))) await require('./smoke-v6-games.cjs').run(browser, { check, rows, SHOTS });   // v6 two-player games: Volley Clash, Paint Wars, Tower Race, Boss Raid, Defend the Core, Spark Rush, Last Platform
     if (fs.existsSync(path.join(__dirname, 'smoke-v6-kit.cjs'))) await require('./smoke-v6-kit.cjs').run(browser, { check, rows, SHOTS });   // v6 kit: 8 skills, 3 classes, 4 throwables, 2 mounts, the Team Super
+    if (fs.existsSync(path.join(__dirname, 'smoke-v7-weapons.cjs'))) await require('./smoke-v7-weapons.cjs').run(browser, { check, rows, SHOTS });   // v7 weapons: 16 signature bonuses in seeded duels, focused checks, balance table, screenshots
+    if (fs.existsSync(path.join(__dirname, 'smoke-v7-juice.cjs'))) await require('./smoke-v7-juice.cjs').run(browser, { check, rows });   // v7 juice: impact tiers, finishers, streak callouts, body gags, reduced flashing, fairness
+    if (fs.existsSync(path.join(__dirname, 'smoke-v7-ai.cjs'))) await require('./smoke-v7-ai.cjs').run(browser, { check, rows, SHOTS });   // v7 CPUs: trick use per weapon, kit use, charge reads, weapon swaps, volley net, lines + show-offs, level ladder, bubble screenshots
   } catch (e) {
     failures.push('smoke crashed: ' + (e.stack || e.message));
   } finally {

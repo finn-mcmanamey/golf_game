@@ -63,6 +63,18 @@ More to fight with, and much more for two players on one keyboard.
   the Core**, plus two new mini-games, **Spark Rush** and **Last Platform**. Pick *1 player* on the arena screen to get a
   CPU rival or partner instead.
 
+## New in v7: more fun
+
+- **Juicier fights:** big hits feel big. Heavy blows kick the camera, crushing ones freeze behind a comic WHAM!, and a
+  round can end in a HOME RUN!, SPLAT! or KABOOM!. Chain hits for 3 HIT, 5 HIT and FRENZY, win three rounds in a row to
+  catch ON FIRE, and claw back for a COMEBACK!. Settings → Effects → Comic callouts turns the gags off.
+- **CPUs with character:** they use their weapons' tricks, save throwables for when you're stunned, back away from your
+  charged moves and punish the release, and talk back: they grumble at pillow bonks, shout when they slip on a banana,
+  want revenge and show off when far ahead. Settings → CPU rivals → Taunts & reactions turns the chatter off.
+- **No more weak weapons:** every weapon now wins about half its fights, and 16 have a signature bonus to aim for: the
+  Spear's TIP! crit, the Katana's IAI CUT!, three Haymakers in a row for an UPPERCUT!, the Pulse Pistol's OVERCHARGE!
+  last round and more. The weapon picker tells you each bonus.
+
 ## Controls
 
 | Action | Player 1 | Player 2 | Gamepad |

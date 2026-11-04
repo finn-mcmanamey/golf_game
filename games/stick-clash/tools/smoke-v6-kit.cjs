@@ -224,12 +224,15 @@ async function testThrowablesMounts(page, { check, rows }) {
     }
     { // The duck lures a CPU (watch mode, the thrower idle): it walks up, whacks it and the pop hurts it.
       __K.seed(5);
-      SC.start({ mode: 'watch', map: 'dojo', classes: ['none', 'none'], weapons: ['blade', 'katana'], throws: [['duck', 'none'], ['none', 'none']], diffs: ['easy', 'easy'], orbs: false, winScore: 999 });
+      SC.start({ mode: 'watch', map: 'dojo', classes: ['none', 'none'], weapons: ['blade', 'blade'], throws: [['duck', 'none'], ['none', 'none']], diffs: ['easy', 'easy'], orbs: false, winScore: 999 });
       SC.G.state = 'play'; SC.G.lock = 0; SC.sim(.2);
       const [A, B] = SC.F; A.ai.behave = 'idle'; __K.place(A, 300); __K.place(B, 760); A.face = 1;
-      SC.sim(.1); throwNext(A); SC.sim(1.2);
-      const duck = PROJ.find(p => p.duck), hp0 = B.hp; let popped = false, closest = 1e9;
-      for (let t = 0; t < 4 && duck; t += .05) { SC.sim(.05); if (!duck.dead) closest = Math.min(closest, Math.abs(B.P[2].x - duck.x)); if (duck.dead) { popped = true; break; } }
+      // The foe has a plain Blade: v7's Katana hint rushes in for a quick-draw and can pop the duck mid-air, which is fair
+      // play but not the lure this checks. Watched from the throw.
+      SC.sim(.1); const hp0 = B.hp; throwNext(A);
+      let duck = null, popped = false, closest = 1e9;
+      for (let t = 0; t < 5.2; t += .05) { SC.sim(.05); duck = duck || PROJ.find(p => p.duck) || null;
+        if (duck && !duck.dead) closest = Math.min(closest, Math.abs(B.P[2].x - duck.x)); if (duck && duck.dead) { popped = true; break; } }
       out.duck = { ok: !!duck && popped && B.hp < hp0, note: `landed ${!!duck}, CPU came to ${Math.round(closest)} px, popped ${popped}, foe ${hp0}->${Math.round(B.hp)}` };
     }
     // Mounts: ridden at a foe they hurt it; the orbs mount you; CPUs fight with both.
