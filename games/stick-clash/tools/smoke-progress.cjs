@@ -405,7 +405,10 @@ async function testPicker(browser, ctx) {
     await page.evaluate(() => { window.__pad = { index: 0, id: 'mock pad', buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })), axes: [0, 0, 0, 0] };
       navigator.getGamepads = () => [window.__pad]; });
     await page.waitForTimeout(60);
-    await page.evaluate(() => { __pad.buttons[3].pressed = true; }); await page.waitForTimeout(90);
+    // Y is held until the star flips (at most 600 ms), like press() above: the menu polls pads once a frame (Y acts on
+    // the press edge, so holding it can't toggle twice), and a slow frame could miss a fixed 90 ms tap.
+    await page.evaluate(() => { __pad.buttons[3].pressed = true; });
+    await page.waitForFunction(([k, w]) => PICKS.fav[0].includes(k) === w, [key, was], { timeout: 600 }).catch(() => {});
     await page.evaluate(() => { __pad.buttons[3].pressed = false; }); await page.waitForTimeout(60);
     const byPad = await page.evaluate(k => { navigator.getGamepads = () => []; return { fav: PICKS.fav[0].includes(k), tip: (document.querySelector('#loadout .w-tip') || {}).textContent }; }, key);
     await page.evaluate(() => { LO.cat = 'all'; refreshScreen(); });

@@ -826,8 +826,12 @@ function summary(r) {
     if (fs.existsSync(path.join(__dirname, 'smoke-styles.cjs'))) await require('./smoke-styles.cjs').run(browser, { check, rows, SHOTS });   // v4 arena art styles: styled arenas x2/x8, pixel layer, Arena art setting, kill-cam + photo, render time
     if (fs.existsSync(path.join(__dirname, 'smoke-feel.cjs'))) await require('./smoke-feel.cjs').run(browser, { check, rows });   // v4 feel: silly bodies upright, hit-stop + knockback, guns vs melee, distinct blades, CPU slips + ladder
     if (fs.existsSync(path.join(__dirname, 'smoke-2p.cjs'))) await require('./smoke-2p.cjs').run(browser, { check, rows, SHOTS });   // v4 two players: rivalry, handicap, quick rematch, co-op waves + quest, silly vote, tag team, round length
+    if (fs.existsSync(path.join(__dirname, 'smoke-v6-meta.cjs'))) await require('./smoke-v6-meta.cjs').run(browser, { check, rows, SHOTS });   // v6 two-player meta modes: Clash Cup, Draft Duel, Party Night
     if (fs.existsSync(path.join(__dirname, 'smoke-sound.cjs'))) await require('./smoke-sound.cjs').run(browser, { check, rows, SHOTS });   // v4 sound: per-weapon sounds, grunts + limits, lead melodies, voice settings, no-audio match, voice cap
     if (fs.existsSync(path.join(__dirname, 'smoke-res.cjs'))) await require('./smoke-res.cjs').run(browser, { check, rows });   // v4.1 adaptive resolution: forced steps, governor down/up/holds, pins, fixed buffers + backdrop cache
+    if (fs.existsSync(path.join(__dirname, 'smoke-v6-weapons.cjs'))) await require('./smoke-v6-weapons.cjs').run(browser, { check, rows, SHOTS });   // v6 Party Arsenal: 12 weapons' tricks in seeded CPU duels, round-end cleanup, focused mechanics, screenshots
+    if (fs.existsSync(path.join(__dirname, 'smoke-v6-games.cjs'))) await require('./smoke-v6-games.cjs').run(browser, { check, rows, SHOTS });   // v6 two-player games: Volley Clash, Paint Wars, Tower Race, Boss Raid, Defend the Core, Spark Rush, Last Platform
+    if (fs.existsSync(path.join(__dirname, 'smoke-v6-kit.cjs'))) await require('./smoke-v6-kit.cjs').run(browser, { check, rows, SHOTS });   // v6 kit: 8 skills, 3 classes, 4 throwables, 2 mounts, the Team Super
   } catch (e) {
     failures.push('smoke crashed: ' + (e.stack || e.message));
   } finally {

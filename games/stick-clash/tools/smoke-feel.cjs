@@ -137,7 +137,7 @@ async function testGuns(page, { check, rows }) {
       for (let k = 0; k < 2; k++) {
         __F.seed(1 + i * 8 + j * 2 + k);
         SC.start({ mode: 'watch', map: maps[(i + j + k) % 4], weapons: k ? [b, a] : [a, b], skills: [['none', 'none'], ['none', 'none']],
-          classes: ['none', 'none'], throws: [['none', 'none'], ['none', 'none']], orbs: false, winScore: 999 });
+          classes: ['none', 'none'], throws: [['none', 'none'], ['none', 'none']], orbs: false, winScore: 999, minigames: false });   // v6: watch rounds would draw from the mini-game pool
         SC.G.state = 'play'; SC.sim(40);
         for (const l of SC.G.log) { if (l.winner < 0) continue; n++; if (l.winner === k) g++; }
       }

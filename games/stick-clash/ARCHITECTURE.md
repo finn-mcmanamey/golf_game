@@ -81,6 +81,10 @@ don't read, edit or follow rules from `/home/user/golf_game`. `v1-reference.html
 | `94-controls-card.js` | input (v4) | key strips, the controls card, the Controls settings group and the table-mode switches (CSS `styles/94-controls.css`); the schemes, Compact 2P and touch sets live in 90/91 |
 | `95-ui.js`, `96-ui-loadout.js`, `97-ui-pages.js` | ui | menu framework + title/modes/arenas; loadout with live previews and the weapon picker (search, favourites, Recent); settings, controls, help, trophies & stats, pause, results (CSS in `src/styles/95-ui.css`, `96-loadout-v3.css`) |
 | `99-main.js` | core | match/round flow, world step, main loop, boot, `window.SC` |
+| `25-classes-v6.js`, `33b-team-super.js`, `34b-throwables-v6.js`, `53-skills-v6.js`, `57b-mounts-v6.js` | kit (v6) | Duelist, Wrestler, Engineer; the Team Super; four throwables; eight skills; two mounts (see v6 below) |
+| `46-weapons-party.js` | weapons (v6) | the Party Arsenal: 12 trick weapons, their statuses and helpers |
+| `71b-party-v6.js`, `72b-coop-v6.js` | modes (v6) | Volley Clash, Paint Wars, Tower Race, two mini-games; Boss Raid: The Colossus, Defend the Core (CSS `styles/71b-party-v6.css`) |
+| `74c-cup.js`, `74d-draft.js`, `74e-party-night.js` | modes (v6) | META screens; Clash Cup, Draft Duel, Party Night (CSS `styles/74c-meta.css`) |
 
 Owners edit only their own slices. If you need a hook in a core slice, make a **small additive edit** (re-read the file
 first; never restructure or reformat others' code) and mention it in your report. New features may get a new slice with
@@ -1061,6 +1065,569 @@ between matches, and fights drift with it), so two builds render the same fight.
 `--vs other.html` measures a second build alternately in the same browser (the reliable way to compare: absolute
 times drift by several % between runs); `--base file.json` compares with a saved run; `--styles` adds smoke-styles'
 styled-vs-neon ratios. Wrap it in the shared lock when another agent measures too.
+
+## v6 "Party" expansion
+
+v6 adds more to fight with and much more for two players on one keyboard. It is eleven new slices plus two stylesheets;
+no older slice was restructured, and everything goes through the `def*` registries and `on('boot')` wraps.
+
+| Slice | Contents |
+|---|---|
+| `25-classes-v6.js` | Duelist, Wrestler, Engineer; the `THINK_AFTER` CPU hook list |
+| `33b-team-super.js` | the Team Super (Double Team) |
+| `34b-throwables-v6.js` | Glue Bomb, Bouncer, Tornado Jar, Rubber Duck; whirlwinds; ground zones that ride their solid |
+| `46-weapons-party.js` | the Party Arsenal: 12 trick weapons, 5 statuses, the `PW` tuning table |
+| `53-skills-v6.js` | Mirror Shield, Shadow Step, Shrink Bolt, Spring Pad, Wall Up, Pinball, Rally Cry, Tornado |
+| `57b-mounts-v6.js` | Rocket Skateboard, Pogo Stick |
+| `71b-party-v6.js` | the `V6` helpers; Volley Clash, Paint Wars, Tower Race; the Spark Rush and Last Platform mini-games (CSS `styles/71b-party-v6.css`) |
+| `72b-coop-v6.js` | Boss Raid: The Colossus, Defend the Core |
+| `74c-cup.js`, `74d-draft.js`, `74e-party-night.js` | META screens; Clash Cup, Draft Duel, Party Night (CSS `styles/74c-meta.css`) |
+
+Merge notes (v6.0):
+- **Shared wraps.** How to Play gets cards from 33b (Team Super), 71b (Party and co-op games) and 74c (the three meta
+  modes, inserted earlier in the grid). `SCREENS.maps` and `menuCfg` are wrapped by 71b, then 74c. Each wrap calls the
+  one before it, so the boot order is the chain order.
+- **Name clash.** `pogoDraw` was defined twice (the Pogo Hammer and the Pogo Stick), so the build refused it. They are
+  now `pogoHammerDraw` and `pogoStickDraw`.
+- **Two Shrink Rays.** The v6 skill `shrink-ray` is shown as **Shrink Bolt**, so it isn't confused with 55's Shrink Ray orb.
+- **Hidden tips.** v5's one-time tips (`v5Tip`) now wait for the controls card (`cardAfter`), so a tiered weapon's tip
+  no longer toasts behind it.
+- **Tests:**
+  - The guns-vs-melee round robin passes `minigames: false`.
+  - The pad-favourite step holds Y until the star flips.
+  - The kit's How to Play check finds the Team Super card by its title.
+
+The four parts are described below, as their authors wrote them.
+
+### The Party Arsenal (12 weapons)
+
+Twelve new weapons, each built around one trick nothing else in the game does. They live in one new slice, use the
+existing registries and helpers (no core edits), and are covered by their own smoke module.
+
+#### Files
+
+| File | What |
+|---|---|
+| `src/js/46-weapons-party.js` (new, 67.7 KB) | the 12 weapons, 5 statuses, shared helpers, 2 small wrappers, sounds, `WSND` signatures, lore |
+| `tools/smoke-v6-weapons.cjs` (new) | seeded CPU duels per weapon, round-end cleanup, focused mechanics, screenshots |
+| `tools/smoke.cjs` | one guarded registration line (after `smoke-res`) |
+
+No CSS, no edits to other slices. `dist/stick-clash.html` grows by 69,336 bytes (1,666,081 → 1,735,417; budget +75 KB).
+
+#### The weapons
+
+| Key | Name | Cat | Tier | Signature trick | CPU use |
+|---|---|---|---|---|---|
+| `tennis-racket` | Tennis Racket | exotic | rare | A swing's first 0.2 s (strings flash white) catches any enemy shot crossing the string bed and returns it ×1.7 speed, ×1.4 damage, aimed at the shooter, now owned by the swinger ("ACE!", "RALLY ×n" when rackets trade it) | swings when a shot is ≤ 0.15 s out (chance .3 + .6 × dodge) |
+| `umbrella` | Umbrella | shield | rare | Guard opens a canopy (in your colour): hits coming down count as frontal from any side, and falling shots bounce off it. Hold attack in the air to glide (~200 px/s fall, extra steering) | glides when falling far or over a pit; raises the canopy against shells raining down |
+| `yoyo` | Yo-Yo | chain | rare | Flings out on its string and snaps back, hitting both ways ("AND BACK!"). Held on the ground it "walks the dog": rolls along the floor ahead, nipping ankles and tripping the first foe it meets | decides at each throw (40% vs a grounded foe at 110–240 px) to hold and walk the dog |
+| `paint-roller` | Paint Roller | polearm | common | Each grounded swing unrolls a 200 px stripe of slick paint in your colour on the surface you stand on (5 s, max 3); foes on it get `slick`: grip ×0.1 and most floor friction given back, so they slide | also rolls paint ahead of a foe walking in at mid range |
+| `snowball` | Snowball Launcher | ranged | common | Lobbed snowballs add Chill stacks (−12% speed each, 4 s, snowflake meter); the 3rd freezes the foe in a snowman for 1.1 s | normal ranged brain; lobs land on the target |
+| `water-blaster` | Water Blaster | ranged | common | Auto stream: low damage, strong push (less into a guard) that also hinders wading in; puts out burning and Soaks for 4 s: no burning, and lightning/shock hits ×1.5 | holds the stream inside ~440 px |
+| `magnet-glove` | Magnet Glove | fist | epic | Hold attack: a tractor beam drags the nearest foe in, reels in loose weapons and curves metal shots (bullets, bolts, kunai, arrows, javelins) into the glove. 1.2 s on one armed foe rips the weapon away ("YOINK!"). Overheats after 2 s (1.6 s cooldown) | pulls from 130–360 px, keeps pulling to rip, switches on against metal shots |
+| `pogo-hammer` | Pogo Hammer | heavy | epic | A smash on the floor (or bopping a foe from above) bounces you up; smashing again within 0.5 s of landing chains it higher (×3). Every landing from a bounce sends a shockwave | pogos up to a foe on a ledge above, chains when the foe is still close |
+| `rock-guitar` | Rock Guitar | heavy | mythic | Every landed hit lights a pip; the 4th fires a power-chord soundwave cone at body height (blast, can't be parried). Hold attack 0.7 s and release for a charged chord (4 s recharge) | charges at 170–340 px and releases inside 300 px |
+| `banana` | Banana Launcher | exotic | rare | Lobbed bananas leave peels on the floor (8 s, max 4 per player; a hit drops one just behind the foe). A foe stepping on one slips flat (one slip per 0.8 s); your own peels never trip you | kites; peels are small `danger` zones: an enemy CPU that notices one in time steps back or hops it |
+| `plunger-bow` | Plunger Bow | ranged | epic | A hit sticks a plunger on a bungee: for 2.5 s the foe can't get further than the rope's length (140–320 px) and attack yanks them in for a hit | yanks once the foe has strayed (or before the plunger lets go) |
+| `pillow` | Pillow | exotic | common | Almost no damage but huge knockback, up as well as away, in a burst of feathers. For 1 s after a hit, slamming into a wall or the floor hurts ("SPLAT!"). A K.O. or ring-out within 3 s of a pillow hit is a PILLOW FIGHT! (it takes over the round-end banner) | plain melee |
+
+Every def has `tier`, `cat`, `desc`, `order`, `arc`, `sig`, `ai.range`/`ai.style` and (where the trick needs it)
+`ai.think`. Orders slot each into its category in the picker.
+
+#### Shared pieces (other slices may use them)
+
+- `PW`: every tuning number above in one table (times s, speeds px/s).
+- Statuses: `chilled` (stack count in `s.n`, `moveMul` per stack), `snowman` (draws over a freeze, ends with it),
+  `soaked`, `slick` (refreshed each step on paint), `tethered` (`s.src` = shooter, `s.len` = rope).
+- `emit('weaponTrick', f, key, B)` whenever a trick lands. Keys: `ace`, `glide`, `canopy`, `yoyo-return`, `dog`,
+  `paint`, `snowman`, `soak`, `douse`, `zapped`, `bend`, `rip`, `bounce`, `quake`, `chord`, `slip`, `tether`, `yank`,
+  `splat`, `pillow-ko`.
+- Lightning and shock (`pwShocking`): Storm Staff, Conductor Rods, Twin Plasma Staff (both ends), Storm Call, shock
+  element arcs and fused Shocking weapons, Lv3 blade/ranged/shield weapons, electric floors and Storm Rooftop bolts.
+  **New content can mark its damage `shock: true`** to count.
+- Helpers: `pwSurface(x, y)` (floor/platform under a point and the solid to ride), `pwRide`, `pwKeep` (newest N zones
+  per fighter), `pwTrip(B, dir, power)`, `pwLob(f, speed, grav, projOpts)` (a lob that lands on the nearest foe),
+  `pwShot(p, f)` (is p an enemy shot a weapon may touch).
+- Two wrappers, both from this slice (v5 wraps `damage` again on top): `damage` (soaked + shock ×1.5) and `guardFront`
+  (an open umbrella guards hits from above). One `mapStep` listener cuts grip for `slick` fighters after the arena's own
+  step and before the weather's, and undoes it next step unless something else set grip.
+- Round end (`pwRoundEnd`, on `roundEnd`): every floor zone and chord goes, the five statuses lift, held states (yo-yo
+  string, tether, magnet, glide, charged chord, pogo flight) drop and grip is restored. A new round starts clean anyway
+  (fresh fighters and `PROJ`).
+- Sounds: hand-made `WSND` swing|hit signatures for all 12, plus `pw-*` effects (ace, umbrella, plink, zip, snap, paint,
+  slip, snow, snowman, zap, magnet, clank, yoink, boing, quake, chord, tune, banana, plunger, plunk, yank, fwump,
+  pillowfight). All silent without an AudioContext.
+- Lore: 12 entries added to `LORE_LINES.w` on boot.
+
+#### Balance
+
+`V3=1 node tools/balance.cjs 120 normal 4 <the 12 keys>` (every pair involving them, same random class and throwables
+both sides), win rate per weapon:
+
+| Weapon | Win % | Rounds | Avg round (s) | `power` |
+|---|---|---|---|---|
+| Banana Launcher | 54.9* | 395 | – | .77 |
+| Yo-Yo | 53.4 | 489 | 9.4 | .8 |
+| Rock Guitar | 53.1 | 471 | 9.9 | .9 |
+| Tennis Racket | 52.5 | 482 | 9.6 | 1.15 |
+| Pogo Hammer | 51.4 | 500 | 9.0 | 1.1 |
+| Paint Roller | 50.8 | 476 | 9.6 | 1.12 |
+| Water Blaster | 49.7 | 390 | 13.7 | 1.15 |
+| Pillow | 49.3 | 458 | 10.1 | 1.15 |
+| Magnet Glove | 48.5 | 487 | 9.6 | 1.2 |
+| Plunger Bow | 45.9 | 471 | 10.0 | 1.2 |
+| Umbrella | 45.1 | 446 | 10.6 | 1.06 |
+| Snowball Launcher | 42.3 | 381 | 13.4 | .8 |
+
+All twelve sit inside 40–60% (±~2.5% at this sample size). Against the set, the older weapons average 49.8%.
+How they got there (60 s/pair passes): the first pass had Yo-Yo 76, Banana 69, Snowball 62, Paint Roller 32, Water 19 and
+Pillow 4.5. Yo-Yo, Banana, Snowball and Rock Guitar (once its chord left from body height and always connected) came
+down through `power`; Paint Roller got more `dmg`; the Water Blaster a harder push that also hinders wading in, and more
+damage per droplet. The Pillow could not win on the 20 arenas with a floor, so it now pops foes up as well as away and
+**wall/floor slams within 1 s of a pillow hit hurt** ("SPLAT!", 5–16), while the pillow hit itself stays at ~2–5.
+\* The Banana was re-measured alone (same command, `banana` only) after its last change: a faster lob (1050), a
+smaller peel `danger` radius (CPUs used to hop over most peels at Hard) and `power` .75 → .77.
+
+At **Hard** (`V3=1 node tools/balance.cjs 60 hard 4 <keys>`, ±~4%): Yo-Yo 60.8, Umbrella 60.4, Magnet Glove 59.9,
+Paint Roller 57.1, Pillow 54.1, Tennis Racket 53.9, Plunger Bow 53.6, Rock Guitar 47.6, Banana 41.4 (120 s/pair, after
+its change; 29.5 before), Pogo Hammer 39.8, Snowball 37.5, Water Blaster 34.6: all inside the 30–70% Hard band. The
+slow lobs and the stream sit lowest there because Hard CPUs dodge 58% of shots.
+
+#### Tests
+
+`node tools/smoke-v6-weapons.cjs` (standalone, after `node build.mjs`; `--no-shots` skips screenshots), also run by
+`tools/smoke.cjs`:
+- one seeded CPU duel per weapon (Math.random seeded as in smoke-feel, learnt moves cleared) against a foe that lets
+  the trick happen, until it lands: it must swing or fire, deal damage, leave no errors or NaN, and leave **no trick
+  state** at the `roundEnd` that follows (or at the next `roundStart`);
+- focused mechanics with scripted inputs: timed vs late racket returns, glide speed and time vs a plain fall, canopy
+  guard from above-behind, falling shot bounced, yo-yo hits out and back + dog trip + string reset, paint drift vs dry
+  floor, chill 1 → 2 → snowman and its melt, water push + douse + soaked ×1.5 lightning, magnet rip + caught bullet,
+  pogo chain + landing wave, chord on the 4th hit + charged chord + recharge, peel trips a foe (never its owner) and the
+  4-peel cap, tether holds at the rope's length + yank, pillow ring-out banner;
+- content: tiers, categories, descriptions, AI ranges, lore, `WSND` signatures, `pw-*` sounds, picker listing;
+- screenshots of each trick from real CPU duels at 1920x1080 @1 and 1536x864 @1.25 (`tmp/smoke/v6w-*.png`).
+
+### The v6 kit: classes, skills, throwables, mounts, Team Super
+
+Five new slices and no edits to anyone else's slice; the only shared-file change is one guarded registration line in
+`tools/smoke.cjs`. Everything goes through the `def*` registries, so the loadout, How to Play, the codex, CPUs and the
+balance tools pick it up.
+
+| Slice | Contents |
+|---|---|
+| `25-classes-v6.js` | Duelist, Wrestler, Engineer; the `THINK_AFTER` CPU hook list; `swingHitsOff`, `enemyTipHits`, `enemyShotsHit` |
+| `33b-team-super.js` | the Team Super (Double Team) |
+| `34b-throwables-v6.js` | Glue Bomb, Bouncer, Tornado Jar, Rubber Duck; the whirlwind zone; `zoneSolidAt`, `zoneRide`; the duck lure |
+| `53-skills-v6.js` | Mirror Shield, Shadow Step, Shrink Bolt, Spring Pad, Wall Up, Pinball, Rally Cry, Tornado |
+| `57b-mounts-v6.js` | Rocket Skateboard, Pogo Stick and their mount orbs |
+
+#### Shared helpers
+
+- `swingHitsOff(f, secs)`: a body flung at speed (a piledrive, a rocket charge, a pogo dive) would land big weapon hits just
+  by carrying its weapon along, so it holds f's swing hits back (`f.hitCd` for every foe). Only the move's own hit counts.
+- `enemyTipHits(team, near)` / `enemyShotsHit(team, near)`: foes smash an object (turret, duck, wall) with a fast weapon tip
+  (`> TUNE.minHit`) or a shot where `near(point)` says; shots stop there and their damage (at least 4) is returned.
+  Zones, pickups and decor (negative radius) never count.
+- `zoneSolidAt(x, y)` / `zoneRide(z)`: a ground zone remembers the solid under it (`z.on`) and rides it each step; a zone
+  whose platform broke or was parked goes away. Turrets, pads, puddles, ducks, walls and whirlwinds all use it.
+- `THINK_AFTER`: functions `(f, dt)` run after 65's `think` for CPU brains (65's `think` is wrapped once, at boot): class
+  play (`cls.cpu`), the duck lure, mount tactics (`mount.cpu`).
+- Classes take two optional fields: `ai` (multipliers on the CPU level's knobs, applied in a wrapper around 67's
+  `aiTuned`, capped at .95) and `cpu(f, L, dt)` (a think hook).
+
+#### Classes (`25-classes-v6.js`)
+
+| Class | Numbers | Passive | CPU |
+|---|---|---|---|
+| Duelist † | hp 1, speed 1.06, mass .95, stamina 1.1 | `parryWin: 1.8`: a fresh guard parries hits up to 1.8 × the normal window (.27 s melee, .18 s shots). A parry gives the `riposte` status (1.5 s, `dmgMul` 1.4, a glint on the blade tip); the first direct hit spends it ("RIPOSTE!") | parry ×1.4, punish ×1.15; swings the moment it parries |
+| Wrestler ⋈ | hp .95, speed .95, mass 1.15, stamina 1.05 | `grabReach: 1.3` (tryGrab runs with GRAB.reach scaled), `grabCd: .75` (recovery, hit or whiff), throws `throwPower: 1.25` damage and `throwFling: 1.12` speed. It may hop while holding someone (a wrapper on `movesActions`); a throw made 55+ px above real ground is a PILEDRIVER: the foe is flipped head-down and driven into the floor (18, unblockable, .5 s stun, 6 to other foes within 120 px). Never over a pit (a plain throw instead) | grab ×1.1 and grabs from its longer reach; piledrives on about 30% of its grabs (hops, throws from the top) |
+| Engineer ⚒ | hp .97, stamina .95 | Once a round a turret (8 s, 30 hp) that plinks the nearest visible foe within 650 px (2 every .8 s, kind `skill`). Deploy: the throwable key with no throwables left, or hold it .45 s (a tap still throws, on release); Simple controls deploy it by themselves 3 s into the round. Foes smash it with fast swings (10) and shots. HUD: a ⚙ badge after the throwables (dim once used, a ring while charging) | deploys it 150–700 px from its foe |
+
+Wrappers: 22's `guardHit`, `tryGrab`, `movesActions`, `grabThrow` (top level, since 22 loads first); at boot 34's
+`throwNext` (kept in `ENG.throwNext`), 90's `readHuman` (sets `f.inp.throwHeld` from the held throwable key; tests set it
+directly), 85's `drawThrowIcons`, 67's `aiTuned`, 65's `think`.
+
+#### Skills (`53-skills-v6.js`)
+
+| Skill | cd | What it does |
+|---|---|---|
+| Mirror Shield ⟐ | 9 | `mirror` status 1.2 s: every enemy shot within 80 px flies back at its shooter, 25% faster, now ours |
+| Shadow Step ⬗ | 6 | teleports behind the nearest foe (50's `blinkSpot`), facing it; `umbra` status: +35% damage for 1.2 s. No invulnerability (unlike Phase Step) |
+| Shrink Bolt ⊚ (key `shrink-ray`) | 10 | a bolt (kind skill, 4 dmg) that gives `shrunk` for 5 s: body links × .66, `dmgMul` .75 |
+| Spring Pad ⇪ | 10 | an 8 s pad at your feet (one each). Anyone who steps or lands on it is launched ~360 px; foes take 5, a .6 s daze and a nudge sideways so they land beside it. Arms after .3 s; the dropper gets .8 s to step off |
+| Wall Up ▥ | 11 | a 4 s, 40 hp, 150 px tall barrier 72 px toward the nearest foe: foes' bodies and weapons are pushed back out of it and enemy shots stop on it; you, your allies and your shots pass. Swings (8) and shots chip it. A zone, not a map solid, so it never traps anyone, blocks its caster or confuses CPU navigation |
+| Pinball ⦿ | 9 | `pinball` status 2 s (damage taken × .75): body links curl to .45, a wrapper on 20's `driveBody` rolls the ball toward the held direction (or the foe) and spins it; it bounces on landing; each foe it crashes into takes 9 (once per .6 s). A grab or throw ends the rolling |
+| Rally Cry ⚑ | 16 | you and allies within 340 px heal 12% and get `rally` (+15% damage, 5 s). With no allies at all (a 1v1, FFA) it heals only you, 8% |
+| Tornado 🌪 | 12 | a 3.2 s whirlwind (34b's) drifting at the nearest foe at 130 px/s: lifts foes inside ~115 px and carries them, 1 damage per .3 s. Turns back at walls, ledges and drops, so it never carries anyone over a pit |
+
+Every visual state is a status (the kill-cam copies statuses per frame). Sounds reuse existing ones where they fit
+(`rift-prism`, `vanish`, `gun-zap`, `mapBoing`, `rift-anchor`, `arPop`, `arWhirr`); Rally Cry has its own fanfare (`s6-rally`).
+
+#### Throwables (`34b-throwables-v6.js`)
+
+| Throwable | What it does |
+|---|---|
+| Glue Bomb ◍ | splats into a 5 s puddle (156 px wide); foes in it get `glued` (move × .4). CPUs avoid it (`danger`) |
+| Bouncer ◓ | a rubber ball: 3 hits (7, then × .75), knockback 860, livelier bounces than the core's; a wall bounce clears its hit list so it can hit the same foe again |
+| Tornado Jar ⚗ | shatters into a small whirlwind (2.2 s, radius 50, lift .85) |
+| Rubber Duck 🦆 | lobbed about half way to the foe, sits squeaking for 6 s, then pops (blast 90 px, 12). An enemy swing, foot or shot touching it pops it at once. Enemy melee CPUs that notice it (chance `1 − .6 × dodge`) walk up and whack it (`duckLure`, a `THINK_AFTER` hook that still runs `aiSafety`) |
+
+The whirlwind: `whirlSpawn(owner, x, groundY, { life, radius, height, speed, dir, dps, lift, color, kind })`; caught foes
+are pulled toward 85% of its height.
+
+#### Mounts (`57b-mounts-v6.js`)
+
+| Mount | What it does | CPU |
+|---|---|---|
+| Rocket Skateboard 🛹 (8 s, 40 hp, speed × 1.2) | rides on wheels a little above the ground; attack fires the rocket: a .55 s charge at 1250 px/s that rams each foe once (13, knockback 980). 1.1 s between charges | its own `cpu` hook charges a foe within 300 px on the same level, only with ground ahead (the swing brain's learned table never judges a charge) |
+| Pogo Stick ↟ (8 s, 40 hp, speed × 1.1) | automatic bounces (1080 px/s, 1350 holding jump); landing near a foe hits it (5); coming down on a foe's head stomps it (14, .35 s stun); attack in the air dives (1700 px/s) for a 120 px shockwave (11, .3 s stun) | dives when it is above a foe |
+
+Both get a `mount-<key>` orb (weight .2), like 57's.
+
+#### Team Super (`33b-team-super.js`)
+
+- **Armed** when two real players (`ctrl: 'human'`, not autopilot or summons) on the same team both have 100 super, can
+  act, aren't mounted or holding someone, and stand within 220 px; never in a `duo: 'versus'` mode, never while a round
+  is ending. `TS.ready` lists the armed pairs; a chime plays when a pair becomes ready.
+- **Hint** (world space, drawn after 67's speech bubbles, so hidden in photo mode and the kill-cam): a dashed gold tether
+  between their heads, "TEAM SUPER READY" and "both press X + \ together" with each player's own super key (`keyHint`; ★
+  on touch). After one press: "<partner>: press super now!".
+- **Input**: a wrapper on `useUltimate`. While armed, the first press waits (`TS.pending`); the partner's press within .5 s
+  starts Double Team; otherwise the first player's own ultimate fires when the window ends. Unarmed presses fire at once.
+- **Double Team** (1.2 s, both heroes untouchable, both meters spent, an `ultimate` event for each): a .55 s telegraph (the
+  heroes rise and glow; a red X of the dash paths and the shockwave's reach flash on the ground; CPU foes may jump or raise
+  a guard), then each hero blinks to one side above the foes and dashes down through the crossing point (12 to every foe
+  within 78 px of the path), then a shockwave from the crossing hits every foe (20, falling to 8 at the far edge, a .35 s
+  stun; a blast, so a guard takes it as chip damage and nobody can parry it). A foe caught by everything takes ~44.
+  Dash end points step back toward the centre until there is ground (never over a pit). Banner "DOUBLE TEAM!" for the
+  telegraph only (it never hides the dash), camera focus, slow-mo, sounds `s6-team` and `s6-team-wave`.
+- Help: How to Play gets a "Team Super" card; the codex's Techniques tab an entry.
+
+#### Tests
+
+`node tools/smoke-v6-kit.cjs` (30 checks, ~25 s; also run by `tools/smoke.cjs`): the registry and lore; each skill
+scripted against a foe; the Duelist's late parry and riposte, the Wrestler's reach, throw and Piledriver, the Engineer's
+turret (none left, hold, tap, once a round); seeded CPU fights in which each class plays to its passive; each throwable
+and mount on a foe, the duck luring a CPU into popping it, CPUs riding both mounts; the Team Super in Co-op 2v2 (armed,
+Double Team hits every foe), a lone press, players too far apart, Co-op Waves, and Versus (never armed). Screenshots
+`tmp/smoke/v6s-*.png` at 1920x1080@1 and 1536x864@1.25.
+
+#### Balance (Normal)
+
+Classes (`node tools/class-balance.cjs 72 20 normal 4`, ~510 rounds each): Gunner 55.0, Wrestler 54.7, Brute 51.0,
+Engineer 49.5, Ninja 49.3, Trickster 48.1, Mage 47.7, Duelist 46.7, Tank 46.3. Every pair 35–65 (Mage–Wrestler 35/65 is
+the widest, on ~66 rounds). The six original classes ran 45–54 without the new ones on the same build. Tuning that got
+there: the Wrestler started at 79% (grab ×2.2, throws ×1.4, piledrives on half its grabs); now grab ×1.1, throws ×1.25,
+hp .95 and piledrives on ~30% of grabs. The turret went from 3 every .6 s to 2 every .8 s.
+
+Skills (`node tools/skill-balance.cjs`, impact = a carrier vs the same weapon without skills, ~230–480 rounds; field =
+random loadouts, ~140–175 rounds):
+
+| Skill | impact | uses/round | field |
+|---|---|---|---|
+| Rally Cry | 60.2 | 0.98 | 59.0 |
+| Shrink Bolt | 59.9 | 1.40 | 48.3 |
+| Shadow Step | 59.4 | 0.95 | 46.0* |
+| Mirror Shield | 56.0 | 0.81 | 52.4 |
+| Wall Up | 53.7 | 0.55 | 46.0 |
+| Spring Pad | 53.2 | 0.90 | 49.7 |
+| Pinball | 53.2 | 1.13 | 38.4* |
+| Tornado | 52.0 | 0.96 | 41.3 |
+
+*field measured before the last buff (Shadow Step +30% → +35%, 1 → 1.2 s, cd 7 → 6; Pinball 8 → 9 damage and 25% damage
+reduction). Wall Up started at 41% impact as a real map solid (it blocked its own caster's swings and shots and confused
+CPU navigation) and became the one-sided barrier above.
+
+### Clash Cup, Draft Duel, Party Night
+
+Three modes that sit on top of the duel modes and 73-duo's names and head-to-head record. Nothing in the fight itself
+changed: no weapon, skill, physics or CPU knob was touched.
+
+| File | Contents |
+|---|---|
+| `src/js/74c-cup.js` | META (the shared screen over the frozen fight), `metaSettle`, confetti, the menu hooks; Clash Cup (`cup`) |
+| `src/js/74d-draft.js` | Draft Duel (`draft`) |
+| `src/js/74e-party-night.js` | Party Night (`night`) and its hidden mini-game host (`nightmini`) |
+| `src/styles/74c-meta.css` | the screens, bracket, draft table, scoreboard, podium and confetti |
+| `tools/smoke-v6-meta.cjs` | tests (one guarded line in `tools/smoke.cjs`) |
+
+#### META screens (74c)
+
+One DOM screen at a time over a frozen fight, for the bracket, the draft and the party playlist.
+
+```js
+metaOpen(screen)   // screen = { cls, build() -> node, key(slot, act), tick(dt) }, act 'left' | 'right' | 'ok'
+metaClose()        // the fight goes on; presses made on the screen are cleared
+metaLive()         // the screen is showing (state 'play', its own G_STATE.override, same match)
+META_MODES[key] = { opts() /* arena-screen fields */, cfg() /* extra menu cfg */, panel(node), help: [icon, title, text()] }
+META_RESULTS.push(card => replacement | undefined)   // results-card hooks
+metaSettle(names, winSlot)   // one result in the pair's head-to-head record (73's rules; never on autopilot)
+```
+
+- Like 79's silly vote, the world waits behind the screen (`G_STATE.override = metaHold`, `G_STATE.lock` held), and
+  it only shows once 94's controls card has gone. Its `mapStep` hook is registered before 79-silly's, so a screen
+  comes before the vote. A screen belongs to one match (`G_STATE.info`): restart or quit drops it.
+- Keys: each player's own `keySets()` left/right choose, attack, jump or dash is OK; a pad's d-pad, A or X. A new
+  screen ignores input for 450 ms (`META_ARM`), so a key mashed in the fight can't press it. Esc pauses (the screen
+  hides while paused).
+- Headless runs tick screens in `mapStep` (`SC.sim`); autopilot runs (tests) press OK by themselves.
+- Screens are anchored to the top of the window so the toasts at the bottom never cover their buttons.
+
+#### Clash Cup (`cup`, 74c)
+
+- A knockout bracket of 4 or 8 (arena screen: **Bracket**, `cfg.cupSize`): Player 1 and Player 2 are seeds 1 and 2,
+  the rest are named CPU rivals (67's personas, `aiPersonaEntry` with their own gear) at the chosen CPU level (with 8:
+  seeds 3-4 one level up, 7-8 one level down). Standard seeding, so the players can only meet in the final.
+- One match with roster swaps, like the Tournament: `run.cup = { size, win, ent, rounds, phase, pick, riv }`, each tie
+  `{ r, m, a, b, w, sc, how }`. Every tie is best of 3 (`cup.win` 2); 73's Round length applies to every fight.
+- Between ties the bracket screen shows every tie (seeds, names, scores; players in their colours with P1/P2 chips,
+  losers struck through), the next tie lit, and its buttons: **Fight!** for a tie with a player, **Quick result** or
+  **Watch it** for a CPU tie. A quick result rolls each round with odds from the level gap (3:1 per level, about what
+  the bot ladder measures). While watching, either player's OK key settles the rest of the tie the same way.
+- The players' tie is billed as the **Rivalry Match** (bracket tag, banner). When it ends it counts once in their
+  head-to-head record (`metaSettle`, then `G_STATE.info.duoRec` is set so 73's `duoSettle` leaves the cup alone), and
+  73's Handicap applies to that tie only (`cupRoster` resets `info.duoHcap`). The silly vote, if on, also runs there.
+- A tie with only Player 2 in it: Player 2 keeps slot 1 (arrow keys), every pad drives them and their key strip shows
+  (`padSlot` and `stripSlot` wrapped at boot; 90 and 94 assume the lone human is P1).
+- The champion's results card shows the finished bracket instead of the per-slot table (its slots change every tie),
+  with confetti and a fanfare (`cup-win`). `won` and `tournament` are set when a player wins, so the stats count it.
+  Rematch starts a new cup; R (quick rematch) a new cup with new weapons.
+
+#### Draft Duel (`draft`, 74d)
+
+- `setup` builds a pool: 8 weapons from 8 different categories, 6 skills, 3 classes (`run.draft`). Round 1 opens on
+  the draft screen; `DRAFT_ORDER = 'wwwwwwsssscc'` picks in snake order (`DRAFT_SNAKE` P1, P2, P2, P1): 3 weapons
+  each, then 2 skills, then 1 class. Each player moves their own cursor with their own keys (P1's cursor marks a
+  card's top edge, P2's its bottom); a press out of turn is refused. 20 s a pick, then the cursor's card is taken.
+- A CPU can take Player 2's seat (arena screen: **Player 2**, `cfg.draftP2: 'cpu'`): it prefers rarer weapons, skills
+  that suit its weapons (70's `MODE_THEMES`) and a random class. With one human, both key sets drive Player 1.
+- `draftFinish` puts the kits on the roster and starts round 1 again with fresh fighters. Round n uses each player's
+  nth weapon (`roundOver` swaps them); both get the same two random throwables. Best of 3; two humans count in the
+  head-to-head record as any 2-player duel does. Rematch drafts again. No loadout screen (`pickers: 0`): colours,
+  hats and looks come from the players' saved loadouts (the shared `menuCfg` hook).
+
+#### Party Night (`night`, `nightmini`, 74e)
+
+- `night`'s setup draws a playlist (arena screen: **Events**, 5, 8 or 12; `cfg.nightLen`, 3 in tests) and shows it on
+  a META screen. Events come from `NIGHT_MODES` (`[fighters, first to, name]`: Duel, One-Hit KO, Weapon Roulette,
+  King of the Hill, Tag Team, Soccer, Capture the Flag, Hot Potato, Gun Game, Juggernaut, Lava Rising, Battle Royale,
+  Blitz Rush, Rift Storm) plus every mini-game in `MINIS` (v6's new ones join by themselves) and any v6 mode in
+  `NIGHT_NEW` (`volley`, `paint`, `tower`, `coinrush`, `lastplatform`) that exists at runtime and is not a mini-game.
+  Modes open and close the night; about 2 in 5 events are mini-games; no repeats until the pool runs out.
+- Each event is its own match: `startMatch` with the night's cfg plus `night: id`, random gear for both players, Short
+  rounds by default. `nightWrap` (applied when a mode is first played) seats Player 2 in a CPU seat on another team, as
+  93's lobby would, and gives both players their names and looks. A mini-game event runs in `nightmini`: a P1-vs-P2
+  match that starts the mini-game on its first step and ends with its winner (the mini-game's stats carry into the
+  result round, since 79 rebuilds the fighters when it ends).
+- The event's results card is replaced (`META_RESULTS`) by the scoreboard: who won, the points (3 for the winner,
+  1 for everyone else who took part; a CPU win or a draw gives 1 each), the playlist with each winner's colour, and
+  what is next. The final event counts double. After it, the podium (confetti), and the night counts once in the
+  pair's head-to-head record. Rematch starts a new playlist; so does R, except after a Weapon Roulette final (73 only
+  arms R for modes with loadout pickers). Single events never count in the record (`info.duoRec = null`), and
+  quitting or starting any other match ends the night.
+- Silly rules (73's setup panel, relabelled **Twists** here; Handicap is hidden for the night): a third of the mode
+  events get a silly rule (79's `SILLY`) for every round, shown on the playlist and the HUD.
+- During an event the HUD's bottom-left corner shows the event number, the standings and the final's ×2
+  (`miniDraw` wrapped at boot, drawn right after every mode's own HUD).
+
+#### Shared hooks (all `on('boot')` wraps; no other slice was edited)
+
+`SCREENS.maps` (options after 73's setup panel), `SCREENS.howto` (one card per mode), `menuCfg` (the modes' cfg,
+saved loadouts for pickerless modes), `buildResults` (`META_RESULTS`), `padSlot` and `stripSlot` (a P2-only cup tie),
+`miniDraw` (the party HUD), `quickRematch` (R on a party card never replays one event). Settings are saved in the
+`store` key `meta6`. Sounds: `cup-win`, `meta-step`, `draft-pick`.
+
+#### Tests
+
+`node tools/smoke-v6-meta.cjs` (also run by `tools/smoke.cjs`; about 50 s), all seeded:
+- menus: the three modes in the mode list (icon and description, `nightmini` hidden), their arena-screen options and
+  menu cfg, the night's panel (no Handicap, Twists), the How to Play cards;
+- Clash Cup, 4 fighters, by both players' keys: pause hides the bracket, P1 knocked out in the semifinal, P2's
+  tie on P2's own keys and pads, P2 champion (bracket and confetti on the results), R for a quick rematch; the
+  Rivalry Match billed and counted once; 8 fighters with both players out, one CPU tie watched then skipped, the
+  others by quick result, a CPU champion; an autopilot cup to its end;
+- Draft Duel: all 12 picks by keyboard events in snake order (a press out of turn ignored), the kits on the fighters,
+  a new weapon each round, results with the kits, Rematch drafts again; a CPU in Player 2's seat;
+- Party Night: 3 events started and continued by keys and clicks to the podium (points `3/1 1/3 6/2`, the record once),
+  R and quitting, an autopilot night of 3 to its podium, twists applied, v6 keys joining the pool (stand-ins when they
+  don't exist yet) with Player 2 seated;
+- screens at 1920x1080 and 1536x864 at 125% fit with no scrolling (`tmp/smoke/v6m-*.png`).
+
+### Party and co-op games
+
+Three versus party games, two co-op modes and two mini-games, all for two players on one keyboard (CPUs fill the
+other seats). Everything goes through the existing registries (`defMode`, `defMap`, `defMini`, `defWeapon`,
+`defSfx`, `LORE_LINES`) and `on('boot')` wraps; no other slice was edited.
+
+| File | What |
+|---|---|
+| `src/js/71b-party-v6.js` (new) | shared v6 helpers; Volley Clash (`volley`), Paint Wars (`paint`), Tower Race (`tower`); the Spark Rush (`coinrush`) and Last Platform (`lastplatform`) mini-games; arenas `beach`, `spire`; sounds |
+| `src/js/72b-coop-v6.js` (new) | co-op helpers; Boss Raid: The Colossus (`raid`), Defend the Core (`defend`); arenas `colossus`, `corevault`; the hidden `drone-blaster` |
+| `src/styles/71b-party-v6.css` (new) | the arena screen's rules panel and own-arena card |
+| `tools/smoke-v6-games.cjs` (new) | tests; one guarded registration line in `tools/smoke.cjs` |
+| `tools/smoke-feel.cjs` (one line) | the guns-vs-melee round robin passes `minigames: false`: its seeded Watch rounds drew from the mini-game pool, so two more mini-games moved it from 69.6% to 70.4% (band 30–70); without mini-games it reads 63.4% on both builds |
+
+The mode keys `volley`, `paint`, `tower` and mini-game keys `coinrush`, `lastplatform` are the ones Party Night
+(agent M1, `NIGHT_NEW`) looks for. All four arenas are `hidden` (each suits only its mode).
+
+#### Shared v6 helpers (71b; 72b uses them)
+
+```js
+V6.help[key] = ['rule', ...]                   // the arena screen's rules panel (How to Play uses the mode's desc)
+V6.own[key]  = mapKey                          // a mode that always plays on its own arena (its card replaces the grid)
+v6Def(key, def)        // defMode with the shared shape: players [1, 2], 2 pickers, cpu, one round the mode ends
+                       // (holdRound, roundOver 'match'), crowd [2, 4, 2], onKO -> run.dead[id] = def.respawn
+v6Crowd(cfg, n, teams, cpuName, side)   // P1, P2 (a CPU named cpuName when cfg.humans is 1) and CPUs up to n
+v6Rivalry(score)       // results line "Head-to-head: ..." (73's pair record) for matches with CPUs; see below
+v6Frame(fn)            // fn(f, phase, enter) after the arena's own MAP.frame, this round only (mini-games)
+v6Still(f)             // clears a fighter's inputs (a benched Last Platform player)
+v6SideLead(team), v6TeamColor(team), v6SideName(team), v6Result(win, lines), v6Clock(s), v6Mode(key)
+```
+
+- **Seats.** The arena screen of every v6 mode has a **Players** choice: `1 player vs CPU` / `1 player + CPU ally`, or
+  `2 players` (saved in `MENU.v6humans`; `menuCfg` is wrapped at boot to send it as `cfg.humans`). With 1, a CPU
+  takes Player 2's seat. Without `cfg.humans` (SC.start, Party Night) both seats are human. The Fighters stepper
+  (`crowd`) and the join lobby (93) work as in the other party modes; boss parts are bigger than 1.05, so the lobby
+  never seats a player in one.
+- **Rivalry line.** 73 counts and shows a duel of just the two players. When CPUs are in the match too (2v2 volley,
+  a 4-racer tower), `v6Rivalry` counts the result once into the same pair record (`info.v6Rec`; who scored more
+  wins) and adds the line to the results. It never counts on autopilot, with `cfg.noRecord`, or in a Party Night
+  event (`cfg.night`). Co-op modes show a friendly rivalry instead: both players' damage and K.O.s and the MVP, plus
+  the pair's best together (store key `v6coop`, `{ 'raid:a|b': seconds, 'vault:a|b': held or 1000 + kills }`).
+- **Drawing.** 85's `drawFighter` is wrapped at boot: a fighter with `v6part` is not drawn (its mode draws it), one
+  with `v6draw` draws itself (drones). Kill-cam ghosts inherit both.
+- How to Play gets one **Party and co-op games** card (all seven, each with its first sentence).
+
+#### Volley Clash (`volley`, arena `beach` "Sunset Court")
+
+- A beach court with a 180 px net post (hop it: brawling across the net is allowed, and K.O.s respawn in 2.5 s).
+  1v1, 2v2 or 3v3 (`crowd` [2, 6, 2], even); P1's side is team 0 (left).
+- The ball (r 32, 0.42 gravity, drag, wind gusts) is pushed by bodies (a header pops it up) and **hit by weapons**:
+  speed `(230 + 95 × mass) × swing` toward the other court, up `530 + 65 × mass`, so heavier weapons send it
+  further. Airborne at least 50 px up and within 360 px of the net, a hit is a **SPIKE** (`560 + 130 × mass`, steep
+  down). Shots and blasts shove it too. A ball over 560 px/s that hits a rival's body **BONK**s them (2–9 damage).
+- A ball touching the sand scores for the other side; the side that lost the point serves (the ball hovers 1.2 s
+  with a countdown). First to 7 (`VC_POINTS`: Short 5, Long 11); 240 s × round length, then the leader wins.
+- Readability: the ball's shadow on the sand (drawn in the arena's `drawBg`, under the fighters), a dotted look-ahead
+  path and a pulsing ring + cross where it will land, in the colour of the side about to lose the point.
+- CPUs: the teammate nearest the predicted landing spot stands a step behind it (lower levels misjudge it by
+  `VC_AIM_ERR` px), the others wait in their half; per step they swing at a ball in reach and jump at a high one.
+- Results: points, longest rally, spikes, the rivalry line.
+
+#### Paint Wars (`paint`, any arena with a floor: `partyMap`)
+
+- The floor and every ledge top (≥ 48 px) are cut into 16 px cells (cells over hazards don't count). Grounded feet
+  paint 18 px around them; every direct hit splashes `26 + 2.5 × damage` px under the victim; blasts splash 0.8 ×
+  their radius. Two sides as in Volley Clash (1v1 to 3v3); damage taken × 0.6, K.O.s back in 2.5 s.
+- 60 s (Short 42, Long 96); the side with more cells wins. HUD: a tug-of-war coverage bar with both percentages and
+  the clock. CPUs walk to the nearest cell not in their colour (rival paint first, climbing weighed), kept 0.6–1.2 s.
+- Results: coverage, the busiest brush (tiles painted), the rivalry line.
+
+#### Tower Race (`tower`, arena `spire` "The Wick Spire")
+
+- Every race builds a fresh tower (`twBuild`): rows 150–190 px apart, a main ledge zigzagging 140–300 px from the last
+  (so every row is reachable), up to two side ledges (20% solid blocks to wall-jump), 16% sliding main ledges, a wide
+  blue checkpoint every 620 px and a 360 px flag ledge on top. Height 3000 px × round length (Short 2100, Long 4800).
+- **The camera climbs by scrolling the world** (`twShift`): the physics keeps points above y -320 and shots die below
+  y 1120, so instead of a taller arena everything moves together: fighters (points, remembered grapple/rewind/pet
+  positions, mounts, the CPU's climb target, trails), shots and their trails, orbs, ledges (and their `y0`), hazards,
+  the floor, particles, labels, rings, beams, shatter pieces and the camera. A dead zone (y 170–600 for the players'
+  heads and feet) keeps it still most of the time. Every ledge carries a still `move` so the kill-cam records it.
+- Falls: a racer more than 160 px below their last checkpoint, or below y 930, is put back on the checkpoint (or the
+  lowest ledge on screen when it has scrolled away), with 1 s of protection; `f.ringSave` does the same for a
+  ring-out, so nobody is ever rung out. A K.O. respawns there after 2 s. Damage taken × 0.5, knockback × 1.25.
+- First to touch the flag wins the race; first to 2 races. 150 s × round length per race, then the highest racer.
+  HUD: a climb meter on the right (checkpoints, flag, every racer). Results: races won, the rivalry line.
+- CPUs climb to the best ledge 80–320 px above their feet (higher better, far sideways worse), the flag near the top.
+
+#### Boss Raid: The Colossus (`raid`, arena `colossus` "The Colossus's Yard")
+
+- Heroes: P1, P2 (or a CPU ally) and allies up to 4 (`crowd` [2, 4, 2]), 1.3× health; a fallen hero is back in 5 s,
+  but if all are down at once the raid fails (also at 300 s × round length).
+- **Weak points are pinned stand-in fighters** (`cv6Part`: summons, idle, `kbMul` 0, `v6part`, health set directly),
+  re-pinned every step (`cv6Pin`). So every weapon, shot, blast, status, skill, throwable and ultimate hurts them,
+  CPUs target them with no extra code, and they get no HUD card. The Colossus's body is drawn in the arena's
+  `drawBg`; the parts' rings, health bars and telegraphs in the mode's `drawWorld`.
+- **Phases** use 74's `bossPhases([cannonL, cannonR, core], ...)`: the core (twice a cannon's health) is shielded
+  (`inv`) until both cannons break, so the pool reaches exactly 50% then: **CORE EXPOSED** (chest plates open, core
+  vulnerable, drones), and at 25% **OVERLOAD** (74's `rain` fx: marked debris). `bossPhaseMarks` notches the bar.
+- Attacks, one at a time, every `coloGap` (2.3 / 2.1 / 1.5 s by phase, 10% faster per extra hero, ÷ √difficulty).
+  Difficulty (`COLO_DIFF`: Easy 0.7, Normal 1, Hard 1.4, Insane 1.7) multiplies every damage below:
+  - phase 1: a cannon **shot** (0.75 s charge glow, then an aimed 540 px/s shell: 9 damage, 60 px blast, at the
+    nearest hero more than 150 px away; heroes hugging the cannon are **swatted** off instead, no damage) or an arm
+    **slam**: the fist rises over a hero's spot for 1 s (red column, floor ring, a `danger` zone CPUs step out of),
+    falls (15 damage to anyone under the column, side ledges included: no safe camping) and sends a **shockwave**
+    both ways along the floor (9 damage, jump it); the fist then
+    rests on the floor for 1.7 s: the cannon is easy to hit there. A broken cannon's arm hangs limp and sparks.
+  - phase 2+: the **sweeping laser** (1.1 s dashed aiming line with an arrow, then a 1.9 s sweep of the floor: 12
+    damage + burn, jump it or stand on a ledge; afterwards the core sinks 80 px and vents for 2.6 s), the **stomp**
+    (a 0.9 s red column over the middle that also reaches the core's ledge, then shockwaves from the middle; a
+    `danger` zone CPUs step out of) and **drones** (every 14 s while fewer than the heroes). Phase 3's
+    debris (74's `rain`) hits for 8 × difficulty.
+- Health: cannons 520 and the core 1040, × (1 + 0.55 per hero past 2) × round length; parts take × 0.6 damage;
+  drones + 1 per extra hero.
+- Parts are harmless to touch: their rigs carry no weapon segments (`r.ws = []`, so `strike` skips them) and the
+  arena's `frame` hook (`cv6Frame`) drops whatever their idle drive just did, so a hero walking into a still fist is
+  never hurt by it. All the Colossus's damage comes from its telegraphed attacks.
+- **Drones** (`cv6Drone`): summoned CPU gunners with the hidden `drone-blaster`, hovering 220 px over the floor beside
+  their target (`cv6Fly` sets every point's velocity and cancels gravity), drawn as a little rotor drone.
+- CPU heroes go for a cannon resting on the floor, else the ledge beside a cannon, then the middle ledge under the
+  core; they jump shockwaves and the laser (`COLO_DODGE` by level).
+- Results: the time (and heroes, level) or how much was left, the friendly rivalry line, the best time together.
+- Balance (seeded autopilot runs, 2 CPU heroes): Normal 4 of 5 won in 1:40–4:05 with 0–2 hero K.O.s (one wipe at
+  1:56); Hard 4 of 4 (1:39–3:59); heroes that never jump shockwaves or the laser 5 of 5. CPU heroes dodge from code,
+  so for players the telegraphs are the test; `COLO_DIFF`, `COLO_HP` and the heroes' 1.3× health are the knobs.
+
+#### Defend the Core (`defend`, arena `corevault` "The Core Vault")
+
+- The core is a pinned stand-in on the heroes' team (760 health × (1 + 0.45 per hero past 2) × round length), drawn as
+  a crystal on a pedestal that cracks and reddens as it is hurt; its bar is the HUD's main row.
+- 180 s × round length (Short 2:06, Long 4:48), in 5 waves plus the **final rush** (the last 30 s). Invaders are
+  summons entering at both gates (drones fly in): Husk, Skitter (fast), Blastling (explodes beside the core or a hero,
+  or where it is beaten: 14 damage, 120 px), Drone, Gloam Brute; more kinds each wave. One spawns every
+  `lerp(3.4, 2, wave / 6)` s (3.2 s in wave 1, 2.2 s in wave 5) and every 1.8 s in the rush (rush invaders have 1.1×
+  health), divided by the hero factor, with at most `1 + wave + heroes` alive (cap 7), all heading for the core
+  (`aiGoal`).
+- A **repair orb** floats down away from the core every 18–24 s; a hero's touch heals the core 15%. Fallen heroes are
+  back beside the core in 4 s. Beaten invaders shatter and count as the hero's K.O.
+- CPU heroes fetch the orb (the nearest, once the core is under 75%) or guard the side more invaders come from.
+- Results: time held, invaders destroyed, repairs, the friendly rivalry line, the best together.
+- Balance (seeded, 2 CPU heroes, Normal): 10 of 15 saved; every loss came late (2:26–3:00, mostly in the final rush);
+  saved cores ended at 16–69%. Heroes go down 5–10 times a game.
+
+#### Mini-games (79's `defMini`, registered at boot)
+
+- **Spark Rush** (key `coinrush`, kept for Party Night; shown as sparks because v4's no-economy check bans the word
+  "coin" on every screen; 12 s): sparks fall every ~0.3 s (12% are purple, worth 3), bounce and rest for 5 s; touch
+  to bank. A rival's direct hit knocks one spark out of your stash (once per 0.7 s). CPUs chase the best spark.
+- **Last Platform** (`lastplatform`, 16 s): seven 128 px tiles in a row at y 420 (the arena's own ledges sit out
+  while it runs: only the tiles and the floor are solid); every 1.9 s (faster later) one shakes red
+  for 0.9 s, then crumbles (60% of the time one somebody stands on). Falling below the row or touching anything but a
+  tile puts you out: benched, faint and frozen. Score = seconds standing + knock-offs; the last one standing ends it
+  early with +3 (scores are final from then on). CPUs stay over a safe tile, in the air too (their momentum counts),
+  and hop to the nearest safe tile when theirs starts shaking.
+  In 16 seeded minis (2–4 CPUs on Dojo, Neon City, Sky Islands, Kitchen) it lasted 14.6 s on average with 24
+  knock-offs; CPUs fell on their own only near the end (13 s on, two tiles or fewer left).
+- Both steer CPUs through `v6Frame` (the arena's own frame hook runs first) and leave nothing behind: the next round
+  rebuilds the arena.
+
+#### Sounds and lore
+
+New: `v6-bump`, `v6-spike`, `v6-point`, `v6-coin`, `v6-laser` (`defSfx`, silent without audio). Reused: `chime`
+(checkpoints), `rift-splat` (paint splashes), `charge` (the Colossus's wind-ups), `heal` (repairs), `mapCrumble`,
+`boom`, `slam`, `cheer`. Lore: `LORE_LINES.m.beach`, `.spire`, `.colossus`, `.corevault` and
+`LORE_LINES.w['drone-blaster']`.
+
+#### Tests (`tools/smoke-v6-games.cjs`)
+
+Seeded (`__V.seed`, as smoke-feel): every mode to its end with Players 1 (a CPU in P2's seat), 2 autopiloted humans and
+the team / crowd version, checking the scoring per mode (the winner met the goal; coverage decides; 2 races, the world
+scrolled, checkpoints claimed, no ring-outs; the Colossus's phases in order with the core untouched before; Defend's
+waves, rush and kills); round length (goals, tower heights, clocks); both mini-games on Dojo, Sky Islands and Neon City
+with 2–4 fighters (the last one standing tops the scores); the rivalry line counted once; the MVP line; quitting mid-raid; quick rematch; the arena screen's
+rules panel, own-arena card and Players choice reaching the cfg; How to Play; lore keys. Screenshots
+`tmp/smoke/v6-*-1920x1080.png` and `v6-*-1536x864.png` (each mode, both mini-games, the arena screen, a results card).
 
 ## v5 "Rift" expansion and the v5.1 merge
 

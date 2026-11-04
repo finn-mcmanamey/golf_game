@@ -1,0 +1,7 @@
+/* 71b-party-v6.css: the v6 modes' rules panel and own-arena card (arena screen). */
+.v6-help { display: grid; gap: 8px; padding: 12px 16px; border-left: 4px solid var(--gold); border-radius: 12px; background: var(--panel2); }
+.v6-help h3 { margin: 0; display: flex; gap: 10px; font: 20px var(--display); color: var(--gold); }
+.v6-help ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; font: 600 15px var(--body); }
+.v6-own { display: grid; grid-template-columns: minmax(200px, 340px) 1fr; gap: 14px; align-items: center; }
+.v6-own img { width: 100%; border-radius: 10px; }
+.v6-own strong { display: block; font: 20px var(--display); }

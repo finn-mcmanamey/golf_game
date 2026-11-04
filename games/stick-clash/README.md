@@ -45,6 +45,24 @@ secret extras stay hidden until you find them (see **Secrets** below). None of i
 the Ascension roguelite climb, the Infection, Blitz and Rift modes, two new arenas and a fifth Mythic Quest realm, the
 Neon Rift.
 
+## New in v6: Party Night
+
+More to fight with, and much more for two players on one keyboard.
+
+- **The Party Arsenal:** 12 silly weapons, each with one trick nothing else does (see **Party Arsenal** under Weapons).
+  Return shots with a **Tennis Racket**, float under an **Umbrella**, walk the dog with a **Yo-Yo**, end a round with a
+  **Pillow** for a PILLOW FIGHT!
+- **New kit:** three classes (**Duelist**, **Wrestler**, **Engineer**), eight skills, four throwables (one is a squeaky
+  Rubber Duck that CPUs can't resist) and two rare mounts, the **Rocket Skateboard** and the **Pogo Stick**.
+- **Team Super:** two players on the same team with full super meters, standing close together: TEAM SUPER READY
+  appears. Press super together for **Double Team**.
+- **Two-player nights:** **Clash Cup** (a knockout bracket of 4 or 8), **Draft Duel** (take turns drafting weapons,
+  skills and classes from one pool, then fight with them) and **Party Night** (a playlist of 5, 8 or 12 random events,
+  3 points a win, the final counts double, then a podium).
+- **Party and co-op games:** **Volley Clash**, **Paint Wars**, **Tower Race**, **Boss Raid: The Colossus** and **Defend
+  the Core**, plus two new mini-games, **Spark Rush** and **Last Platform**. Pick *1 player* on the arena screen to get a
+  CPU rival or partner instead.
+
 ## Controls
 
 | Action | Player 1 | Player 2 | Gamepad |
@@ -116,7 +134,7 @@ Neon Rift.
 
 ### Classes
 
-Pick one in the loadout (the **Class** tab). Every class wins 44-54% against the others in CPU tests.
+Pick one in the loadout (the **Class** tab). Every class wins 46-55% against the others in CPU tests.
 
 | Class | Body | Passive |
 |---|---|---|
@@ -126,6 +144,9 @@ Pick one in the loadout (the **Class** tab). Every class wins 44-54% against the
 | **Gunner** | Balanced | +50% ammo, reloads 60% faster, one extra throwable |
 | **Tank** | Slow, heavy, hits a little softer | +15% health, +50% guard stamina, hard to knock away |
 | **Trickster** | A little faster | Dash goes 60% further, recharges faster and turns you invisible for a moment |
+| **Duelist** | A little faster, lighter | Parries over a much wider window; the next hit after a parry is a +40% riposte |
+| **Wrestler** | Heavy, a little slower | Grabs from 30% further and recovers faster, throws harder; jump with a foe held and throw for a PILEDRIVER |
+| **Engineer** | Balanced | Once a round, press the throwable key with none left (or hold it) to set up a turret that plinks the nearest foe for 8 s |
 
 ### Ultimates (one per weapon type)
 
@@ -150,6 +171,10 @@ Pick one in the loadout (the **Class** tab). Every class wins 44-54% against the
 | **Smoke Bomb** | A thick cloud: anyone inside is hidden from sight and aim. |
 | **Ice Bomb** | Shatters on impact and freezes everyone nearby for 1.2 s. |
 | **Cluster Bomb** | Pops after a second and scatters five bomblets. |
+| **Glue Bomb** | Splats into a sticky puddle for 5 s: foes in it move at under half speed. |
+| **Bouncer** | A rubber ball that ricochets off walls and hits up to three times with big knockback. |
+| **Tornado Jar** | Shatters into a small whirlwind that lifts and carries foes. |
+| **Rubber Duck** | Sits squeaking for 6 s, then pops. CPUs can't resist walking up to whack it. |
 
 ## Modes
 
@@ -179,12 +204,20 @@ Pick one in the loadout (the **Class** tab). Every class wins 44-54% against the
 | **Zombie Horde** | You and a CPU ally against 5 waves of shamblers (they grab), runners, bloaters (they burst) and a grave brute. |
 | **Battle Royale** | Eight fighters, one winner. A storm closes in from the edges and supply drops (a weapon and health) fall inside the safe zone. |
 | **Lava Rising** | The floor is lava and it keeps rising; new platforms appear above it. Last one up scores; first to 2. |
+| **Clash Cup** | A knockout bracket of 4 or 8: both players plus CPU rivals, best of 3 a tie. CPU ties get a quick result (or watch them); when you two meet it is the Rivalry Match. |
+| **Draft Duel** | Take turns drafting from one shared pool on one screen (3 weapons, 2 skills, 1 class each), then fight best of 3 with a new weapon each round. |
+| **Party Night** | A playlist of 5, 8 or 12 random party modes and mini-games. Win an event for 3 points, take part for 1; the final counts double. Then the podium. |
+| **Volley Clash** | Beach volleyball with weapons: smack the big ball over the net, jump-swing near the net to spike. A ball landing on your side scores for your rival. First to 7. |
+| **Paint Wars** | Every step and every hit paints the arena in your colour. Cover the most in 60 seconds. |
+| **Tower Race** | Race up a freshly built tower to the flag while knocking each other off. Checkpoints catch your falls. First to 2 races. |
+| **Boss Raid: The Colossus** | Co-op: break a giant machine's two arm cannons, then its glowing core, while dodging slams, shockwaves, a floor laser and drones. |
+| **Defend the Core** | Co-op: hold off 3 minutes of invaders and a final rush. Grab the repair orbs to heal the core. |
 
 Free-for-All, CPU vs CPU and the party modes take up to 8 fighters (the **Fighters** stepper on the arena screen).
 On the arena screen you can also add **mutators** (Low Gravity, Tiny Fighters, Vampire, Ricochet, Sudden Death, Random
 Weapons, Supercharged, Orb Storm, Explosive K.O.s, Speed ×1.5, and a secret one) and pick the **weather**. In CPU vs
 CPU and the party modes, every other round opens with a short **party mini-game** (Sumo Shove, Dodgeball Rain, Hot
-Floor, Reflex Duel); the winner carries a small perk into the real round (Settings → Party mini-games).
+Floor, Reflex Duel, Spark Rush, Last Platform); the winner carries a small perk into the real round (Settings → Party mini-games).
 
 Boss Rush bosses now have **phases**: at half health and at a quarter they change their attacks and the arena
 (spikes or lava at the edges, rock and hail storms, sliding platforms, summoned guards, a howling wind).
@@ -295,6 +328,23 @@ guard or skill too often and they start countering it ("READ YOU!").
 | **Void Orb** | Lob a dark orb that becomes a gravity well, then bursts. |
 | **Twin Plasma Staff** | Double-ended energy staff. Both ends burn; every third hit releases a static blast. |
 
+### Party Arsenal (v6)
+
+| Weapon | |
+|---|---|
+| **Tennis Racket** | Swing just as a shot arrives (the strings flash white) to send it back faster and harder, now yours. |
+| **Umbrella** | Guard to open a canopy that also covers you from above. Hold attack in the air to glide. |
+| **Yo-Yo** | Flings out and snaps back, hitting both ways. Hold attack on the ground to walk the dog and trip a foe. |
+| **Paint Roller** | Swings leave a slippery stripe of paint on the floor for 5 s. Foes on it slide. |
+| **Snowball Launcher** | Lobbed snowballs chill and slow; the third one in a row freezes the foe in a snowman. |
+| **Water Blaster** | A stream with a strong push and little damage. Puts out fires; soaked foes take +50% from lightning. |
+| **Magnet Glove** | Hold attack to pull the nearest foe and loose weapons in. Keep pulling to rip their weapon away. |
+| **Pogo Hammer** | A smash bounces you up; chain it higher, and every landing sends a shockwave. |
+| **Rock Guitar** | Heavy swings. Every 4th hit, or a charged one, plays a power chord: a soundwave cone. |
+| **Banana Launcher** | Lobbed bananas leave peels on the floor for 8 s. Foes who step on one slip flat. |
+| **Plunger Bow** | A hit sticks a plunger on a bungee: the foe can't get away, and attack yanks them in. |
+| **Pillow** | Almost no damage, but huge knockback and feathers. Slamming into a wall after it hurts. |
+
 Pick **Random** in the loadout to roll a new weapon every round.
 
 ## Skills
@@ -327,6 +377,14 @@ Each fighter carries two skills (Skill 1 and Skill 2) with their own cooldowns, 
 | ◐ | **Vanish** | 10 s | Turn invisible for 3.5 s with a burst of speed. Your first hit from hiding deals +8 and reveals you. |
 | ⌖ | **Snare Mine** | 7 s | Drop a mine at your feet (up to 2). It arms in 0.6 s; a foe stepping on it is stunned and popped into the air. |
 | ⋒ | **Magnet Pulse** | 8 s | Yank nearby foes and their weapons toward you (throwing their guard off) and pull in power-up orbs. |
+| ⟐ | **Mirror Shield** | 9 s | For 1.2 s every enemy shot that comes near flies back at its shooter, faster. |
+| ⬗ | **Shadow Step** | 6 s | Teleport behind the nearest foe; your hits deal +35% for 1.2 s. |
+| ⊚ | **Shrink Bolt** | 10 s | A bolt that shrinks the foe it hits for 5 s: a smaller body that deals 25% less. |
+| ⇪ | **Spring Pad** | 10 s | Drop a bounce pad for 8 s. Anyone who lands on it is launched sky-high. |
+| ▥ | **Wall Up** | 11 s | Raise a breakable barrier toward the foe for 4 s. Foes and their shots can't pass; you and your shots can. |
+| ⦿ | **Pinball** | 9 s | Curl into a bouncing ball for 2 s that bowls foes over and takes less damage. |
+| ⚑ | **Rally Cry** | 16 s | You and nearby allies heal 12% and deal +15% for 5 s (alone: heal 8%). |
+| 🌪 | **Tornado** | 12 s | Send a slow whirlwind at the foe that lifts and carries them. |
 
 ## Power-up orbs
 
@@ -347,6 +405,8 @@ Each fighter carries two skills (Skill 1 and Skill 2) with their own cooldowns, 
 | **Mech Suit** (rare) | 6 s: armour softens damage and most knockback; attack throws a crushing mech punch. |
 | **Jetpack** (rare) | 8 s: hold jump to fly; the exhaust burns anyone underneath. |
 | **Dragon** (rare) | 8 s: fly with jump and hold attack to breathe fire. |
+| **Rocket Skateboard** (rare) | 8 s: ride fast; attack fires the rocket for a charge that rams foes. |
+| **Pogo Stick** (rare) | 8 s: big automatic bounces; land on a foe's head to stomp it, or attack in the air to dive for a shockwave. |
 
 ## Arenas
 

@@ -600,7 +600,7 @@ const V5_TIPS = store.getObj('v5tips');
 function v5Tip(id, title, sub) {
   if (!v5On('v5Tips') || V5_TIPS[id] || G_STATE.cfg && G_STATE.cfg.autopilot) return;
   V5_TIPS[id] = 1; store.set('v5tips', V5_TIPS);
-  toast(title, sub, '?', '#8cf6ff');
+  cardAfter(() => toast(title, sub, '?', '#8cf6ff'), G_STATE.cfg);   // v6: held until the controls card closes, or it hides behind it
 }
 on('perfectDodge', B => { if (!aiBrain(B)) v5Tip('pd', 'Perfect dodge!', 'Your next hit within 1.2 s is a +35% COUNTER.'); else if (F.some(f => f.ctrl === 'human' && !aiBrain(f))) v5Tip('pd-cpu', 'The CPU perfect-dodged', 'Dash right as a hit lands to do it yourself.'); });
 on('roundStart', () => {
